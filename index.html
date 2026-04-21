@@ -416,6 +416,57 @@ const G = {
 /* ───────── ENTITY BASE ───────── */
 function makeEnt(props){ const e = Object.assign({alive:true, t:0}, props); G.ents.push(e); return e; }
 
+/* ───────── SPATIAL HASH GRID (enemies only) ─────────
+   Rebuilt once per frame before collision work. Cell size 128px is much
+   larger than typical enemy radius / per-frame movement, so a single cell
+   radius of neighbors is sufficient for queries. */
+const EGRID = {
+  cell: 128,
+  map: new Map(),
+  enemies: [],       // flat list of alive enemies for this frame — use instead of G.ents.filter
+  _key(cx, cy){ return cx * 100003 + cy; },
+  build(ents){
+    this.map.clear();
+    const list = this.enemies;
+    list.length = 0;
+    const cs = this.cell;
+    for(let i = 0; i < ents.length; i++){
+      const e = ents[i];
+      if(e.type !== 'enemy' || !e.alive) continue;
+      list.push(e);
+      const k = this._key(Math.floor(e.x / cs), Math.floor(e.y / cs));
+      let arr = this.map.get(k);
+      if(!arr){ arr = []; this.map.set(k, arr); }
+      arr.push(e);
+    }
+  },
+  // Fill out[] with enemies whose cell could intersect the circle (x,y,r).
+  // Caller still needs to distance-filter.
+  query(x, y, r, out){
+    out.length = 0;
+    const cs = this.cell;
+    const cx0 = Math.floor((x - r) / cs), cx1 = Math.floor((x + r) / cs);
+    const cy0 = Math.floor((y - r) / cs), cy1 = Math.floor((y + r) / cs);
+    for(let cx = cx0; cx <= cx1; cx++){
+      for(let cy = cy0; cy <= cy1; cy++){
+        const arr = this.map.get(this._key(cx, cy));
+        if(arr) for(let i = 0; i < arr.length; i++) out.push(arr[i]);
+      }
+    }
+    return out;
+  },
+  // Query a fat line segment (for beams): use the bounding circle of the segment
+  // expanded by r. Conservative but avoids scanning the whole world.
+  queryLine(x1, y1, x2, y2, r, out){
+    const cx = (x1 + x2) * .5, cy = (y1 + y2) * .5;
+    const half = Math.hypot(x2 - x1, y2 - y1) * .5;
+    return this.query(cx, cy, half + r, out);
+  },
+  count(){ return this.enemies.length }
+};
+// Reusable scratch arrays for EGRID.query callers — avoid allocs in hot path
+const _EQ1 = [], _EQ2 = [];
+
 /* ───────── PARTICLE / FX HELPERS ───────── */
 function fxBurst(x,y,color,count=14,speed=180,size=3,life=.5){
   for(let i=0;i<count;i++){
@@ -910,44 +961,82 @@ function drawDiamond(x, y, r, rot=0, color='#fff', glow=12, fill=null){
    =================================================================== */
 const BG = {
   stars: [],
+  starLayerW: 0,
+  starLayerH: 0,
+  starLayer: null,       // offscreen canvas with all stars pre-rendered, tileable
+  gradCanvas: null,      // offscreen canvas with base radial gradient
+  gradHue: -999,         // last hue the gradient was baked at
   init(){
     this.stars = [];
     for(let i=0;i<140;i++){
       this.stars.push({x:Math.random()*W*3-W, y:Math.random()*H*3-H, r:Math.random()*1.5+.3, p:Math.random()*.6+.4, c:choice([C.cyan,C.magenta,C.violet,C.lime,C.gold])});
     }
+    // --- pre-render star layer to offscreen canvas (no shadowBlur, no twinkle — baked once) ---
+    const sw = Math.floor(W*1.5), sh = Math.floor(H*1.5);
+    this.starLayerW = sw; this.starLayerH = sh;
+    const sc = document.createElement('canvas');
+    sc.width = sw; sc.height = sh;
+    const sx2 = sc.getContext('2d');
+    for(const s of this.stars){
+      // map star coords into [0,sw) × [0,sh) so the layer tiles cleanly
+      const px = ((s.x % sw) + sw) % sw;
+      const py = ((s.y % sh) + sh) % sh;
+      sx2.globalAlpha = s.p;
+      sx2.fillStyle = s.c;
+      sx2.beginPath(); sx2.arc(px, py, s.r, 0, TAU); sx2.fill();
+      // small soft halo without shadowBlur: draw a larger faint dot underneath (much cheaper than blur)
+      sx2.globalAlpha = s.p * 0.25;
+      sx2.beginPath(); sx2.arc(px, py, s.r * 2.2, 0, TAU); sx2.fill();
+    }
+    sx2.globalAlpha = 1;
+    this.starLayer = sc;
+    // --- pre-allocate gradient canvas ---
+    const gc = document.createElement('canvas');
+    gc.width = W; gc.height = H;
+    this.gradCanvas = gc;
   },
-  draw(){
-    // base background
-    const g = ctx.createRadialGradient(W/2, H/2+100, 0, W/2, H/2, 800);
-    const hue = (G.bgT*8) % 360;
+  bakeGradient(hue){
+    const gc = this.gradCanvas, gx = gc.getContext('2d');
+    const g = gx.createRadialGradient(W/2, H/2+100, 0, W/2, H/2, 800);
     g.addColorStop(0, `hsla(${hue} 55% 12% / 1)`);
     g.addColorStop(.5, `hsla(${(hue+50)%360} 35% 6% / 1)`);
     g.addColorStop(1, '#04050b');
-    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+    gx.fillStyle = g; gx.fillRect(0,0,W,H);
+    this.gradHue = hue;
+  },
+  draw(){
+    // --- base background: re-bake gradient only when hue drifts > 8° (≈ once per second) ---
+    const hue = (G.bgT*8) % 360;
+    let dh = Math.abs(hue - this.gradHue);
+    if(dh > 180) dh = 360 - dh;
+    if(this.gradHue === -999 || dh > 8) this.bakeGradient(hue);
+    ctx.drawImage(this.gradCanvas, 0, 0);
 
-    // parallax stars (slow drift)
-    const cx = G.cam.x*.05, cy = G.cam.y*.05;
-    for(const s of this.stars){
-      const sx = ((s.x - cx) % (W*1.5) + W*1.5) % (W*1.5) - W*.25;
-      const sy = ((s.y - cy) % (H*1.5) + H*1.5) % (H*1.5) - H*.25;
-      ctx.save();
-      ctx.globalAlpha = s.p * (.5 + .5*Math.sin(G.bgT*2 + s.x*.01));
-      ctx.fillStyle = s.c; ctx.shadowBlur = 6; ctx.shadowColor = s.c;
-      ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, TAU); ctx.fill();
-      ctx.restore();
-    }
-    // grid
+    // --- parallax stars: blit pre-rendered layer tiled with camera drift ---
+    const sw = this.starLayerW, sh = this.starLayerH;
+    const cx = ((G.cam.x*.05) % sw + sw) % sw;
+    const cy = ((G.cam.y*.05) % sh + sh) % sh;
+    // overall subtle twinkle on the whole layer (cheap global alpha mod instead of per-star sin)
+    ctx.globalAlpha = .78 + .22*Math.sin(G.bgT*1.6);
+    // draw the layer up to 4 times to cover visible rect regardless of wrap position
+    ctx.drawImage(this.starLayer, -cx, -cy);
+    if(cx > 0)           ctx.drawImage(this.starLayer, sw - cx, -cy);
+    if(cy > 0)           ctx.drawImage(this.starLayer, -cx, sh - cy);
+    if(cx > 0 && cy > 0) ctx.drawImage(this.starLayer, sw - cx, sh - cy);
+    ctx.globalAlpha = 1;
+
+    // --- grid (single stroke, kept as-is — already cheap) ---
     const grid = 64;
     const ox = -((G.cam.x % grid) + grid) % grid;
     const oy = -((G.cam.y % grid) + grid) % grid;
-    ctx.save();
     ctx.strokeStyle = 'rgba(60,120,220,.08)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for(let x = ox; x < W; x += grid){ ctx.moveTo(x, 0); ctx.lineTo(x, H); }
     for(let y = oy; y < H; y += grid){ ctx.moveTo(0, y); ctx.lineTo(W, y); }
     ctx.stroke();
-    // brighter sub-grid pulse near player
+
+    // --- brighter sub-grid pulse near player (single-pass gradient, kept) ---
     if(G.player){
       const ps = worldToScreen(G.player.x, G.player.y);
       const rg = ctx.createRadialGradient(ps.x, ps.y, 30, ps.x, ps.y, 380);
@@ -955,7 +1044,6 @@ const BG = {
       rg.addColorStop(1, 'rgba(0,240,255,0)');
       ctx.fillStyle = rg; ctx.fillRect(0,0,W,H);
     }
-    ctx.restore();
   }
 };
 BG.init();
@@ -1014,10 +1102,12 @@ const WEAPONS = {
         // visual line stored on weapon
         if(!w.beams) w.beams = [];
         w.beams[b] = {x1:p.x,y1:p.y,x2:ex,y2:ey,life:G.dt};
-        // damage along the line
+        // damage along the line — grid-scoped to beam's bounding circle
         if(damageThisFrame){
-          for(const e of G.ents){
-            if(e.type !== 'enemy' || !e.alive) continue;
+          const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
+          for(let li = 0; li < list.length; li++){
+            const e = list[li];
+            if(!e.alive) continue;
             const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
             if(d <= e.r + s.width){
               dealDamage(e, s.dmg * p.dmgMul, '#ffd400');
@@ -1046,8 +1136,10 @@ const WEAPONS = {
         const a = w.angle + (i*TAU/s.count);
         const nx = p.x + Math.cos(a)*s.radius * p.areaMul;
         const ny = p.y + Math.sin(a)*s.radius * p.areaMul;
-        for(const e of G.ents){
-          if(e.type !== 'enemy' || !e.alive) continue;
+        const list = EGRID.query(nx, ny, s.nodeR + 40, _EQ1);
+        for(let li = 0; li < list.length; li++){
+          const e = list[li];
+          if(!e.alive) continue;
           const dd = (e.x-nx)*(e.x-nx) + (e.y-ny)*(e.y-ny);
           const rr = (e.r + s.nodeR);
           if(dd < rr*rr){
@@ -1062,8 +1154,10 @@ const WEAPONS = {
         if(!w.lastNodes) w.lastNodes = [];
         w.lastNodes[i] = {x:nx, y:ny};
       }
-      // decay hit cooldowns
-      for(const e of G.ents){
+      // decay hit cooldowns — only on alive enemies via EGRID.enemies
+      const el = EGRID.enemies;
+      for(let ei = 0; ei < el.length; ei++){
+        const e = el[ei];
         if(e.hitOrbit){ for(const k in e.hitOrbit) e.hitOrbit[k] -= G.dt; }
       }
     },
@@ -1642,9 +1736,23 @@ function pointSegDist(px,py, ax,ay, bx,by){
   return Math.hypot(px-cx, py-cy);
 }
 function nearestEnemy(p, range=Infinity){
+  // For bounded ranges use the grid; for unbounded (Infinity) just scan
+  // EGRID.enemies (still avoids type filter over non-enemy entities).
   let best=null, bd=range*range;
-  for(const e of G.ents){
-    if(e.type !== 'enemy' || !e.alive) continue;
+  if(range === Infinity || !isFinite(range)){
+    const el = EGRID.enemies;
+    for(let i = 0; i < el.length; i++){
+      const e = el[i];
+      if(!e.alive) continue;
+      const d = (e.x-p.x)*(e.x-p.x)+(e.y-p.y)*(e.y-p.y);
+      if(d < bd){ bd = d; best = e; }
+    }
+    return best;
+  }
+  const list = EGRID.query(p.x, p.y, range, _EQ1);
+  for(let i = 0; i < list.length; i++){
+    const e = list[i];
+    if(!e.alive) continue;
     const d = (e.x-p.x)*(e.x-p.x)+(e.y-p.y)*(e.y-p.y);
     if(d < bd){ bd = d; best = e; }
   }
@@ -1652,8 +1760,10 @@ function nearestEnemy(p, range=Infinity){
 }
 function nearestEnemyExcept(p, exclude, range){
   let best=null, bd=range*range;
-  for(const e of G.ents){
-    if(e.type !== 'enemy' || !e.alive || exclude.has(e)) continue;
+  const list = EGRID.query(p.x, p.y, range, _EQ1);
+  for(let i = 0; i < list.length; i++){
+    const e = list[i];
+    if(!e.alive || exclude.has(e)) continue;
     const d = (e.x-p.x)*(e.x-p.x)+(e.y-p.y)*(e.y-p.y);
     if(d < bd){ bd = d; best = e; }
   }
@@ -1683,11 +1793,15 @@ function firePulse(x,y,r,dmg,kb){
   AUDIO.explode(x, y);
   fxShockwave(x,y,C.cyan,r,.45);
   shake(.05);
-  for(const e of G.ents){
-    if(e.type !== 'enemy' || !e.alive) continue;
-    const d = Math.hypot(e.x-x, e.y-y);
-    if(d <= r + e.r){
-      const a = angTo({x,y}, e);
+  // grid-scoped query, distance-squared compare
+  const list = EGRID.query(x, y, r + 40, _EQ1);
+  for(let i = 0; i < list.length; i++){
+    const e = list[i];
+    if(!e.alive) continue;
+    const dx = e.x - x, dy = e.y - y;
+    const rr = r + e.r;
+    if(dx*dx + dy*dy <= rr*rr){
+      const a = Math.atan2(dy, dx);
       e.vx += Math.cos(a)*kb;
       e.vy += Math.sin(a)*kb;
       dealDamage(e, dmg, C.cyan);
@@ -1699,11 +1813,14 @@ function fireFanShock(x,y,angle,r,arc,dmg){
   // Visual
   makeEnt({type:'fan', x,y,angle, r, arc, color:C.magenta, life:.35, maxLife:.35});
   shake(.06);
-  for(const e of G.ents){
-    if(e.type !== 'enemy' || !e.alive) continue;
-    const d = Math.hypot(e.x-x, e.y-y);
-    if(d > r + e.r) continue;
-    const a = Math.atan2(e.y-y, e.x-x);
+  const list = EGRID.query(x, y, r + 40, _EQ1);
+  for(let i = 0; i < list.length; i++){
+    const e = list[i];
+    if(!e.alive) continue;
+    const dx = e.x - x, dy = e.y - y;
+    const rr = r + e.r;
+    if(dx*dx + dy*dy > rr*rr) continue;
+    const a = Math.atan2(dy, dx);
     let diff = ((a - angle) % TAU + Math.PI*3) % TAU - Math.PI;
     if(Math.abs(diff) <= arc/2){
       dealDamage(e, dmg, C.magenta);
@@ -1907,12 +2024,17 @@ function damagePlayer(amount){
    =================================================================== */
 function update(){
   AUDIO.tick();
+  // rebuild spatial hash once per frame — every subsequent collision / nearest-enemy
+  // check reads from EGRID rather than scanning G.ents
+  EGRID.build(G.ents);
   // Camera + intensity for dynamic music / positional SFX
   AUDIO.setCamera(G.cam.x + W/2, G.cam.y + H/2, W);
   {
     const p0 = G.player;
     if(p0){
-      const enemyCnt = G.ents.filter(x=>x.type==='enemy' && !x.isBoss).length;
+      // count non-boss enemies directly from EGRID (no allocation / filter)
+      let enemyCnt = 0;
+      for(let i = 0; i < EGRID.enemies.length; i++){ if(!EGRID.enemies[i].isBoss) enemyCnt++; }
       const hpFrac   = p0.hp / (p0.maxHp || 1);
       const bossBoost = G.bossActive ? 0.35 : 0;
       const intensity = Math.min(1, (enemyCnt / 40) * 0.55 + (1 - hpFrac) * 0.35 + bossBoost + Math.min(0.25, G.t/600));
@@ -1989,26 +2111,34 @@ function update(){
     }
     else if(e.type === 'blackhole'){
       e.life -= G.dt; if(e.life<=0){ fxShockwave(e.x,e.y,C.violet,e.r*1.4,.6); AUDIO.explode(e.x,e.y); shake(.2); e.alive=false; }
-      // pull and damage
-      for(const en of ents){
-        if(en.type === 'enemy' && en.alive){
-          const d = Math.hypot(en.x-e.x, en.y-e.y);
-          if(d < e.r){
-            const a = Math.atan2(e.y-en.y, e.x-en.x);
-            const f = (1 - d/e.r) * e.pull;
-            en.vx += Math.cos(a)*f*G.dt*60;
-            en.vy += Math.sin(a)*f*G.dt*60;
-            en._bhTimer = (en._bhTimer||0) + G.dt;
-            if(en._bhTimer >= .25){ en._bhTimer = 0; dealDamage(en, e.dmgPerSec * .25, C.violet); }
-          }
+      // pull and damage — enemies via grid, pickups via linear scan (few of them)
+      const elist = EGRID.query(e.x, e.y, e.r, _EQ1);
+      const rSq = e.r * e.r;
+      for(let bi = 0; bi < elist.length; bi++){
+        const en = elist[bi];
+        if(!en.alive) continue;
+        const ddx = en.x - e.x, ddy = en.y - e.y;
+        const d2 = ddx*ddx + ddy*ddy;
+        if(d2 < rSq){
+          const d = Math.sqrt(d2);
+          const a = Math.atan2(-ddy, -ddx);
+          const f = (1 - d/e.r) * e.pull;
+          en.vx += Math.cos(a)*f*G.dt*60;
+          en.vy += Math.sin(a)*f*G.dt*60;
+          en._bhTimer = (en._bhTimer||0) + G.dt;
+          if(en._bhTimer >= .25){ en._bhTimer = 0; dealDamage(en, e.dmgPerSec * .25, C.violet); }
         }
-        else if(en.type==='xp' || en.type==='coin'){
-          const d = Math.hypot(en.x-e.x, en.y-e.y);
-          if(d < e.r*1.5){
-            const a = Math.atan2(e.y-en.y, e.x-en.x);
-            en.vx += Math.cos(a) * 200 * G.dt;
-            en.vy += Math.sin(a) * 200 * G.dt;
-          }
+      }
+      // pickups: iterate ents (no grid for them — usually few pickups)
+      const pickR = e.r * 1.5, pickR2 = pickR * pickR;
+      for(let pi = 0; pi < ents.length; pi++){
+        const en = ents[pi];
+        if(en.type !== 'xp' && en.type !== 'coin') continue;
+        const ddx = en.x - e.x, ddy = en.y - e.y;
+        if(ddx*ddx + ddy*ddy < pickR2){
+          const a = Math.atan2(-ddy, -ddx);
+          en.vx += Math.cos(a) * 200 * G.dt;
+          en.vy += Math.sin(a) * 200 * G.dt;
         }
       }
     }
@@ -2059,7 +2189,8 @@ function update(){
   // camera follow
   updateCamera();
   // cleanup
-  G.ents = G.ents.filter(e => e.alive);
+  // in-place compaction (swap-and-pop) — avoids per-frame array allocation
+  { const arr = G.ents; let wi = 0; for(let ri = 0; ri < arr.length; ri++){ if(arr[ri].alive) arr[wi++] = arr[ri]; } arr.length = wi; }
   // shake decay
   G.shake = Math.max(0, G.shake * Math.pow(.001, G.dt));
   G.flash = Math.max(0, G.flash - G.dt * .8);
@@ -2119,9 +2250,13 @@ function updateEnemy(e, freezeMul){
     e.timer -= G.dt;
     if(e.timer <= 0){
       e.timer = 1.5;
-      // heal nearby allies
-      for(const al of G.ents){
-        if(al !== e && al.type==='enemy' && al.alive && Math.hypot(al.x-e.x, al.y-e.y) < 140){
+      // heal nearby allies — grid query, distance-squared
+      const list = EGRID.query(e.x, e.y, 140, _EQ2);
+      for(let li = 0; li < list.length; li++){
+        const al = list[li];
+        if(al === e || !al.alive) continue;
+        const dxh = al.x - e.x, dyh = al.y - e.y;
+        if(dxh*dxh + dyh*dyh < 140*140){
           al.hp = Math.min(al.maxHp, al.hp + 15);
           fxLine(e.x,e.y,al.x,al.y,C.teal,.3,2);
         }
@@ -2213,13 +2348,16 @@ function updateEnemy(e, freezeMul){
   e.x += e.vx * G.dt * freezeMul;
   e.y += e.vy * G.dt * freezeMul;
   e.rot += (e.rotSpeed||1) * G.dt * (e.brain==='dasher' && e.state===1 ? 6 : 1);
-  // collision with player
-  const d = Math.hypot(e.x-p.x, e.y-p.y);
-  if(d < p.r + e.r - 2){
-    damagePlayer(e.dmg);
-    // bounce
-    const a = Math.atan2(e.y-p.y, e.x-p.x);
-    e.vx += Math.cos(a)*120; e.vy += Math.sin(a)*120;
+  // collision with player — squared-distance compare (no sqrt)
+  {
+    const cdx = e.x - p.x, cdy = e.y - p.y;
+    const crr = p.r + e.r - 2;
+    if(cdx*cdx + cdy*cdy < crr*crr){
+      damagePlayer(e.dmg);
+      // bounce
+      const a = Math.atan2(cdy, cdx);
+      e.vx += Math.cos(a)*120; e.vy += Math.sin(a)*120;
+    }
   }
 }
 function updateProjectile(pr){
@@ -2240,12 +2378,15 @@ function updateProjectile(pr){
   pr.x += pr.vx * G.dt;
   pr.y += pr.vy * G.dt;
   pr.spin += G.dt * 8;
-  // collision
-  for(const e of G.ents){
-    if(e.type !== 'enemy' || !e.alive) continue;
+  // collision — grid-scoped, distance-squared
+  const _pList = EGRID.query(pr.x, pr.y, pr.r + 40, _EQ1);
+  for(let pi = 0; pi < _pList.length; pi++){
+    const e = _pList[pi];
+    if(!e.alive) continue;
     if(pr.hits.has(e)) continue;
-    const d = Math.hypot(pr.x - e.x, pr.y - e.y);
-    if(d < pr.r + e.r){
+    const dx = pr.x - e.x, dy = pr.y - e.y;
+    const rr = pr.r + e.r;
+    if(dx*dx + dy*dy < rr*rr){
       dealDamage(e, pr.dmg, pr.color);
       fxBurst(pr.x, pr.y, pr.color, 4, 100, 2, .2);
       pr.hits.add(e);
@@ -2268,14 +2409,20 @@ function updateProjectile(pr){
    =================================================================== */
 function updateEnemyBullets(){
   const p = G.player;
-  for(const b of G.ents){
+  const ents = G.ents;
+  for(let i = 0; i < ents.length; i++){
+    const b = ents[i];
     if(b.type !== 'ebullet' || !b.alive) continue;
     b.life -= G.dt; if(b.life<=0){ b.alive=false; continue; }
     b.x += b.vx * G.dt; b.y += b.vy * G.dt;
-    if(p && Math.hypot(b.x-p.x, b.y-p.y) < p.r + b.r){
-      damagePlayer(b.dmg);
-      fxBurst(b.x, b.y, b.color, 6, 120, 2, .25);
-      b.alive = false;
+    if(p){
+      const dxb = b.x - p.x, dyb = b.y - p.y;
+      const rr = p.r + b.r;
+      if(dxb*dxb + dyb*dyb < rr*rr){
+        damagePlayer(b.dmg);
+        fxBurst(b.x, b.y, b.color, 6, 120, 2, .25);
+        b.alive = false;
+      }
     }
   }
 }
@@ -2585,8 +2732,8 @@ function drawWorld(){
   for(const e of G.ents){
     if(e.type==='xp' || e.type==='coin' || e.type==='heart' || e.type==='magnet' || e.type==='freeze' || e.type==='chest' || e.type==='item') drawPickup(e);
   }
-  // enemies
-  for(const e of G.ents){ if(e.type==='enemy' && e.alive) drawEnemy(e); }
+  // enemies — EGRID.enemies already holds the alive-enemies snapshot for this frame
+  { const el = EGRID.enemies; for(let i = 0; i < el.length; i++) drawEnemy(el[i]); }
   // player
   if(G.player) drawPlayer(G.player);
   // projectiles
@@ -2620,7 +2767,7 @@ function drawPlayer(p){
     ctx.strokeStyle = p.color;
     ctx.globalAlpha = t * .5;
     ctx.lineWidth = 1 + t*4;
-    ctx.shadowBlur = 10; ctx.shadowColor = p.color;
+    ctx.shadowBlur = 4; ctx.shadowColor = p.color;
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
   }
   ctx.restore();
@@ -2660,17 +2807,17 @@ function drawEnemy(e){
     ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(e.x,e.y, r*3, 0, TAU); ctx.fill(); ctx.restore();
   }
   if(e.isDiamond){
-    drawDiamond(e.x, e.y, r, e.rot, col, 14, fillCol);
+    drawDiamond(e.x, e.y, r, e.rot, col, 6, fillCol);
   } else if(e.sides === 0){
-    drawCircle(e.x, e.y, r, col, 12, fillCol, 2);
+    drawCircle(e.x, e.y, r, col, 6, fillCol, 2);
   } else {
-    drawPolygon(e.x, e.y, e.sides, r, e.rot, col, e.isBoss ? 28 : 12, fillCol, e.isBoss ? 3 : 2);
+    drawPolygon(e.x, e.y, e.sides, r, e.rot, col, e.isBoss ? 14 : 6, fillCol, e.isBoss ? 3 : 2);
   }
   // hp bar (small enemies only)
   if(!e.isBoss && e.hp < e.maxHp){
     const w = r*1.8, x = e.x - w/2, y = e.y + r + 5;
     ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x,y,w,2);
-    ctx.fillStyle = e.color; ctx.shadowBlur = 6; ctx.shadowColor = e.color;
+    ctx.fillStyle = e.color; ctx.shadowBlur = 0;
     ctx.fillRect(x,y, w*(e.hp/e.maxHp), 2);
     ctx.shadowBlur = 0;
   }
@@ -2678,18 +2825,18 @@ function drawEnemy(e){
 
 function drawProjectile(pr){
   if(pr.subtype === 'shuriken'){
-    drawStar(pr.x, pr.y, 4, 14, 6, pr.spin, pr.color, 18, pr.color, 1.6);
+    drawStar(pr.x, pr.y, 4, 14, 6, pr.spin, pr.color, 8, pr.color, 1.6);
   } else if(pr.subtype === 'homing'){
-    drawDiamond(pr.x, pr.y, 8, Math.atan2(pr.vy,pr.vx), pr.color, 14, pr.color);
+    drawDiamond(pr.x, pr.y, 8, Math.atan2(pr.vy,pr.vx), pr.color, 6, pr.color);
   } else if(pr.subtype === 'prism'){
-    drawPolygon(pr.x, pr.y, 3, 8, Math.atan2(pr.vy,pr.vx)+Math.PI/2, pr.color, 14, pr.color, 1.6);
+    drawPolygon(pr.x, pr.y, 3, 8, Math.atan2(pr.vy,pr.vx)+Math.PI/2, pr.color, 6, pr.color, 1.6);
   } else {
     // bullet
-    drawCircle(pr.x, pr.y, 4, pr.color, 14, pr.color, 1);
+    drawCircle(pr.x, pr.y, 4, pr.color, 6, pr.color, 1);
   }
 }
 function drawEnemyBullet(b){
-  drawCircle(b.x, b.y, b.r, b.color, 14, b.color, 1.4);
+  drawCircle(b.x, b.y, b.r, b.color, 6, b.color, 1.4);
 }
 
 function drawBeams(p){
@@ -2706,12 +2853,12 @@ function drawBeams(p){
       ctx.strokeStyle = g;
       ctx.lineWidth = w.stats.width + 6;
       ctx.lineCap = 'round';
-      ctx.shadowBlur = 28; ctx.shadowColor = C.gold;
+      ctx.shadowBlur = 12; ctx.shadowColor = C.gold;
       ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
       // inner core
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = w.stats.width;
-      ctx.shadowBlur = 14;
+      ctx.shadowBlur = 6;
       ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
       ctx.restore();
     }
@@ -2722,7 +2869,7 @@ function drawOrbits(p){
     if(w.key !== 'ORBIT' || !w.lastNodes) continue;
     for(const n of w.lastNodes){
       if(!n) continue;
-      drawCircle(n.x, n.y, w.stats.nodeR, C.violet, 18, hsl(280,80,15,.5), 2);
+      drawCircle(n.x, n.y, w.stats.nodeR, C.violet, 8, hsl(280,80,15,.5), 2);
       // node line to player
       ctx.save();
       ctx.strokeStyle = 'rgba(155,92,255,.25)';
@@ -2747,7 +2894,7 @@ function drawBlackhole(e){
     const r1 = e.r * (.4 + i*.12);
     ctx.strokeStyle = `hsla(280 80% 70% / ${.7 - i*.12})`;
     ctx.lineWidth = 1.5;
-    ctx.shadowBlur = 12; ctx.shadowColor = C.violet;
+    ctx.shadowBlur = 6; ctx.shadowColor = C.violet;
     ctx.beginPath();
     for(let s=0;s<24;s++){
       const aa = a + s*.18;
@@ -2762,15 +2909,15 @@ function drawBlackhole(e){
 }
 function drawPickup(e){
   if(e.type==='xp'){
-    drawDiamond(e.x, e.y, e.r, G.realT*3, e.color, 14, e.color);
+    drawDiamond(e.x, e.y, e.r, G.realT*3, e.color, 6, e.color);
   } else if(e.type==='coin'){
     ctx.save();
     ctx.translate(e.x, e.y); ctx.rotate(G.realT*4);
-    drawDiamond(0,0,e.r, 0, C.gold, 16, C.gold);
+    drawDiamond(0,0,e.r, 0, C.gold, 8, C.gold);
     ctx.restore();
   } else if(e.type==='heart'){
     ctx.save();
-    ctx.fillStyle = C.red; ctx.shadowColor = C.red; ctx.shadowBlur = 14;
+    ctx.fillStyle = C.red; ctx.shadowColor = C.red; ctx.shadowBlur = 8;
     const s = e.r;
     ctx.beginPath();
     ctx.moveTo(e.x, e.y - s*.2);
@@ -2779,11 +2926,11 @@ function drawPickup(e){
     ctx.fill();
     ctx.restore();
   } else if(e.type==='magnet'){
-    drawStar(e.x, e.y, 4, e.r, e.r*.4, G.realT*2, C.pink, 14, C.pink, 1.6);
+    drawStar(e.x, e.y, 4, e.r, e.r*.4, G.realT*2, C.pink, 8, C.pink, 1.6);
   } else if(e.type==='freeze'){
-    drawStar(e.x, e.y, 6, e.r, e.r*.5, G.realT, C.teal, 14, C.teal, 1.6);
+    drawStar(e.x, e.y, 6, e.r, e.r*.5, G.realT, C.teal, 8, C.teal, 1.6);
   } else if(e.type==='chest'){
-    drawStar(e.x, e.y, 5, e.r*1.4, e.r*.6, G.realT*1.2, C.gold, 22, hsl(50,90,20,.7), 2);
+    drawStar(e.x, e.y, 5, e.r*1.4, e.r*.6, G.realT*1.2, C.gold, 10, hsl(50,90,20,.7), 2);
   } else if(e.type==='item'){
     const col = e.color || C.gold;
     const glow = e.glow || 18;
@@ -2812,7 +2959,7 @@ function drawFxParticle(e){
   const a = e.life / e.maxLife;
   ctx.save();
   ctx.globalAlpha = a;
-  ctx.fillStyle = e.color; ctx.shadowBlur = 12; ctx.shadowColor = e.color;
+  ctx.fillStyle = e.color; ctx.shadowBlur = 4; ctx.shadowColor = e.color;
   ctx.beginPath(); ctx.arc(e.x, e.y, e.size * a, 0, TAU); ctx.fill();
   ctx.restore();
 }
@@ -2821,7 +2968,7 @@ function drawFxRing(e){
   ctx.save();
   ctx.globalAlpha = a * .8;
   ctx.strokeStyle = e.color; ctx.lineWidth = 2 + (1-a)*4;
-  ctx.shadowBlur = 18; ctx.shadowColor = e.color;
+  ctx.shadowBlur = 8; ctx.shadowColor = e.color;
   ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, TAU); ctx.stroke();
   ctx.restore();
 }
@@ -2830,7 +2977,7 @@ function drawFxShock(e){
   ctx.save();
   ctx.globalAlpha = (1 - k) * .9;
   ctx.strokeStyle = e.color; ctx.lineWidth = 4 + k*10;
-  ctx.shadowBlur = 28; ctx.shadowColor = e.color;
+  ctx.shadowBlur = 10; ctx.shadowColor = e.color;
   ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, TAU); ctx.stroke();
   ctx.restore();
 }
@@ -2839,7 +2986,7 @@ function drawFxLine(e){
   ctx.save();
   ctx.globalAlpha = a;
   ctx.strokeStyle = e.color; ctx.lineWidth = e.width;
-  ctx.shadowBlur = 16; ctx.shadowColor = e.color;
+  ctx.shadowBlur = 6; ctx.shadowColor = e.color;
   ctx.beginPath(); ctx.moveTo(e.x1,e.y1);
   // jitter
   const segs = 6;
@@ -2857,7 +3004,7 @@ function drawFan(e){
   ctx.save();
   ctx.globalAlpha = a * .7;
   ctx.fillStyle = e.color;
-  ctx.shadowBlur = 24; ctx.shadowColor = e.color;
+  ctx.shadowBlur = 10; ctx.shadowColor = e.color;
   ctx.beginPath();
   ctx.moveTo(e.x, e.y);
   ctx.arc(e.x, e.y, e.r, e.angle - e.arc/2, e.angle + e.arc/2);
@@ -2870,7 +3017,7 @@ function drawText(e){
   ctx.save();
   ctx.globalAlpha = a;
   ctx.font = (e.big ? '700 18px ' : '700 14px ') + "'JetBrains Mono', monospace";
-  ctx.fillStyle = e.color; ctx.shadowBlur = 8; ctx.shadowColor = e.color;
+  ctx.fillStyle = e.color; ctx.shadowBlur = 4; ctx.shadowColor = e.color;
   ctx.textAlign = 'center';
   ctx.fillText(e.text, e.x, e.y);
   ctx.restore();
