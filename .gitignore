@@ -1,3 +1,4 @@
 node_modules/
 *.backup-*.html
+*backup*.html
 .DS_Store

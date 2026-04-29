@@ -1,0 +1,359 @@
+/* ===================================================================
+   DATA TABLES — pure-ish data definitions.
+   Some apply() callbacks reach into entities.js (fx, dealDamage), so we
+   import only what those callbacks need.
+   =================================================================== */
+import { G, TAU, C } from './core.js';
+import {
+  dealDamage, fxBurst, fxRing, fxShockwave, fxText, shake, flash, setEnemyTables,
+} from './entities.js';
+
+/* ───────── CLASSES ───────── */
+export const CLASSES = {
+  CIRCLE:   { name:'CIRCLE',   color:C.cyan,    sides:0,  r:14, hp:120, speed:240, startWeap:'PULSE',    desc:'균형형. 펄스 폭발이 시작 무기.', unlock:0 },
+  TRIANGLE: { name:'TRIANGLE', color:C.gold,    sides:3,  r:15, hp:90,  speed:265, startWeap:'BEAM',     desc:'예리. 회전 빔이 시작 무기.', unlock:0 },
+  HEXAGON:  { name:'HEXAGON',  color:C.violet,  sides:6,  r:15, hp:150, speed:225, startWeap:'ORBIT',    desc:'견고. 궤도 노드가 시작 무기.', unlock:200 },
+  SQUARE:   { name:'SQUARE',   color:C.magenta, sides:4,  r:15, hp:170, speed:215, startWeap:'SHOCK',    desc:'중장. 충격파가 시작 무기.', unlock:400 },
+  STAR:     { name:'STAR',     color:C.lime,    sides:5,  r:15, hp:100, speed:255, startWeap:'CHAIN',    desc:'혼돈. 번개 사슬이 시작 무기.', unlock:800 }
+};
+
+/* ───────── PASSIVES ─────────
+   Compressed maxLv 5 → 3. Each level now grants a small actual stat boost
+   (so Lv 1-2 picks aren't dead picks), AND Lv 3 unlocks the evolution gate.
+   13-pick evolution slog → ~7-9 picks. Items still carry primary stat scaling.
+   =================================================================== */
+export const PASSIVES = {
+  POWER:   { name:'POWER',   color:C.red,    desc:'화력 — 데미지 +8%/Lv. Lv.3 시 화력 진화 해금', maxLv:3,
+             apply:(p,lv)=>{ p.dmgMul *= (1 + .08*lv); },
+             lv3Reward: p => { p._boostDmg = 8; p._boostDmgMul = 1.5; } },
+  HASTE:   { name:'HASTE',   color:C.cyan,   desc:'기동 — 이동 +6%/Lv. Lv.3 시 기동 진화 해금', maxLv:3,
+             apply:(p,lv)=>{ p.speed *= (1 + .06*lv); },
+             lv3Reward: p => { p._boostSpd = 8; p._boostSpdMul = 1.4; } },
+  CADENCE: { name:'CADENCE', color:C.gold,   desc:'연사 — 쿨감 +6%/Lv. Lv.3 시 연사 진화 해금', maxLv:3,
+             apply:(p,lv)=>{ p.cdMul *= (1 + .06*lv); },
+             lv3Reward: p => { p._boostCdr = 8; p._boostCdrMul = 1.3; } },
+  REACH:   { name:'REACH',   color:C.violet, desc:'범위 — 효과 범위 +8%/Lv. Lv.3 시 범위 진화 해금', maxLv:3,
+             apply:(p,lv)=>{ p.areaMul *= (1 + .08*lv); },
+             lv3Reward: p => { p.hp = p.maxHp; } },
+  ARMOR:   { name:'ARMOR',   color:C.teal,   desc:'방어 — 피해 감소 +4%/Lv. Lv.3 시 방어 진화 해금', maxLv:3,
+             apply:(p,lv)=>{ p.dr += .04*lv; },
+             lv3Reward: p => { p._boostInvuln = 4; } },
+  SOUL:    { name:'SOUL',    color:C.lime,   desc:'생명 — 최대HP +12, 재생 +0.25/Lv. Lv.3 시 생명 진화 해금', maxLv:3,
+             apply:(p,lv)=>{ p.maxHp += 12*lv; p.hp += 12*lv; p.regen += .25*lv; },
+             lv3Reward: p => { p.hp = p.maxHp; } },
+  MAGNET:  { name:'MAGNET',  color:C.pink,   desc:'유인 — 픽업 범위 +20%/Lv. Lv.3 시 유인 진화 해금', maxLv:3,
+             apply:(p,lv)=>{ p.magnet *= (1 + .20*lv); },
+             lv3Reward: ()=> { G.superMagnetTimer = 10; } },
+  LUCK:    { name:'LUCK',    color:C.magenta,desc:'행운 — 드랍/희귀 +6%/Lv. Lv.3 시 행운 진화 해금', maxLv:3,
+             apply:(p,lv)=>{ p.luck += .06*lv; },
+             lv3Reward: p => { p._boostDmg = 8; p._boostDmgMul = 1.3; } },
+};
+
+/* ───────── ENEMIES ───────── */
+export const ENEMIES = {
+  TRI:   { sides:3, color:C.cyan,    r:11, hp:14,  speed:120, dmg:6,  xp:1, gold:.06, brain:'chase' },
+  SQR:   { sides:4, color:C.violet,  r:14, hp:50,  speed:85,  dmg:12, xp:3, gold:.14, brain:'chase' },
+  HEX:   { sides:6, color:C.lime,    r:18, hp:80,  speed:95,  dmg:12, xp:5, gold:.22, brain:'chase', onDeath:'split' },
+  PEN:   { sides:5, color:C.gold,    r:14, hp:42,  speed:65,  dmg:10, xp:4, gold:.20, brain:'shooter' },
+  DIA:   { sides:4, color:C.pink,    r:13, hp:30,  speed:160, dmg:16, xp:3, gold:.14, brain:'dasher', isDiamond:true },
+  OCT:   { sides:8, color:C.teal,    r:15, hp:120, speed:70,  dmg:8,  xp:6, gold:.28, brain:'healer' },
+  SWARM: { sides:3, color:C.magenta, r:8,  hp:6,   speed:185, dmg:5,  xp:1, gold:.04, brain:'chase' },
+};
+
+/* ───────── BOSSES ───────── */
+export const BOSSES = {
+  RING_LORD: { name:'RING LORD', color:C.magenta, r:42, sides:0, hp:600, speed:50, dmg:14, xp:60, gold:10, brain:'ringboss' },
+  SPIKE_KING:{ name:'SPIKE KING', color:C.red,   r:46, sides:8, hp:1050, speed:78, dmg:20, xp:80, gold:12, brain:'spikeboss' },
+  HYDRA:     { name:'HYDRA CORE', color:C.lime,  r:50, sides:6, hp:1600, speed:52, dmg:22, xp:110, gold:16, brain:'hydraboss' },
+  PRISMA:    { name:'PRISMA',     color:C.gold,  r:55, sides:5, hp:2400, speed:66, dmg:26, xp:160, gold:22, brain:'prismaboss' },
+};
+
+// Register with entities.js so spawnEnemy / spawnBoss can find them.
+setEnemyTables(ENEMIES, BOSSES);
+
+/* ───────── UPGRADE TIERS (level-up card rarity) ───────── */
+export const UPGRADE_TIERS = {
+  common: { key:'common', label:'COMMON', color:'#b0bccc', glow:'rgba(176,188,204,.5)', weight:60, minMult:0.90, maxMult:1.10 },
+  rare:   { key:'rare',   label:'RARE',   color:C.cyan,    glow:'rgba(0,240,255,.8)',   weight:28, minMult:1.10, maxMult:1.45 },
+  epic:   { key:'epic',   label:'EPIC',   color:C.violet,  glow:'rgba(155,92,255,.9)',  weight:10, minMult:1.45, maxMult:1.85 },
+  legend: { key:'legend', label:'LEGEND', color:C.gold,    glow:'rgba(255,212,0,1)',    weight:4,  minMult:1.80, maxMult:2.40 },
+};
+export function rollUpgradeTier(luck){
+  const L = Math.max(0, (luck||0));
+  const bias = { common:-L*35, rare:L*14, epic:L*14, legend:L*14 };
+  const keys = ['common','rare','epic','legend'];
+  let total = 0; const weights = {};
+  for(const k of keys){ const w = Math.max(2, UPGRADE_TIERS[k].weight + bias[k]); weights[k] = w; total += w; }
+  let r = Math.random()*total;
+  for(const k of keys){ r -= weights[k]; if(r<=0) return UPGRADE_TIERS[k]; }
+  return UPGRADE_TIERS.common;
+}
+export function rollTierMult(tier){
+  if(!tier) return 1;
+  return tier.minMult + Math.random()*(tier.maxMult - tier.minMult);
+}
+
+/* ───────── ITEMS ───────── */
+export const ITEM_TIERS = {
+  common:    { key:'common',    color:'#b0bccc', glow:'rgba(176,188,204,.6)' },
+  rare:      { key:'rare',      color:C.cyan,    glow:'rgba(0,240,255,.8)' },
+  legendary: { key:'legendary', color:C.gold,    glow:'rgba(255,212,0,1)' },
+};
+// Per-item glyph icons drawn inside the world tier-shell. Each takes (cx, x, y, s)
+// and uses ctx primitives. Kept compact — neon outline + glow.
+const I = {
+  heart(cx,x,y,s,col){ cx.save(); cx.fillStyle=col; cx.shadowColor=col; cx.shadowBlur=10; const r=s*.32;
+    cx.beginPath(); cx.moveTo(x,y-r*.3);
+    cx.bezierCurveTo(x-r*1.5,y-r*1.5,x-r*2,y+r*.4,x,y+r*1.4);
+    cx.bezierCurveTo(x+r*2,y+r*.4,x+r*1.5,y-r*1.5,x,y-r*.3);
+    cx.fill(); cx.restore(); },
+  bolt(cx,x,y,s,col){ cx.save(); cx.fillStyle=col; cx.shadowColor=col; cx.shadowBlur=12; const r=s*.32;
+    cx.beginPath();
+    cx.moveTo(x-r*.4,y-r); cx.lineTo(x+r*.3,y-r*.15); cx.lineTo(x-r*.05,y-r*.15);
+    cx.lineTo(x+r*.4,y+r); cx.lineTo(x-r*.3,y+r*.15); cx.lineTo(x+r*.05,y+r*.15);
+    cx.closePath(); cx.fill(); cx.restore(); },
+  clock(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=10; cx.lineWidth=2;
+    cx.beginPath(); cx.arc(x,y,s*.32,0,TAU); cx.stroke();
+    cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x,y-s*.22); cx.stroke();
+    cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x+s*.16,y); cx.stroke(); cx.restore(); },
+  atom(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=12; cx.lineWidth=1.6;
+    for(let i=0;i<3;i++){ cx.save(); cx.translate(x,y); cx.rotate(i*Math.PI/3);
+      cx.beginPath(); cx.ellipse(0,0,s*.36,s*.13,0,0,TAU); cx.stroke(); cx.restore(); }
+    cx.fillStyle=col; cx.beginPath(); cx.arc(x,y,s*.07,0,TAU); cx.fill(); cx.restore(); },
+  shield(cx,x,y,s,col){ cx.save(); cx.fillStyle=`rgba(0,240,255,.18)`; cx.strokeStyle=col;
+    cx.shadowColor=col; cx.shadowBlur=10; cx.lineWidth=2; const r=s*.32;
+    cx.beginPath(); cx.moveTo(x,y-r);
+    cx.bezierCurveTo(x+r,y-r*.7,x+r,y,x,y+r);
+    cx.bezierCurveTo(x-r,y,x-r,y-r*.7,x,y-r);
+    cx.fill(); cx.stroke(); cx.restore(); },
+  burst(cx,x,y,s,col){ cx.save(); cx.fillStyle=col; cx.shadowColor=col; cx.shadowBlur=14;
+    const r=s*.36; cx.beginPath();
+    for(let i=0;i<10;i++){ const a=i*TAU/10-Math.PI/2; const rr=i%2===0?r:r*.4;
+      const px=x+Math.cos(a)*rr, py=y+Math.sin(a)*rr;
+      if(i===0) cx.moveTo(px,py); else cx.lineTo(px,py); }
+    cx.closePath(); cx.fill(); cx.restore(); },
+  upArrow(cx,x,y,s,col){ cx.save(); cx.fillStyle=col; cx.shadowColor=col; cx.shadowBlur=12;
+    const r=s*.32; cx.beginPath();
+    cx.moveTo(x,y-r); cx.lineTo(x+r*.7,y); cx.lineTo(x+r*.3,y);
+    cx.lineTo(x+r*.3,y+r*.6); cx.lineTo(x-r*.3,y+r*.6);
+    cx.lineTo(x-r*.3,y); cx.lineTo(x-r*.7,y); cx.closePath(); cx.fill(); cx.restore(); },
+  gear(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=10; cx.lineWidth=2;
+    const r=s*.26; cx.beginPath();
+    for(let i=0;i<10;i++){ const a=i*TAU/10; const rr=i%2===0?r:r*1.35;
+      const px=x+Math.cos(a)*rr, py=y+Math.sin(a)*rr;
+      if(i===0) cx.moveTo(px,py); else cx.lineTo(px,py); }
+    cx.closePath(); cx.stroke();
+    cx.beginPath(); cx.arc(x,y,r*.45,0,TAU); cx.stroke(); cx.restore(); },
+  plate(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=8; cx.lineWidth=2;
+    cx.fillStyle=`rgba(176,188,204,.15)`; const w=s*.55,h=s*.4;
+    cx.beginPath();
+    if(cx.roundRect) cx.roundRect(x-w/2,y-h/2,w,h,4);
+    else cx.rect(x-w/2,y-h/2,w,h);
+    cx.fill(); cx.stroke();
+    cx.beginPath(); cx.moveTo(x-w/2+5,y); cx.lineTo(x+w/2-5,y); cx.stroke(); cx.restore(); },
+  magnet(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=10;
+    cx.lineWidth=4; cx.lineCap='round'; const r=s*.3;
+    cx.beginPath(); cx.arc(x,y+r*.1,r,Math.PI*.15,Math.PI*.85,false); cx.stroke();
+    cx.strokeStyle='#fff';
+    cx.beginPath(); cx.moveTo(x-r*.95,y+r*.3); cx.lineTo(x-r*.95,y-r*.1); cx.stroke();
+    cx.beginPath(); cx.moveTo(x+r*.95,y+r*.3); cx.lineTo(x+r*.95,y-r*.1); cx.stroke(); cx.restore(); },
+  drop(cx,x,y,s,col){ cx.save(); cx.fillStyle=col; cx.shadowColor=col; cx.shadowBlur=10; const r=s*.3;
+    cx.beginPath(); cx.moveTo(x,y-r*1.2);
+    cx.bezierCurveTo(x+r,y-r*.4,x+r,y+r*.6,x,y+r*.9);
+    cx.bezierCurveTo(x-r,y+r*.6,x-r,y-r*.4,x,y-r*1.2);
+    cx.fill(); cx.restore(); },
+  signal(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=10; cx.lineWidth=2;
+    for(let i=1;i<=3;i++){ cx.beginPath();
+      cx.arc(x-s*.18,y,s*.1*i,-Math.PI*.4,Math.PI*.4); cx.stroke(); }
+    cx.fillStyle=col; cx.beginPath(); cx.arc(x-s*.22,y,s*.06,0,TAU); cx.fill(); cx.restore(); },
+  flywheel(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=10; cx.lineWidth=2;
+    const r=s*.3;
+    cx.beginPath(); cx.arc(x,y,r,0,TAU); cx.stroke();
+    for(let i=0;i<4;i++){ const a=i*Math.PI/2;
+      cx.beginPath(); cx.moveTo(x+Math.cos(a)*r*.3,y+Math.sin(a)*r*.3);
+      cx.lineTo(x+Math.cos(a)*r,y+Math.sin(a)*r); cx.stroke(); }
+    cx.restore(); },
+  triangle(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=10; cx.lineWidth=2;
+    cx.fillStyle=`rgba(0,240,255,.1)`; const r=s*.32;
+    cx.beginPath();
+    cx.moveTo(x,y-r); cx.lineTo(x+r*.866,y+r*.5); cx.lineTo(x-r*.866,y+r*.5);
+    cx.closePath(); cx.fill(); cx.stroke(); cx.restore(); },
+  hexShield(cx,x,y,s,col){ cx.save(); cx.fillStyle=`rgba(255,212,0,.15)`; cx.strokeStyle=col;
+    cx.shadowColor=col; cx.shadowBlur=12; cx.lineWidth=2.4; const r=s*.34;
+    cx.beginPath();
+    for(let i=0;i<6;i++){ const a=i*TAU/6-Math.PI/2;
+      const px=x+Math.cos(a)*r, py=y+Math.sin(a)*r;
+      if(i===0) cx.moveTo(px,py); else cx.lineTo(px,py); }
+    cx.closePath(); cx.fill(); cx.stroke();
+    cx.lineWidth=2;
+    cx.beginPath(); cx.moveTo(x,y-r*.4); cx.lineTo(x,y+r*.4); cx.stroke();
+    cx.beginPath(); cx.moveTo(x-r*.4,y); cx.lineTo(x+r*.4,y); cx.stroke(); cx.restore(); },
+  concentric(cx,x,y,s,col){ cx.save(); cx.shadowColor=C.violet; cx.shadowBlur=10; cx.lineWidth=2;
+    for(let i=0;i<3;i++){
+      cx.strokeStyle=`hsla(280 80% ${65-i*18}% / ${.95-i*.22})`;
+      cx.beginPath(); cx.arc(x,y,s*.1+i*s*.09,0,TAU); cx.stroke(); }
+    cx.fillStyle='#000'; cx.beginPath(); cx.arc(x,y,s*.07,0,TAU); cx.fill(); cx.restore(); },
+  clover(cx,x,y,s,col){ cx.save(); cx.fillStyle=col; cx.shadowColor=col; cx.shadowBlur=10;
+    const r=s*.18;
+    for(let i=0;i<4;i++){ const a=i*Math.PI/2+Math.PI/4;
+      cx.beginPath();
+      cx.arc(x+Math.cos(a)*r*.7, y+Math.sin(a)*r*.7, r*.7, 0, TAU); cx.fill(); }
+    cx.fillStyle='#fff'; cx.beginPath(); cx.arc(x,y,r*.25,0,TAU); cx.fill(); cx.restore(); },
+};
+export const ITEMS = {
+  // ── CONSUMABLE ──
+  repair:    { id:'repair',    name:'REPAIR KIT',   kind:'consumable', tier:'common',    desc:'HP +30',
+               apply: p => { p.hp = Math.min(p.maxHp, p.hp + 30); fxText(p.x, p.y-30, '+30 HP', C.red); },
+               icon:(cx,x,y,s)=>I.heart(cx,x,y,s,C.red) },
+  battery:   { id:'battery',   name:'BATTERY',      kind:'consumable', tier:'common',    desc:'10초 이동+30%',
+               apply: p => { p._boostSpd = Math.max(p._boostSpd||0, 10); p._boostSpdMul = 1.30; },
+               icon:(cx,x,y,s)=>I.bolt(cx,x,y,s,C.cyan) },
+  overclock: { id:'overclock', name:'OVERCLOCK',    kind:'consumable', tier:'rare',      desc:'10초 쿨-20%',
+               apply: p => { p._boostCdr = Math.max(p._boostCdr||0, 10); p._boostCdrMul = 1.25; },
+               icon:(cx,x,y,s)=>I.clock(cx,x,y,s,C.cyan) },
+  fission:   { id:'fission',   name:'FISSION CELL', kind:'consumable', tier:'rare',      desc:'10초 피해 +30%',
+               apply: p => { p._boostDmg = Math.max(p._boostDmg||0, 10); p._boostDmgMul = 1.30; },
+               icon:(cx,x,y,s)=>I.atom(cx,x,y,s,C.gold) },
+  shieldPack:{ id:'shieldPack',name:'SHIELD PACK',  kind:'consumable', tier:'rare',      desc:'6초 무적',
+               apply: p => { p._boostInvuln = Math.max(p._boostInvuln||0, 6); },
+               icon:(cx,x,y,s)=>I.shield(cx,x,y,s,C.cyan) },
+  novaBomb:  { id:'novaBomb',  name:'NOVA BOMB',    kind:'consumable', tier:'legendary', desc:'화면 내 적 피해 대폭',
+               apply: p => {
+                 for(const e of G.ents){
+                   if(e.type!=='enemy' || !e.alive) continue;
+                   const d = Math.hypot(e.x-p.x, e.y-p.y);
+                   if(d < 900) dealDamage(e, Math.max(80, e.maxHp*.55), C.gold);
+                 }
+                 fxShockwave(p.x, p.y, C.gold, 900, .8); shake(.4); flash(C.gold, .4);
+               },
+               icon:(cx,x,y,s)=>I.burst(cx,x,y,s,C.gold) },
+  ascend:    { id:'ascend',    name:'ASCEND',       kind:'consumable', tier:'legendary', desc:'즉시 레벨업',
+               apply: p => { p.xp = Math.max(p.xp, p.xpNext); p._forcedLevelup = true; },
+               icon:(cx,x,y,s)=>I.upArrow(cx,x,y,s,C.gold) },
+
+  // ── RELIC (영구) ──
+  // Magnitudes bumped ~30-50% to compensate for passives losing stat role.
+  // Items are now the PRIMARY stat lever.
+  gyro:      { id:'gyro',      name:'GYRO CORE',    kind:'relic', tier:'common',    desc:'이동속도 +14%',
+               apply: p => { p.speed *= 1.14; },
+               icon:(cx,x,y,s)=>I.gear(cx,x,y,s,'#b0bccc') },
+  plating:   { id:'plating',   name:'NEON PLATING', kind:'relic', tier:'common',    desc:'최대 HP +20%, 재생 +0.5',
+               apply: p => { const boost = Math.round(p.maxHp*.20); p.maxHp += boost; p.hp += boost; p.regen += .5; },
+               icon:(cx,x,y,s)=>I.plate(cx,x,y,s,'#b0bccc') },
+  magcoil:   { id:'magcoil',   name:'MAG COIL',     kind:'relic', tier:'common',    desc:'픽업 범위 +55%',
+               apply: p => { p.magnet *= 1.55; },
+               icon:(cx,x,y,s)=>I.magnet(cx,x,y,s,C.pink) },
+  siphon:    { id:'siphon',    name:'LIFE SIPHON',  kind:'relic', tier:'rare',      desc:'처치 시 12% 확률 +4 HP',
+               apply: p => { p.killHealChance = (p.killHealChance||0) + .12; p.killHealAmt = Math.max(p.killHealAmt||0, 4); },
+               icon:(cx,x,y,s)=>I.drop(cx,x,y,s,C.lime) },
+  amplifier: { id:'amplifier', name:'AMPLIFIER',    kind:'relic', tier:'rare',      desc:'피해 +22%',
+               apply: p => { p.dmgMul *= 1.22; },
+               icon:(cx,x,y,s)=>I.signal(cx,x,y,s,C.cyan) },
+  flywheel:  { id:'flywheel',  name:'FLYWHEEL',     kind:'relic', tier:'rare',      desc:'발사 속도 +18%',
+               apply: p => { p.cdMul *= 1.18; },
+               icon:(cx,x,y,s)=>I.flywheel(cx,x,y,s,C.cyan) },
+  lens:      { id:'lens',      name:'PRISM LENS',   kind:'relic', tier:'rare',      desc:'범위 +25%',
+               apply: p => { p.areaMul *= 1.25; },
+               icon:(cx,x,y,s)=>I.triangle(cx,x,y,s,C.cyan) },
+  aegis:     { id:'aegis',     name:'AEGIS CORE',   kind:'relic', tier:'legendary', desc:'피해 감소 +16%, 재생 +0.8',
+               apply: p => { p.dr = Math.min(.85, p.dr + .16); p.regen += .8; },
+               icon:(cx,x,y,s)=>I.hexShield(cx,x,y,s,C.gold) },
+  singularityCore: {
+               id:'singularityCore', name:'SINGULARITY CORE', kind:'relic', tier:'legendary', desc:'피해 +28%, 쿨 -14%',
+               apply: p => { p.dmgMul *= 1.28; p.cdMul *= 1.14; },
+               icon:(cx,x,y,s)=>I.concentric(cx,x,y,s,C.violet) },
+  fourLeaf:  { id:'fourLeaf',  name:'FOUR LEAF',    kind:'relic', tier:'legendary', desc:'행운 +60%, XP +20%',
+               apply: p => { p.luck += .6; p.xpGainMul = (p.xpGainMul||1) * 1.20; },
+               icon:(cx,x,y,s)=>I.clover(cx,x,y,s,C.lime) },
+};
+export function itemsByTier(tier){ return Object.values(ITEMS).filter(it => it.tier === tier); }
+
+/* ───────── SYNERGIES ───────── */
+function _hasW(p, key){ return !!p.weapons.find(w => w.key === key); }
+function _pLv(p, key){ return p.passives[key]||0; }
+function _hasEvo(p){ return p.weapons.some(w => w.evolved); }
+export const SYNERGIES = {
+  prismatic: {
+    name:'PRISMATIC', tier:1, desc:'BEAM + PRISM — 피해 +18%',
+    has: p => _hasW(p,'BEAM') && _hasW(p,'PRISM'),
+    apply: p => { p.dmgMul *= 1.18; }
+  },
+  conductor: {
+    name:'CONDUCTOR', tier:1, desc:'CHAIN + BEAM — 발사 속도 +12%',
+    has: p => _hasW(p,'CHAIN') && _hasW(p,'BEAM'),
+    apply: p => { p.cdMul *= 1.12; }
+  },
+  eventHorizon: {
+    name:'EVENT HORIZON', tier:1, desc:'BLACKHOLE + HOMING — 범위 +15%, 피해 +10%',
+    has: p => _hasW(p,'BLACKHOLE') && _hasW(p,'HOMING'),
+    apply: p => { p.areaMul *= 1.15; p.dmgMul *= 1.10; }
+  },
+  starfall: {
+    name:'STARFALL', tier:1, desc:'BLADE + CROSS — 이동속도 +8%, 피해 +10%',
+    has: p => _hasW(p,'BLADE') && _hasW(p,'CROSS'),
+    apply: p => { p.speed *= 1.08; p.dmgMul *= 1.10; }
+  },
+  resonance: {
+    name:'RESONANCE', tier:1, desc:'PULSE + SHOCK — 반경 +20%, 쿨 -10%',
+    has: p => _hasW(p,'PULSE') && _hasW(p,'SHOCK'),
+    apply: p => { p.areaMul *= 1.20; p.cdMul *= 1.10; }
+  },
+  guardian: {
+    name:'GUARDIAN', tier:1, desc:'ORBIT + SHOCK — 최대 HP +25, 재생 +0.5',
+    has: p => _hasW(p,'ORBIT') && _hasW(p,'SHOCK'),
+    apply: p => { p.maxHp += 25; p.hp += 25; p.regen += .5; }
+  },
+  overdrive: {
+    name:'OVERDRIVE', tier:2, desc:'POWER Lv3+ + PULSE — 피해 +15%',
+    has: p => _pLv(p,'POWER') >= 3 && _hasW(p,'PULSE'),
+    apply: p => { p.dmgMul *= 1.15; }
+  },
+  swiftShard: {
+    name:'SWIFT SHARD', tier:2, desc:'HASTE Lv3+ + BLADE — 쿨 -10%',
+    has: p => _pLv(p,'HASTE') >= 3 && _hasW(p,'BLADE'),
+    apply: p => { p.cdMul *= 1.10; }
+  },
+  magneticCore: {
+    name:'MAGNETIC CORE', tier:2, desc:'MAGNET Lv3+ + HOMING — 피해 +12%',
+    has: p => _pLv(p,'MAGNET') >= 3 && _hasW(p,'HOMING'),
+    apply: p => { p.dmgMul *= 1.12; }
+  },
+  vitalCircuit: {
+    name:'VITAL CIRCUIT', tier:2, desc:'SOUL Lv3+ + ORBIT — 재생 +0.8, 최대 HP +30',
+    has: p => _pLv(p,'SOUL') >= 3 && _hasW(p,'ORBIT'),
+    apply: p => { p.regen += .8; p.maxHp += 30; p.hp += 30; }
+  },
+  luckySpark: {
+    name:'LUCKY SPARK', tier:2, desc:'LUCK Lv3+ + CHAIN — 연쇄 추가 +1, 피해 +10%',
+    has: p => _pLv(p,'LUCK') >= 3 && _hasW(p,'CHAIN'),
+    apply: p => { p.dmgMul *= 1.10; const w = p.weapons.find(x=>x.key==='CHAIN'); if(w) w.stats.jumps += 1; }
+  },
+  trinityBeam: {
+    name:'TRINITY BEAM', tier:3, desc:'BEAM + PRISM + CHAIN — 피해 +25%, 쿨 -10%',
+    has: p => _hasW(p,'BEAM') && _hasW(p,'PRISM') && _hasW(p,'CHAIN'),
+    apply: p => { p.dmgMul *= 1.25; p.cdMul *= 1.10; }
+  },
+  singularity: {
+    name:'SINGULARITY', tier:3, desc:'BLACKHOLE + ORBIT + SHOCK — 범위 +25%',
+    has: p => _hasW(p,'BLACKHOLE') && _hasW(p,'ORBIT') && _hasW(p,'SHOCK'),
+    apply: p => { p.areaMul *= 1.25; p.dmgMul *= 1.08; }
+  },
+  ascendant: {
+    name:'ASCENDANT', tier:3, desc:'진화 무기 보유 — 전 스탯 +8%',
+    has: p => _hasEvo(p),
+    apply: p => { p.dmgMul *= 1.08; p.speed *= 1.08; p.cdMul *= 1.08; p.areaMul *= 1.08; }
+  }
+};
+
+/* ───────── SHOP ───────── */
+export const SHOP_ITEMS = [
+  {key:'hp',     name:'+ HP',         desc:'시작 HP +20', max:8, costFn: lv => 10 + lv*5 },
+  {key:'dmg',    name:'POWER CORE',   desc:'기본 데미지 +6%', max:8, costFn: lv => 12 + lv*6 },
+  {key:'speed',  name:'KINETIC',      desc:'이동 속도 +4%', max:8, costFn: lv => 10 + lv*5 },
+  {key:'magnet', name:'MAGNET FIELD', desc:'픽업 범위 +25%', max:6, costFn: lv => 14 + lv*7 },
+  {key:'regen',  name:'REGEN',        desc:'재생 +0.4/s', max:6, costFn: lv => 16 + lv*8 },
+  {key:'armor',  name:'PLATING',      desc:'피해 감소 +4%', max:6, costFn: lv => 16 + lv*8 },
+  {key:'reroll', name:'REROLL +',     desc:'레벨업 리롤 비용 -1', max:3, costFn: lv => 30 + lv*15 },
+  {key:'luck',   name:'LUCK',         desc:'드랍/희귀 가산 +10%', max:5, costFn: lv => 22 + lv*10 },
+  {key:'start',  name:'PRELOADED',    desc:'시작 시 무작위 유물 1개씩 자동 장착', max:2, costFn: lv => 60 + lv*40 },
+];

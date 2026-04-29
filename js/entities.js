@@ -1,0 +1,342 @@
+/* ===================================================================
+   ENTITIES — base entity factory + spatial hash + fx + spawning + combat helpers.
+   This is the bottom of the game-logic stack: weapons.js calls into here
+   (firePulse / fireProjectile / fxBurst / etc), and player.js calls dealDamage.
+   =================================================================== */
+import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce } from './core.js';
+import { AUDIO } from './audio.js';
+
+/* ───────── ENTITY BASE ───────── */
+export function makeEnt(props){
+  const e = Object.assign({alive:true, t:0}, props);
+  G.ents.push(e);
+  return e;
+}
+
+/* ───────── SPATIAL HASH GRID (enemies only) ───────── */
+export const EGRID = {
+  cell: 128,
+  map: new Map(),
+  enemies: [],
+  _key(cx, cy){ return cx * 100003 + cy; },
+  build(ents){
+    this.map.clear();
+    const list = this.enemies;
+    list.length = 0;
+    const cs = this.cell;
+    for(let i = 0; i < ents.length; i++){
+      const e = ents[i];
+      if(e.type !== 'enemy' || !e.alive) continue;
+      list.push(e);
+      const k = this._key(Math.floor(e.x / cs), Math.floor(e.y / cs));
+      let arr = this.map.get(k);
+      if(!arr){ arr = []; this.map.set(k, arr); }
+      arr.push(e);
+    }
+  },
+  query(x, y, r, out){
+    out.length = 0;
+    const cs = this.cell;
+    const cx0 = Math.floor((x - r) / cs), cx1 = Math.floor((x + r) / cs);
+    const cy0 = Math.floor((y - r) / cs), cy1 = Math.floor((y + r) / cs);
+    for(let cx = cx0; cx <= cx1; cx++){
+      for(let cy = cy0; cy <= cy1; cy++){
+        const arr = this.map.get(this._key(cx, cy));
+        if(arr) for(let i = 0; i < arr.length; i++) out.push(arr[i]);
+      }
+    }
+    return out;
+  },
+  queryLine(x1, y1, x2, y2, r, out){
+    const cx = (x1 + x2) * .5, cy = (y1 + y2) * .5;
+    const half = Math.hypot(x2 - x1, y2 - y1) * .5;
+    return this.query(cx, cy, half + r, out);
+  },
+  count(){ return this.enemies.length; }
+};
+export const _EQ1 = [], _EQ2 = [];
+
+/* ───────── PARTICLE / FX HELPERS ───────── */
+// Global particle budget — when entity count is high (mid-late run boss waves),
+// shrink particle spawn counts. shadowBlur dominates draw cost so trimming fx
+// is the single biggest FPS lever we have.
+function _particleBudget(count){
+  const n = G.ents.length;
+  if(n > 1500) return Math.max(1, count >> 3);    // 12%
+  if(n > 900)  return Math.max(1, count >> 2);    // 25%
+  if(n > 500)  return Math.max(1, count >> 1);    // 50%
+  if(n > 300)  return Math.max(2, (count*.7)|0);  // 70%
+  return count;
+}
+export function fxBurst(x,y,color,count=14,speed=180,size=3,life=.5){
+  count = _particleBudget(count);
+  for(let i=0;i<count;i++){
+    const a = Math.random()*TAU;
+    const sp = speed * (.4 + Math.random()*.9);
+    makeEnt({type:'fx', x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, color, size:size*(.6+Math.random()*.8), life, maxLife:life});
+  }
+}
+export function fxRing(x,y,color,size=60,life=.4){
+  makeEnt({type:'ring', x, y, color, r:8, maxR:size, life, maxLife:life});
+}
+export function fxText(x,y,text,color='#fff',big=false){
+  makeEnt({type:'text', x, y, text, color, life:.7, maxLife:.7, vy:-50, big});
+}
+export function fxLine(x1,y1,x2,y2,color,life=.18,width=2){
+  makeEnt({type:'line', x1,y1,x2,y2,color,life,maxLife:life,width});
+}
+export function fxShockwave(x,y,color,maxR=180,life=.5){
+  makeEnt({type:'shock', x, y, color, r:8, maxR, life, maxLife:life});
+}
+export function shake(amt){ G.shake = Math.min(1, G.shake + amt); }
+export function hitstop(s){ G.hitstop = Math.max(G.hitstop, s); }
+export function flash(color,a=.4){ G.flash = a; G.flashColor = color; }
+
+/* ───────── COMBAT HELPERS ───────── */
+export function dealDamage(e, dmg, color='#fff'){
+  if(!e.alive) return;
+  dmg = Math.round(dmg);
+  e.hp -= dmg;
+  e.hitFlash = .12;
+  fxText(e.x, e.y - e.r - 4, dmg, color);
+  if(e.hp <= 0){ killEnemy(e); }
+  else { AUDIO.hit(e.x); }
+}
+
+// Slow effect from evolution `extra:{slow, slowDur}`. Applied when an enemy
+// is hit by a slow-tagged attack. Multiplier is (1 - factor); duration in s.
+// Stronger slows override weaker; equal-strength refresh duration.
+export function applySlow(e, factor, duration){
+  if(!e || !e.alive) return;
+  const mul = Math.max(0, 1 - factor);
+  if(e.slowMul == null || mul < e.slowMul || (mul === e.slowMul && (e.slowTime||0) < duration)){
+    e.slowMul = mul;
+    e.slowTime = duration;
+  }
+}
+export function killEnemy(e){
+  if(!e.alive) return;
+  e.alive = false;
+  G.killCount++;
+  G.combo++;
+  G.comboTimer = 2.2;
+  if(G.player && G.player.killHealChance && Math.random() < G.player.killHealChance){
+    const amt = G.player.killHealAmt || 0;
+    if(amt > 0){
+      G.player.hp = Math.min(G.player.maxHp, G.player.hp + amt);
+      fxRing(G.player.x, G.player.y, C.lime, 36, .25);
+    }
+  }
+  fxBurst(e.x, e.y, e.color, e.isBoss?42:14, e.isBoss?340:200, e.isBoss?5:3, .6);
+  fxRing(e.x, e.y, e.color, e.isBoss?160:e.r*3.5, e.isBoss?.7:.45);
+  if(e.isBoss){ shake(.6); flash(e.color, .35); AUDIO.explode(e.x, e.y); announce('CORE SHATTERED', 1.6); }
+  else { shake(.04); AUDIO.hit(e.x); }
+  // drops are handled by player.js (it imports the items table) via _onKill hook
+  if(_onKillHook) _onKillHook(e);
+  // boss UI cleanup + music swap
+  if(e.isBoss && G.bossActive === e){
+    G.bossActive = null;
+    document.getElementById('boss-hp-wrap').style.display='none';
+    document.getElementById('boss-name').style.display='none';
+    AUDIO.setMode('main');
+  }
+}
+// player.js installs a hook here so we can drop XP / items / split-spawns
+// without entities.js needing to import items + spawn helpers transitively.
+let _onKillHook = null;
+export function setOnKillHook(fn){ _onKillHook = fn; }
+
+export function pointSegDist(px,py, ax,ay, bx,by){
+  const dx = bx-ax, dy = by-ay;
+  const len = dx*dx + dy*dy;
+  let t = ((px-ax)*dx + (py-ay)*dy) / (len||1);
+  t = clamp(t, 0, 1);
+  const cx = ax + dx*t, cy = ay + dy*t;
+  return Math.hypot(px-cx, py-cy);
+}
+export function nearestEnemy(p, range=Infinity){
+  let best=null, bd=range*range;
+  if(range === Infinity || !isFinite(range)){
+    const el = EGRID.enemies;
+    for(let i = 0; i < el.length; i++){
+      const e = el[i];
+      if(!e.alive) continue;
+      const d = (e.x-p.x)*(e.x-p.x)+(e.y-p.y)*(e.y-p.y);
+      if(d < bd){ bd = d; best = e; }
+    }
+    return best;
+  }
+  const list = EGRID.query(p.x, p.y, range, _EQ1);
+  for(let i = 0; i < list.length; i++){
+    const e = list[i];
+    if(!e.alive) continue;
+    const d = (e.x-p.x)*(e.x-p.x)+(e.y-p.y)*(e.y-p.y);
+    if(d < bd){ bd = d; best = e; }
+  }
+  return best;
+}
+export function nearestEnemyExcept(p, exclude, range){
+  let best=null, bd=range*range;
+  const list = EGRID.query(p.x, p.y, range, _EQ1);
+  for(let i = 0; i < list.length; i++){
+    const e = list[i];
+    if(!e.alive || exclude.has(e)) continue;
+    const d = (e.x-p.x)*(e.x-p.x)+(e.y-p.y)*(e.y-p.y);
+    if(d < bd){ bd = d; best = e; }
+  }
+  return best;
+}
+
+/* ───────── PROJECTILE / ATTACK SPAWNERS ───────── */
+export function fireProjectile(x,y,angle,speed,dmg,life,color,kind='bullet',extra={}){
+  AUDIO.shoot(x);
+  const p = makeEnt(Object.assign({
+    type:'proj', subtype:kind, x, y,
+    vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
+    angle, speed, dmg, color, life, maxLife:life,
+    r: kind==='shuriken' ? 14 : 6,
+    pierce: extra.pierce!=null ? extra.pierce : 0,
+    hits: new Set(),
+    spin: extra.spin || 0,
+    target: extra.target || null,
+    turn: extra.turn || 0,
+    splits: extra.splits || 0,
+  }, extra));
+  return p;
+}
+export function firePulse(x,y,r,dmg,kb,opts){
+  AUDIO.explode(x, y);
+  fxShockwave(x,y,opts?.color || C.cyan,r,.45);
+  shake(.05);
+  const list = EGRID.query(x, y, r + 40, _EQ1);
+  for(let i = 0; i < list.length; i++){
+    const e = list[i];
+    if(!e.alive) continue;
+    const dx = e.x - x, dy = e.y - y;
+    const rr = r + e.r;
+    if(dx*dx + dy*dy <= rr*rr){
+      const a = Math.atan2(dy, dx);
+      e.vx += Math.cos(a)*kb;
+      e.vy += Math.sin(a)*kb;
+      dealDamage(e, dmg, opts?.color || C.cyan);
+      if(opts?.slow) applySlow(e, opts.slow, opts.slowDur || 1);
+    }
+  }
+}
+export function fireFanShock(x,y,angle,r,arc,dmg,opts){
+  AUDIO.explode(x, y);
+  const color = opts?.color || C.magenta;
+  makeEnt({type:'fan', x,y,angle, r, arc, color, life:.35, maxLife:.35});
+  shake(.06);
+  const list = EGRID.query(x, y, r + 40, _EQ1);
+  for(let i = 0; i < list.length; i++){
+    const e = list[i];
+    if(!e.alive) continue;
+    const dx = e.x - x, dy = e.y - y;
+    const rr = r + e.r;
+    if(dx*dx + dy*dy > rr*rr) continue;
+    const a = Math.atan2(dy, dx);
+    let diff = ((a - angle) % TAU + Math.PI*3) % TAU - Math.PI;
+    if(Math.abs(diff) <= arc/2){
+      dealDamage(e, dmg, color);
+      const k = 220;
+      e.vx += Math.cos(a)*k;
+      e.vy += Math.sin(a)*k;
+      if(opts?.slow) applySlow(e, opts.slow, opts.slowDur || 1);
+    }
+  }
+}
+export function spawnBlackhole(x,y,r,life,pull,dmgPerSec){
+  const bh = makeEnt({type:'blackhole', x, y, r, life, maxLife:life, pull, dmgPerSec, color:C.violet, t:0});
+  AUDIO.boss();
+  fxRing(x,y,C.violet,r,.6);
+  return bh;
+}
+
+/* ───────── ENEMY / PICKUP SPAWNERS ───────── */
+// ENEMIES + BOSSES tables live in data.js; we need them here for spawn.
+// To keep entities.js below data.js in the dep order, data.js installs the
+// definitions via setEnemyTables.
+let ENEMIES_REF = null, BOSSES_REF = null;
+export function setEnemyTables(enemies, bosses){ ENEMIES_REF = enemies; BOSSES_REF = bosses; }
+
+export function spawnEnemy(typeKey, x, y){
+  const def = ENEMIES_REF[typeKey];
+  const tier = 1 + G.t/180;
+  const e = makeEnt({
+    type:'enemy', kind:typeKey, def,
+    x, y, vx:0, vy:0,
+    sides:def.sides, color:def.color, r:def.r,
+    hp: def.hp * tier, maxHp: def.hp * tier,
+    speed: def.speed,
+    dmg: def.dmg * Math.sqrt(tier),
+    xp: def.xp,
+    gold: def.gold,
+    brain: def.brain,
+    rot: Math.random()*TAU, rotSpeed:rand(-1,1),
+    hitFlash:0,
+    hitOrbit:{},
+    isDiamond: def.isDiamond,
+    state:0, timer:0,
+  });
+  return e;
+}
+export function spawnBoss(typeKey){
+  const def = BOSSES_REF[typeKey];
+  const a = Math.random()*TAU;
+  const distSpawn = 380;
+  const x = G.player.x + Math.cos(a)*distSpawn;
+  const y = G.player.y + Math.sin(a)*distSpawn;
+  // Gentler scaling: first boss at 110s ≈ 0.81x, was 0.84x with old curve.
+  // Later bosses still grow, just less steeply.
+  const tier = .45 + G.t/360;
+  const e = makeEnt({
+    type:'enemy', kind:typeKey, def, isBoss:true,
+    x, y, vx:0, vy:0,
+    sides:def.sides, color:def.color, r:def.r,
+    hp: def.hp * tier, maxHp: def.hp * tier,
+    speed: def.speed,
+    dmg: def.dmg * Math.sqrt(tier),
+    xp: def.xp, gold: def.gold,
+    brain: def.brain,
+    rot:0, rotSpeed: .8,
+    hitFlash:0,
+    state:0, timer:0,
+    name: def.name,
+  });
+  G.bossActive = e;
+  G.bannerTimer = 1.4;
+  document.getElementById('boss-banner').textContent = '▼ ' + def.name + ' ▼';
+  document.getElementById('boss-banner').classList.add('show');
+  document.getElementById('boss-name').textContent = '▼ ' + def.name + ' ▼';
+  document.getElementById('boss-name').style.display = 'block';
+  document.getElementById('boss-hp-wrap').style.display = 'block';
+  setTimeout(()=> document.getElementById('boss-banner').classList.remove('show'), 1400);
+  AUDIO.setMode('boss');
+  AUDIO.boss();
+  shake(.5);
+  return e;
+}
+export function spawnXP(x,y,amount){
+  let kind = 'sm';
+  if(amount >= 12) kind = 'lg';
+  else if(amount >= 5) kind = 'md';
+  if(amount >= 50) kind = 'huge';
+  const colorMap = {sm:C.cyan, md:C.lime, lg:C.gold, huge:C.magenta};
+  makeEnt({type:'xp', x, y, vx:rand(-40,40), vy:rand(-40,40), amount, kind, color:colorMap[kind], r: kind==='sm'?5: kind==='md'?7: kind==='lg'?9:12, life:60, maxLife:60});
+}
+export function spawnCoin(x,y){
+  makeEnt({type:'coin', x, y, vx:rand(-50,50), vy:rand(-50,50), r:6, color:C.gold, life:30, maxLife:30});
+}
+export function spawnHeart(x,y){
+  makeEnt({type:'heart', x, y, vx:rand(-40,40), vy:rand(-40,40), r:8, color:C.red, life:30, maxLife:30});
+}
+export function spawnMagnet(x,y){
+  makeEnt({type:'magnet', x, y, vx:rand(-40,40), vy:rand(-40,40), r:8, color:C.pink, life:30, maxLife:30});
+}
+export function spawnFreeze(x,y){
+  makeEnt({type:'freeze', x, y, vx:rand(-30,30), vy:rand(-30,30), r:9, color:C.teal, life:30, maxLife:30});
+}
+export function spawnChest(x,y){
+  makeEnt({type:'chest', x, y, r:14, color:C.gold, life:120, maxLife:120});
+}
