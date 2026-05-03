@@ -247,27 +247,34 @@ export function update(){
       }
     }
     // Beams + orbit nodes — per-frame redraw based on weapon state.
+    // Match by def.kind so evolved BEAMs and fusion BEAMs (PRISM_HALO,
+    // EVENT_LANCE, STAR_FORGE — kind:'BEAM') all render here. Same for ORBIT
+    // fusions (VOID_PULSAR, RESONANT_RING — kind:'ORBIT').
     if(p.beamGfx){
       p.beamGfx.clear();
       for(const w of p.weapons){
-        if((w.key === 'BEAM' || w.key === 'EVENT_LANCE') && w.beams){
+        if(w.def && w.def.kind === 'BEAM' && w.beams && w.beams.length){
+          const bw = w.stats.width || 3;
+          const beamCol = w.color || '#ffd400';
           for(const b of w.beams){
             if(!b) continue;
             p.beamGfx.moveTo(b.x1, b.y1); p.beamGfx.lineTo(b.x2, b.y2);
-            p.beamGfx.stroke({ color: 0xffd400, alpha: .55, width: (w.stats.width||3) + 12 });
+            p.beamGfx.stroke({ color: beamCol, alpha: .55, width: bw + 12 });
             p.beamGfx.moveTo(b.x1, b.y1); p.beamGfx.lineTo(b.x2, b.y2);
-            p.beamGfx.stroke({ color: 0xffffff, alpha: .95, width: w.stats.width||3 });
+            p.beamGfx.stroke({ color: '#ffffff', alpha: .95, width: bw });
           }
         }
-        if(w.key === 'ORBIT' && w.lastNodes){
+        if(w.def && w.def.kind === 'ORBIT' && w.lastNodes){
+          const nodeCol = w.color || '#9b5cff';
+          const nr = w.stats.nodeR || 10;
           for(const n of w.lastNodes){
             if(!n) continue;
-            p.beamGfx.circle(n.x, n.y, w.stats.nodeR || 10);
-            p.beamGfx.fill({ color: 0x9b5cff, alpha: .35 });
-            p.beamGfx.circle(n.x, n.y, w.stats.nodeR || 10);
-            p.beamGfx.stroke({ color: 0x9b5cff, alpha: .9, width: 2 });
+            p.beamGfx.circle(n.x, n.y, nr);
+            p.beamGfx.fill({ color: nodeCol, alpha: .35 });
+            p.beamGfx.circle(n.x, n.y, nr);
+            p.beamGfx.stroke({ color: nodeCol, alpha: .9, width: 2 });
             p.beamGfx.moveTo(p.x, p.y); p.beamGfx.lineTo(n.x, n.y);
-            p.beamGfx.stroke({ color: 0x9b5cff, alpha: .25, width: 1.2 });
+            p.beamGfx.stroke({ color: nodeCol, alpha: .25, width: 1.2 });
           }
         }
       }
@@ -562,6 +569,10 @@ function _syncEntitySprite(e){
     const wantFlash = e.hitFlash > 0;
     if(wantFlash && e.__flashTex && sp.texture !== e.__flashTex.texture) sp.texture = e.__flashTex.texture;
     else if(!wantFlash && e.__normTex && sp.texture !== e.__normTex.texture) sp.texture = e.__normTex.texture;
+    if(e.auraSprite){
+      e.auraSprite.position.set(e.x, e.y);
+      e.auraSprite.alpha = .35 + Math.sin(G.realT*3) * .12;  // breathing pulse
+    }
   } else if(e.type === 'proj'){
     sp.rotation = e.subtype === 'shuriken' ? e.spin : Math.atan2(e.vy, e.vx);
   } else if(e.type === 'xp')     sp.rotation = G.realT * 3;

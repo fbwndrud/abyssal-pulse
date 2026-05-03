@@ -67,13 +67,17 @@ export const WEAPONS = {
       // could escape entirely — the user-visible "beam misses" bug.
       if(!w._tickHits) w._tickHits = new Set();
       const beamColor = w.color || '#ffd400';
+      // Trim beams to current count — handles evolutions that REDUCE count
+      // (e.g., VOID LANCE 3→1) so stale higher-index beams aren't rendered
+      // at frozen positions.
+      if(!w.beams) w.beams = [];
+      if(w.beams.length !== s.count) w.beams.length = s.count;
       for(let b=0;b<s.count;b++){
         let a = w.angle + (b * TAU/s.count);
         // PRISM RAY: each beam wobbles randomly
         if(exFlags.randomAim) a += (Math.random()-.5) * 1.4;
         const ex = p.x + Math.cos(a)*s.length;
         const ey = p.y + Math.sin(a)*s.length;
-        if(!w.beams) w.beams = [];
         w.beams[b] = {x1:p.x,y1:p.y,x2:ex,y2:ey,life:G.dt};
         const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
         for(let li = 0; li < list.length; li++){
@@ -552,6 +556,7 @@ export const FUSIONS = {
       const damageThisFrame = w.tickT <= 0;
       if(damageThisFrame) w.tickT = tickEvery;
       if(!w.beams) w.beams = [];
+      if(w.beams.length !== s.count) w.beams.length = s.count;
       const col = w.color || C.gold;
       // Same hit-tracking pattern as base BEAM — capture all enemies that
       // overlap any beam frame so fast crossers aren't missed.
@@ -724,6 +729,7 @@ export const FUSIONS = {
       const damageThisFrame = w.tickT <= 0;
       if(damageThisFrame) w.tickT = tickEvery;
       if(!w.beams) w.beams = [];
+      if(w.beams.length !== s.count) w.beams.length = s.count;
       const col = w.color || C.magenta;
       // Same hit-tracking as base BEAM: beam-line and tip-area hits accumulate
       // every frame so fast crossers aren't missed; flushed on each tick.
@@ -969,6 +975,7 @@ export const FUSIONS = {
       const damageThisFrame = w.tickT <= 0;
       if(damageThisFrame) w.tickT = tickEvery;
       if(!w.beams) w.beams = [];
+      if(w.beams.length !== s.count) w.beams.length = s.count;
       const col = w.color || C.gold;
       // Cross-frame hit tracking — see base BEAM for rationale.
       if(!w._tickHits) w._tickHits = new Set();
