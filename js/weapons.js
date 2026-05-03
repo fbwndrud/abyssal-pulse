@@ -62,6 +62,11 @@ export const WEAPONS = {
       const damageThisFrame = w.tickT <= 0;
       if(damageThisFrame) w.tickT = tickEvery;
       const exFlags = w.extra || {};
+      // Track every enemy that overlapped *any* beam since the last damage tick.
+      // Without this, fast/dashing enemies that crossed the beam between ticks
+      // could escape entirely — the user-visible "beam misses" bug.
+      if(!w._tickHits) w._tickHits = new Set();
+      const beamColor = w.color || '#ffd400';
       for(let b=0;b<s.count;b++){
         let a = w.angle + (b * TAU/s.count);
         // PRISM RAY: each beam wobbles randomly
@@ -70,19 +75,21 @@ export const WEAPONS = {
         const ey = p.y + Math.sin(a)*s.length;
         if(!w.beams) w.beams = [];
         w.beams[b] = {x1:p.x,y1:p.y,x2:ex,y2:ey,life:G.dt};
-        if(damageThisFrame){
-          const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
-          const beamColor = w.color || '#ffd400';
-          for(let li = 0; li < list.length; li++){
-            const e = list[li];
-            if(!e.alive) continue;
-            const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
-            if(d <= e.r + s.width){
-              dealDamage(e, s.dmg * p.dmgMul, beamColor);
-              fxBurst(e.x,e.y,beamColor,3,90,2,.18);
-            }
-          }
+        const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
+        for(let li = 0; li < list.length; li++){
+          const e = list[li];
+          if(!e.alive) continue;
+          const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
+          if(d <= e.r + s.width) w._tickHits.add(e);
         }
+      }
+      if(damageThisFrame){
+        for(const e of w._tickHits){
+          if(!e.alive) continue;
+          dealDamage(e, s.dmg * p.dmgMul, beamColor);
+          fxBurst(e.x, e.y, beamColor, 3, 90, 2, .18);
+        }
+        w._tickHits.clear();
       }
     },
     levelUp(w,lv){
@@ -546,26 +553,31 @@ export const FUSIONS = {
       if(damageThisFrame) w.tickT = tickEvery;
       if(!w.beams) w.beams = [];
       const col = w.color || C.gold;
+      // Same hit-tracking pattern as base BEAM — capture all enemies that
+      // overlap any beam frame so fast crossers aren't missed.
+      if(!w._tickHits) w._tickHits = new Map(); // enemy → angle (for shard direction)
       for(let b=0;b<s.count;b++){
         const a = w.angle + (b * TAU/s.count);
         const ex = p.x + Math.cos(a)*s.length;
         const ey = p.y + Math.sin(a)*s.length;
         w.beams[b] = {x1:p.x,y1:p.y,x2:ex,y2:ey,life:G.dt};
-        if(damageThisFrame){
-          const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
-          for(let li = 0; li < list.length; li++){
-            const e = list[li];
-            if(!e.alive) continue;
-            const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
-            if(d <= e.r + s.width){
-              dealDamage(e, s.dmg * p.dmgMul, col);
-              fxBurst(e.x,e.y,col,4,120,2.2,.22);
-              // Each beam tick spawns a prism shard from the hit — splits on impact.
-              const shardA = a + (Math.random()-.5) * .8;
-              fireProjectile(e.x, e.y, shardA, 280, s.dmg * p.dmgMul * .35, .9, col, 'prism', {splits:s.splits});
-            }
-          }
+        const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
+        for(let li = 0; li < list.length; li++){
+          const e = list[li];
+          if(!e.alive) continue;
+          const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
+          if(d <= e.r + s.width && !w._tickHits.has(e)) w._tickHits.set(e, a);
         }
+      }
+      if(damageThisFrame){
+        for(const [e, a] of w._tickHits){
+          if(!e.alive) continue;
+          dealDamage(e, s.dmg * p.dmgMul, col);
+          fxBurst(e.x, e.y, col, 4, 120, 2.2, .22);
+          const shardA = a + (Math.random()-.5) * .8;
+          fireProjectile(e.x, e.y, shardA, 280, s.dmg * p.dmgMul * .35, .9, col, 'prism', {splits:s.splits});
+        }
+        w._tickHits.clear();
       }
     },
   },
@@ -713,6 +725,10 @@ export const FUSIONS = {
       if(damageThisFrame) w.tickT = tickEvery;
       if(!w.beams) w.beams = [];
       const col = w.color || C.magenta;
+      // Same hit-tracking as base BEAM: beam-line and tip-area hits accumulate
+      // every frame so fast crossers aren't missed; flushed on each tick.
+      if(!w._beamHits) w._beamHits = new Set();
+      if(!w._tipHits)  w._tipHits  = new Set();
       for(let b=0;b<s.count;b++){
         const a = w.angle + (b * TAU/s.count);
         const ex = p.x + Math.cos(a)*s.length;
@@ -732,29 +748,37 @@ export const FUSIONS = {
             e.vy += (dy/dist) * force;
           }
         }
+        // Beam-line hit accumulation
+        const lineList = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
+        for(let li = 0; li < lineList.length; li++){
+          const e = lineList[li];
+          if(!e.alive) continue;
+          const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
+          if(d <= e.r + s.width) w._beamHits.add(e);
+        }
+        // Tip-area hit accumulation
+        for(let li = 0; li < tipList.length; li++){
+          const e = tipList[li];
+          if(!e.alive) continue;
+          const dd = (e.x-ex)*(e.x-ex) + (e.y-ey)*(e.y-ey);
+          if(dd < (e.r + tipR)*(e.r + tipR)) w._tipHits.add(e);
+        }
         if(damageThisFrame){
-          // Beam line damage
-          const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
-          for(let li = 0; li < list.length; li++){
-            const e = list[li];
-            if(!e.alive) continue;
-            const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
-            if(d <= e.r + s.width){
-              dealDamage(e, s.dmg * p.dmgMul, col);
-              fxBurst(e.x,e.y,col,4,110,2.2,.2);
-            }
-          }
-          // Tip area damage
-          for(let li = 0; li < tipList.length; li++){
-            const e = tipList[li];
-            if(!e.alive) continue;
-            const dd = (e.x-ex)*(e.x-ex) + (e.y-ey)*(e.y-ey);
-            if(dd < (e.r + tipR)*(e.r + tipR)){
-              dealDamage(e, s.tipDmg * p.dmgMul, col);
-            }
-          }
           fxRing(ex, ey, col, tipR, .18);
         }
+      }
+      if(damageThisFrame){
+        for(const e of w._beamHits){
+          if(!e.alive) continue;
+          dealDamage(e, s.dmg * p.dmgMul, col);
+          fxBurst(e.x, e.y, col, 4, 110, 2.2, .2);
+        }
+        for(const e of w._tipHits){
+          if(!e.alive) continue;
+          dealDamage(e, s.tipDmg * p.dmgMul, col);
+        }
+        w._beamHits.clear();
+        w._tipHits.clear();
       }
     },
   },
@@ -946,23 +970,28 @@ export const FUSIONS = {
       if(damageThisFrame) w.tickT = tickEvery;
       if(!w.beams) w.beams = [];
       const col = w.color || C.gold;
+      // Cross-frame hit tracking — see base BEAM for rationale.
+      if(!w._tickHits) w._tickHits = new Set();
       for(let b=0;b<s.count;b++){
         const a = w.angle + (b * TAU/s.count);
         const ex = p.x + Math.cos(a)*s.length;
         const ey = p.y + Math.sin(a)*s.length;
         w.beams[b] = {x1:p.x,y1:p.y,x2:ex,y2:ey,life:G.dt};
-        if(damageThisFrame){
-          const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
-          for(let li = 0; li < list.length; li++){
-            const e = list[li];
-            if(!e.alive) continue;
-            const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
-            if(d <= e.r + s.width){
-              dealDamage(e, s.dmg * p.dmgMul, col);
-              fxBurst(e.x,e.y,col,4,110,2.2,.2);
-            }
-          }
+        const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
+        for(let li = 0; li < list.length; li++){
+          const e = list[li];
+          if(!e.alive) continue;
+          const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
+          if(d <= e.r + s.width) w._tickHits.add(e);
         }
+      }
+      if(damageThisFrame){
+        for(const e of w._tickHits){
+          if(!e.alive) continue;
+          dealDamage(e, s.dmg * p.dmgMul, col);
+          fxBurst(e.x, e.y, col, 4, 110, 2.2, .2);
+        }
+        w._tickHits.clear();
       }
     },
   },

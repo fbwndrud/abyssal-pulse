@@ -9,7 +9,7 @@ import {
 import { AUDIO } from './audio.js';
 import { withDrawCtx } from './render.js';
 import {
-  shake, flash, clearAllWorldSprites,
+  shake, flash, clearAllWorldSprites, fxBurst, fxRing,
 } from './entities.js';
 import {
   CLASSES, PASSIVES, ENEMIES, UPGRADE_TIERS, SHOP_ITEMS,
@@ -445,9 +445,28 @@ function applyLevelupCard(card){
   if(card.type === 'weap_new'){ addWeapon(p, card.key); }
   else if(card.type === 'weap_up'){ levelWeapon(p, card.key, mult); }
   else if(card.type === 'pas'){ addPassive(p, card.key, mult); }
-  else if(card.type === 'evolve'){ applyEvo(p, card.key, card.evo.id); }
+  else if(card.type === 'evolve'){
+    applyEvo(p, card.key, card.evo.id);
+    // Heavy "milestone" feedback so the player feels the upgrade.
+    const col = card.evo.color || C.cyan;
+    flash(col, .55); shake(.5);
+    fxBurst(p.x, p.y, col, 36, 320, 4, .8);
+    fxRing(p.x, p.y, col, 140, .7);
+    fxRing(p.x, p.y, '#ffffff', 200, .9);
+    AUDIO.level();
+    announce('▲ EVOLVE · ' + card.evo.name, 3);
+  }
   else if(card.type === 'item_pick'){ applyItem(p, card.item.id); }
-  else if(card.type === 'fuse'){ applyFusion(p, card.fuseKey); }
+  else if(card.type === 'fuse'){
+    applyFusion(p, card.fuseKey);
+    const col = (card.fuse && card.fuse.color) || '#ff3dcb';
+    flash(col, .65); shake(.7);
+    fxBurst(p.x, p.y, col, 48, 380, 5, 1.0);
+    fxRing(p.x, p.y, col, 180, .8);
+    fxRing(p.x, p.y, '#ffffff', 260, 1.0);
+    AUDIO.level();
+    announce('★ FUSE · ' + (card.fuse?.name || 'WEAPON FUSED'), 3);
+  }
   else if(card.type === 'heal'){ p.hp = Math.min(p.maxHp, p.hp + p.maxHp*.5 * mult); }
   else if(card.type === 'gold'){ const amt = Math.round(10 * mult); G.coinsRun += amt; meta.coins += amt; saveMeta(); }
   updateSynergies(p);

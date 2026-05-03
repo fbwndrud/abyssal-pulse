@@ -288,9 +288,11 @@ export function update(){
   const firstReady = G.t >= FIRST_BOSS_AT;
   const intervalReady = G.bossTimer >= BOSS_INTERVAL && G.t >= FIRST_BOSS_AT;
   if(!G.bossActive && firstReady && intervalReady){
+    // Cycle through all 4 bosses, then loop. Variety > seeing PRISMA forever
+    // after 6:20. (Was: clamped to last index, so PRISMA repeated indefinitely.)
     const order = ['RING_LORD','SPIKE_KING','HYDRA','PRISMA'];
-    const idx = Math.min(order.length-1, Math.floor((G.t - FIRST_BOSS_AT) / BOSS_INTERVAL));
-    if(idx >= 0) spawnBoss(order[idx]);
+    const cycleIdx = Math.max(0, Math.floor((G.t - FIRST_BOSS_AT) / BOSS_INTERVAL));
+    spawnBoss(order[cycleIdx % order.length]);
     G.bossTimer = 0;
   } else if(!G.bossActive && !firstReady){
     // pre-first-boss: keep timer pegged so post-FIRST_BOSS_AT triggers immediately on next interval
