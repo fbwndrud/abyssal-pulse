@@ -198,6 +198,92 @@ export function getDiamondTexture(r, color='#fff', glow=12, fill=null){
   return getPolygonTexture(4, r, color, glow, fill, 2);
 }
 
+/* ───────── PARTICLE TEX (white round dot for fxBurst, tinted at runtime) ─────── */
+let _PARTICLE_TEX = null;
+export function getParticleTexture(){
+  if(_PARTICLE_TEX) return _PARTICLE_TEX;
+  const sz = 32;
+  const c = document.createElement('canvas'); c.width = sz; c.height = sz;
+  const cx = c.getContext('2d');
+  const g = cx.createRadialGradient(sz/2, sz/2, 0, sz/2, sz/2, sz/2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(.5, 'rgba(255,255,255,.6)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  cx.fillStyle = g; cx.fillRect(0, 0, sz, sz);
+  _PARTICLE_TEX = PIXI.Texture.from(c);
+  return _PARTICLE_TEX;
+}
+
+/* ───────── PARTICLE SPRITE POOL ───────── */
+const PARTICLE_POOL = [];
+export function acquireParticle(){
+  if(PARTICLE_POOL.length){
+    const p = PARTICLE_POOL.pop();
+    p.visible = true;
+    p.alpha = 1;
+    p.scale.set(1);
+    return p;
+  }
+  const p = new PIXI.Sprite(getParticleTexture());
+  p.anchor.set(0.5);
+  return p;
+}
+export function releaseParticle(p){
+  if(!p) return;
+  if(p.parent) p.parent.removeChild(p);
+  p.visible = false;
+  if(PARTICLE_POOL.length < 1024) PARTICLE_POOL.push(p);
+  else p.destroy();
+}
+
+/* ───────── PIXI.Graphics POOL ───────── */
+const GFX_POOL = [];
+export function acquireGraphics(){
+  if(GFX_POOL.length){
+    const g = GFX_POOL.pop();
+    g.clear();
+    g.alpha = 1;
+    g.visible = true;
+    return g;
+  }
+  return new PIXI.Graphics();
+}
+export function releaseGraphics(g){
+  if(!g) return;
+  if(g.parent) g.parent.removeChild(g);
+  g.clear();
+  g.visible = false;
+  if(GFX_POOL.length < 256) GFX_POOL.push(g);
+  else g.destroy();
+}
+
+/* ───────── PIXI.Text POOL (damage numbers / floaters) ───────── */
+const TEXT_POOL = [];
+const TEXT_STYLE_NORM = { fontFamily: 'JetBrains Mono, Consolas, monospace', fontSize: 14, fontWeight: '700', fill: 0xffffff, align: 'center' };
+const TEXT_STYLE_BIG  = { fontFamily: 'JetBrains Mono, Consolas, monospace', fontSize: 18, fontWeight: '700', fill: 0xffffff, align: 'center' };
+export function acquireText(text, color, big){
+  let t;
+  if(TEXT_POOL.length){
+    t = TEXT_POOL.pop();
+    t.visible = true;
+    t.alpha = 1;
+  } else {
+    t = new PIXI.Text({ text: '', style: TEXT_STYLE_NORM });
+    t.anchor.set(0.5);
+  }
+  t.text = String(text);
+  t.style = big ? TEXT_STYLE_BIG : TEXT_STYLE_NORM;
+  t.style.fill = color || '#ffffff';
+  return t;
+}
+export function releaseText(t){
+  if(!t) return;
+  if(t.parent) t.parent.removeChild(t);
+  t.visible = false;
+  if(TEXT_POOL.length < 128) TEXT_POOL.push(t);
+  else t.destroy();
+}
+
 /* ───────── SPRITE POOL ─────────
    acquireSprite(key, texture) returns a PIXI.Sprite (anchor 0.5) ready to position.
    releaseSprite(key, sprite) hides it, removes from parent, returns to pool. */

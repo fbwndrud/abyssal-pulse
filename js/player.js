@@ -4,7 +4,7 @@
    Installs the kill hook in entities.js so killEnemy can drop XP/items
    without entities.js having to import data.js.
    =================================================================== */
-import { G, W, H, C, TAU, rand, meta, saveMeta, saveMetaLater, announce, entityLayer } from './core.js';
+import { G, W, H, C, TAU, rand, meta, saveMeta, saveMetaLater, announce, entityLayer, beamLayer } from './core.js';
 import { AUDIO } from './audio.js';
 import {
   makeEnt, fxBurst, fxRing, fxText, shake, flash,
@@ -13,6 +13,7 @@ import {
 } from './entities.js';
 import {
   getCircleTexture, getPolygonTexture, acquireSprite, releaseSprite,
+  acquireGraphics, releaseGraphics,
 } from './render.js';
 import {
   CLASSES, PASSIVES, ITEMS, ITEM_TIERS, SYNERGIES, itemsByTier,
@@ -71,8 +72,13 @@ export function spawnPlayer(classKey){
   p.dotSprite = acquireSprite(dotTex.key, dotTex.texture);
   p.sprite.position.set(p.x, p.y);
   p.dotSprite.position.set(p.x, p.y);
+  // Player trail (fading line behind player) + beam graphics (BEAM/EVENT LANCE per-frame redraw).
+  p.trailGfx = acquireGraphics();
+  p.beamGfx  = acquireGraphics();
+  entityLayer.addChild(p.trailGfx);
   entityLayer.addChild(p.sprite);
   entityLayer.addChild(p.dotSprite);
+  beamLayer.addChild(p.beamGfx);
   // Snap camera to the player on spawn — without this the run starts with
   // the camera at (0,0) lerping toward the player, which leaves the player
   // visibly off-center for the first ~1 second.

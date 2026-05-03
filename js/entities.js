@@ -3,11 +3,14 @@
    This is the bottom of the game-logic stack: weapons.js calls into here
    (firePulse / fireProjectile / fxBurst / etc), and player.js calls dealDamage.
    =================================================================== */
-import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce, entityLayer } from './core.js';
+import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce, entityLayer, fxLayer, beamLayer } from './core.js';
 import { AUDIO } from './audio.js';
 import {
   getCircleTexture, getPolygonTexture, getStarTexture, getDiamondTexture,
   acquireSprite, releaseSprite,
+  acquireParticle, releaseParticle,
+  acquireGraphics, releaseGraphics,
+  acquireText, releaseText,
 } from './render.js';
 
 /* ───────── ENTITY BASE ───────── */
@@ -20,14 +23,46 @@ export function makeEnt(props){
 
 function _autoAttachSprite(e){
   switch(e.type){
-    case 'enemy':   _attachEnemySprite(e); break;
-    case 'proj':    _attachProjectileSprite(e); break;
-    case 'ebullet': _attachEnemyBulletSprite(e); break;
+    case 'enemy':     _attachEnemySprite(e); e.__sprKind = 'tex'; break;
+    case 'proj':      _attachProjectileSprite(e); e.__sprKind = 'tex'; break;
+    case 'ebullet':   _attachEnemyBulletSprite(e); e.__sprKind = 'tex'; break;
     case 'xp': case 'coin': case 'heart': case 'magnet':
     case 'freeze': case 'chest': case 'item':
-      _attachPickupSprite(e); break;
-    // fx / ring / shock / line / fan / text / blackhole — handled in Step 5 (PIXI.Graphics)
+      _attachPickupSprite(e); e.__sprKind = 'tex'; break;
+    case 'fx':        _attachFxParticleSprite(e); break;
+    case 'ring': case 'shock': case 'line': case 'fan':
+                      _attachFxGraphics(e, fxLayer); break;
+    case 'blackhole': _attachFxGraphics(e, beamLayer); break;
+    case 'text':      _attachFxText(e); break;
   }
+}
+
+function _attachFxParticleSprite(e){
+  const sp = acquireParticle();
+  sp.tint = e.color;
+  // Particle texture is 32px white round dot. e.size is the rendered radius (~3).
+  // scale = (size * 2) / 32 = size / 16.
+  sp.scale.set(Math.max(0.05, (e.size || 3) / 16));
+  sp.position.set(e.x, e.y);
+  fxLayer.addChild(sp);
+  e.sprite = sp;
+  e.__sprKind = 'particle';
+}
+
+function _attachFxGraphics(e, layer){
+  const g = acquireGraphics();
+  g.position.set(0, 0); // graphics draws at world coords directly
+  layer.addChild(g);
+  e.sprite = g;
+  e.__sprKind = 'gfx';
+}
+
+function _attachFxText(e){
+  const t = acquireText(e.text, e.color || '#ffffff', !!e.big);
+  t.position.set(e.x, e.y);
+  fxLayer.addChild(t);
+  e.sprite = t;
+  e.__sprKind = 'text';
 }
 
 /* ───────── SPRITE ATTACHMENT ─────────
@@ -42,8 +77,15 @@ export function attachSpriteFromTexInfo(e, texInfo){
 }
 export function detachSprite(e){
   if(!e.sprite) return;
-  releaseSprite(e.__texKey, e.sprite);
+  switch(e.__sprKind){
+    case 'particle': releaseParticle(e.sprite); break;
+    case 'gfx':      releaseGraphics(e.sprite); break;
+    case 'text':     releaseText(e.sprite); break;
+    case 'tex':
+    default:         releaseSprite(e.__texKey, e.sprite); break;
+  }
   e.sprite = null;
+  e.__sprKind = null;
   e.__texKey = null;
   e.__normTex = null;
   e.__flashTex = null;
@@ -57,6 +99,8 @@ export function clearAllWorldSprites(){
   if(p){
     if(p.sprite){ releaseSprite(p.__bodyKey, p.sprite); p.sprite = null; }
     if(p.dotSprite){ releaseSprite(p.__dotKey, p.dotSprite); p.dotSprite = null; }
+    if(p.trailGfx){ releaseGraphics(p.trailGfx); p.trailGfx = null; }
+    if(p.beamGfx){ releaseGraphics(p.beamGfx); p.beamGfx = null; }
   }
 }
 

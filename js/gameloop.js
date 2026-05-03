@@ -230,6 +230,43 @@ export function update(){
     } else {
       p.sprite.alpha = 1; p.dotSprite.alpha = 1;
     }
+    // Trail — fading line through trail points (each segment has its own alpha).
+    if(p.trailGfx){
+      p.trailGfx.clear();
+      for(let i = 0; i < p.trail.length - 1; i++){
+        const ta = p.trail[i], tb = p.trail[i+1];
+        const k = i / p.trail.length;
+        p.trailGfx.moveTo(ta.x, ta.y);
+        p.trailGfx.lineTo(tb.x, tb.y);
+        p.trailGfx.stroke({ color: p.color, alpha: k * .5, width: 1 + k*4 });
+      }
+    }
+    // Beams + orbit nodes — per-frame redraw based on weapon state.
+    if(p.beamGfx){
+      p.beamGfx.clear();
+      for(const w of p.weapons){
+        if((w.key === 'BEAM' || w.key === 'EVENT_LANCE') && w.beams){
+          for(const b of w.beams){
+            if(!b) continue;
+            p.beamGfx.moveTo(b.x1, b.y1); p.beamGfx.lineTo(b.x2, b.y2);
+            p.beamGfx.stroke({ color: 0xffd400, alpha: .55, width: (w.stats.width||3) + 12 });
+            p.beamGfx.moveTo(b.x1, b.y1); p.beamGfx.lineTo(b.x2, b.y2);
+            p.beamGfx.stroke({ color: 0xffffff, alpha: .95, width: w.stats.width||3 });
+          }
+        }
+        if(w.key === 'ORBIT' && w.lastNodes){
+          for(const n of w.lastNodes){
+            if(!n) continue;
+            p.beamGfx.circle(n.x, n.y, w.stats.nodeR || 10);
+            p.beamGfx.fill({ color: 0x9b5cff, alpha: .35 });
+            p.beamGfx.circle(n.x, n.y, w.stats.nodeR || 10);
+            p.beamGfx.stroke({ color: 0x9b5cff, alpha: .9, width: 2 });
+            p.beamGfx.moveTo(p.x, p.y); p.beamGfx.lineTo(n.x, n.y);
+            p.beamGfx.stroke({ color: 0x9b5cff, alpha: .25, width: 1.2 });
+          }
+        }
+      }
+    }
   }
   // cleanup — swap-and-pop, detach sprites for dying entities
   { const arr = G.ents; let wi = 0; for(let ri = 0; ri < arr.length; ri++){
@@ -474,7 +511,11 @@ function _syncEntitySprite(e){
   const sp = e.sprite;
   if(!sp) return;
   if(e.type === 'ebullet') return; // synced inside updateEnemyBullets after position update
-  sp.position.set(e.x, e.y);
+
+  // Static-sprite types: position follows e.x,e.y. Graphics-redraw types use e.x,e.y inside draw.
+  const gfxType = e.type === 'ring' || e.type === 'shock' || e.type === 'fan' || e.type === 'line' || e.type === 'blackhole';
+  if(!gfxType) sp.position.set(e.x, e.y);
+
   if(e.type === 'enemy'){
     sp.rotation = e.rot;
     const wantFlash = e.hitFlash > 0;
@@ -491,6 +532,86 @@ function _syncEntitySprite(e){
     sp.rotation = G.realT * 0.72;
     const pulseV = 1 + Math.sin(G.realT*4)*.12;
     sp.scale.set(pulseV);
+  }
+  else if(e.type === 'fx'){
+    // particle: alpha + size fade with life
+    const a = e.life / e.maxLife;
+    sp.alpha = a;
+    sp.scale.set(Math.max(0.05, (e.size * a) / 16));
+  }
+  else if(e.type === 'text'){
+    sp.alpha = e.life / e.maxLife;
+  }
+  else if(e.type === 'ring'){
+    const a = e.life / e.maxLife;
+    const w = 2 + (1-a)*4;
+    sp.clear();
+    sp.circle(e.x, e.y, e.r);
+    sp.stroke({ color: e.color, alpha: a * .35, width: w + 6 });
+    sp.circle(e.x, e.y, e.r);
+    sp.stroke({ color: e.color, alpha: a * .8, width: w });
+  }
+  else if(e.type === 'shock'){
+    const k = 1 - e.life/e.maxLife;
+    const w = 4 + k*10;
+    sp.clear();
+    sp.circle(e.x, e.y, e.r);
+    sp.stroke({ color: e.color, alpha: (1-k) * .35, width: w + 8 });
+    sp.circle(e.x, e.y, e.r);
+    sp.stroke({ color: e.color, alpha: (1-k) * .9, width: w });
+  }
+  else if(e.type === 'fan'){
+    const a = e.life / e.maxLife;
+    sp.clear();
+    sp.moveTo(e.x, e.y);
+    sp.arc(e.x, e.y, e.r, e.angle - e.arc/2, e.angle + e.arc/2);
+    sp.lineTo(e.x, e.y);
+    sp.fill({ color: e.color, alpha: a * .7 });
+  }
+  else if(e.type === 'line'){
+    const a = e.life / e.maxLife;
+    sp.clear();
+    sp.moveTo(e.x1, e.y1);
+    const segs = 6;
+    for(let i=1;i<segs;i++){
+      const t = i/segs;
+      const mx = lerp(e.x1, e.x2, t) + (Math.random()-.5)*16;
+      const my = lerp(e.y1, e.y2, t) + (Math.random()-.5)*16;
+      sp.lineTo(mx, my);
+    }
+    sp.lineTo(e.x2, e.y2);
+    sp.stroke({ color: e.color, alpha: a * .35, width: (e.width || 2) + 6 });
+    sp.moveTo(e.x1, e.y1);
+    for(let i=1;i<segs;i++){
+      const t = i/segs;
+      const mx = lerp(e.x1, e.x2, t) + (Math.random()-.5)*8;
+      const my = lerp(e.y1, e.y2, t) + (Math.random()-.5)*8;
+      sp.lineTo(mx, my);
+    }
+    sp.lineTo(e.x2, e.y2);
+    sp.stroke({ color: e.color, alpha: a, width: e.width || 2 });
+  }
+  else if(e.type === 'blackhole'){
+    sp.clear();
+    // Dark core layered circles (radial-gradient approximation).
+    sp.circle(e.x, e.y, e.r);
+    sp.fill({ color: 0x000000, alpha: .85 });
+    sp.circle(e.x, e.y, e.r * .55);
+    sp.fill({ color: 0x280850, alpha: .9 });
+    // 5 violet event-horizon spirals
+    const t = e.t;
+    for(let i = 0; i < 5; i++){
+      const ang0 = t*4 + i*TAU/5;
+      const r1 = e.r * (.4 + i*.12);
+      sp.moveTo(e.x + Math.cos(ang0)*r1, e.y + Math.sin(ang0)*r1);
+      for(let s = 1; s < 24; s++){
+        const aa = ang0 + s*.18;
+        const rr = r1 - s*1.2;
+        if(rr <= 0) break;
+        sp.lineTo(e.x + Math.cos(aa)*rr, e.y + Math.sin(aa)*rr);
+      }
+      sp.stroke({ color: 0x9b5cff, alpha: Math.max(.05, .7 - i*.12), width: 1.5 });
+    }
   }
 }
 
