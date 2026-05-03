@@ -345,7 +345,9 @@ setOnKillHook(function onKill(e){
   }
   const pLuck = G.player ? G.player.luck : 0;
   // Drop rate caps — luck never breaks the game economy.
-  const HEART_CAP = .015, ITEM_MOB_CAP = .008, ITEM_ELITE_CAP = .08;
+  // Item drops halved (mob: .0015→.00075, cap .008→.004; elite: .03→.015, cap .08→.04)
+  // — items felt too common, drowning out other pickup feedback.
+  const HEART_CAP = .015, ITEM_MOB_CAP = .004, ITEM_ELITE_CAP = .04;
   if(e.isBoss){
     // Boss reward = chest only. Chest opens to a 3-relic pick screen.
     // Relics are gated to bosses so they feel like meaningful milestones.
@@ -356,14 +358,14 @@ setOnKillHook(function onKill(e){
     spawnMagnet(e.x, e.y);
   } else if(Math.random() < .0008){
     spawnFreeze(e.x, e.y);
-  } else if(Math.random() < Math.min(ITEM_MOB_CAP, .0015 + pLuck*.003)){
+  } else if(Math.random() < Math.min(ITEM_MOB_CAP, .00075 + pLuck*.0015)){
     // Regular mobs: small chance of a consumable item. Relics never drop here.
     dropItem(e.x, e.y, pLuck, ['common','rare'], 'consumable');
   }
   // Elite (HEX/OCT) drop chance — bumped slightly back to 3% since passives no
   // longer give stat boosts; consumable items now carry the stat scaling load.
   if(!e.isBoss && (e.kind === 'HEX' || e.kind === 'OCT')){
-    if(Math.random() < Math.min(ITEM_ELITE_CAP, .03 + pLuck*.025)){
+    if(Math.random() < Math.min(ITEM_ELITE_CAP, .015 + pLuck*.0125)){
       dropItem(e.x, e.y, pLuck, ['common','rare'], 'consumable');
     }
   }

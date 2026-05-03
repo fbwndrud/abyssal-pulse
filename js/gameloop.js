@@ -181,9 +181,16 @@ export function update(){
       e.x += e.vx * G.dt; e.y += e.vy * G.dt;
       const d = Math.hypot(e.x - p.x, e.y - p.y);
       const range = (e.type==='xp' ? p.magnet : e.type==='coin' ? p.magnet*1.2 : e.type==='item' ? 280 : 220) * G.pickupMagnetMul;
-      if(G.superMagnetTimer > 0 || d < range){
+      if(G.superMagnetTimer > 0){
+        // Super magnet — directly drive pickup velocity toward player at high speed.
+        // Additive forces couldn't overcome dampening across the whole map; this
+        // makes the buff feel like a true vacuum, not a nudge.
         const a = Math.atan2(p.y-e.y, p.x-e.x);
-        const sp = G.superMagnetTimer>0 ? 720 : 360 * (1 - d/range + .2);
+        e.vx = Math.cos(a) * 1200;
+        e.vy = Math.sin(a) * 1200;
+      } else if(d < range){
+        const a = Math.atan2(p.y-e.y, p.x-e.x);
+        const sp = 360 * (1 - d/range + .2);
         e.vx += Math.cos(a)*sp;
         e.vy += Math.sin(a)*sp;
       }
@@ -191,7 +198,7 @@ export function update(){
         if(e.type==='xp'){ const gained = Math.round(e.amount * (p.xpGainMul||1)); p.xp += gained; AUDIO.pickup(e.x); fxText(e.x,e.y,'+'+gained, e.color); }
         else if(e.type==='coin'){ G.coinsRun++; meta.coins++; saveMetaLater(); AUDIO.pickup(e.x); fxText(e.x,e.y,'◆',C.gold); }
         else if(e.type==='heart'){ p.hp = Math.min(p.maxHp, p.hp + 25); AUDIO.heal(); fxText(e.x,e.y,'+25 HP', C.red); }
-        else if(e.type==='magnet'){ G.superMagnetTimer = 4; AUDIO.pickup(); announce('MAGNET ACTIVE', 1); }
+        else if(e.type==='magnet'){ G.superMagnetTimer = 8; AUDIO.pickup(); announce('MAGNET ACTIVE', 1); }
         else if(e.type==='freeze'){ G.freezeTimer = 5; AUDIO.freeze(); announce('TIME FREEZE', 1); }
         else if(e.type==='item'){ applyItem(p, e.item.id); }
         e.alive = false;

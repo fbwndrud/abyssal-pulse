@@ -143,7 +143,8 @@ function _attachEnemyBulletSprite(e){
 function _attachPickupSprite(e){
   let texInfo;
   if(e.type === 'xp'){
-    texInfo = getDiamondTexture(e.r, e.color, 6, e.color);
+    // Brighter XP — was glow=6, now 10 so XP shimmers stand out against enemies on the bg.
+    texInfo = getDiamondTexture(e.r, e.color, 10, e.color);
   } else if(e.type === 'coin'){
     texInfo = getDiamondTexture(e.r, C.gold, 8, C.gold);
   } else if(e.type === 'magnet'){
@@ -161,9 +162,11 @@ function _attachPickupSprite(e){
     const glow = e.glow || 18;
     const isRelic = e.item && e.item.kind === 'relic';
     if(isRelic){
-      texInfo = getPolygonTexture(6, e.r * 1.25, col, glow * .5, 'rgba(0,0,0,.35)', 1.6);
+      // Relic — large hexagon, full glow, bright fill (distinct from any enemy/XP).
+      texInfo = getPolygonTexture(6, e.r * 1.6, col, glow, col, 2.4);
     } else {
-      texInfo = getDiamondTexture(e.r * 1.2, col, glow * .5, 'rgba(0,0,0,.35)');
+      // Consumable — 5-point star (distinct from XP diamond & enemy polygons).
+      texInfo = getStarTexture(5, e.r * 1.6, e.r * 0.75, col, glow, col, 2);
     }
   } else {
     texInfo = getCircleTexture(e.r, '#ffffff', 6, '#ffffff', 1);
