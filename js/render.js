@@ -6,7 +6,7 @@
      once. World rendering uses these textures via acquireSprite() pool.
    - BG: animated grid + parallax stars + nebula tint, with gradient/star pre-bake.
    =================================================================== */
-import { TAU, W, H, C, ctx, choice, hsl, G, worldToScreen } from './core.js';
+import { TAU, W, H, C, ctx, choice, hsl, G, worldToScreen, bgC } from './core.js';
 
 const SPRITE_CACHE = new Map();
 // Bumped from 384 → 1024 to reduce eviction churn. Eviction creates GC pressure
@@ -228,15 +228,65 @@ export function releaseSprite(key, sprite){
 }
 
 /* ===================================================================
-   BACKGROUND
+   BACKGROUND (PIXI)
+   - Sprites all live in bgC (no camera transform); parallax computed manually.
+   - gradSprite : screen-sized radial-gradient tint, hue rebaked when shifted >8°
+   - starSprites: 4-quad parallax wrap of pre-baked star canvas
+   - gridSprite : TilingSprite of a 64×64 grid line texture, tilePosition camera-driven
+   - playerGlow: pre-baked radial-gradient sprite, follows player in screen space
    =================================================================== */
+function _makeStarCanvas(sw, sh, stars){
+  const sc = document.createElement('canvas');
+  sc.width = sw; sc.height = sh;
+  const sx2 = sc.getContext('2d');
+  for(const s of stars){
+    const px = ((s.x % sw) + sw) % sw;
+    const py = ((s.y % sh) + sh) % sh;
+    sx2.globalAlpha = s.p;
+    sx2.fillStyle = s.c;
+    sx2.beginPath(); sx2.arc(px, py, s.r, 0, TAU); sx2.fill();
+    sx2.globalAlpha = s.p * 0.25;
+    sx2.beginPath(); sx2.arc(px, py, s.r * 2.2, 0, TAU); sx2.fill();
+  }
+  sx2.globalAlpha = 1;
+  return sc;
+}
+function _makeGridTexture(){
+  const g = 64;
+  const cv = document.createElement('canvas');
+  cv.width = g; cv.height = g;
+  const cx2 = cv.getContext('2d');
+  cx2.strokeStyle = 'rgba(60,120,220,.08)';
+  cx2.lineWidth = 1;
+  cx2.beginPath();
+  cx2.moveTo(0, 0); cx2.lineTo(g, 0);
+  cx2.moveTo(0, 0); cx2.lineTo(0, g);
+  cx2.stroke();
+  return PIXI.Texture.from(cv);
+}
+function _makePlayerGlowTexture(){
+  const sz = 800;
+  const cv = document.createElement('canvas');
+  cv.width = sz; cv.height = sz;
+  const c2 = cv.getContext('2d');
+  const g = c2.createRadialGradient(sz/2, sz/2, 30, sz/2, sz/2, 380);
+  g.addColorStop(0, 'rgba(0,240,255,.18)');
+  g.addColorStop(1, 'rgba(0,240,255,0)');
+  c2.fillStyle = g;
+  c2.fillRect(0, 0, sz, sz);
+  return PIXI.Texture.from(cv);
+}
+
 export const BG = {
   stars: [],
   starLayerW: 0,
   starLayerH: 0,
-  starLayer: null,
   gradCanvas: null,
   gradHue: -999,
+  gradSprite: null,
+  starSprites: [],
+  gridSprite: null,
+  playerGlow: null,
   init(){
     this.stars = [];
     for(let i=0;i<140;i++){
@@ -244,23 +294,33 @@ export const BG = {
     }
     const sw = Math.floor(W*1.5), sh = Math.floor(H*1.5);
     this.starLayerW = sw; this.starLayerH = sh;
-    const sc = document.createElement('canvas');
-    sc.width = sw; sc.height = sh;
-    const sx2 = sc.getContext('2d');
-    for(const s of this.stars){
-      const px = ((s.x % sw) + sw) % sw;
-      const py = ((s.y % sh) + sh) % sh;
-      sx2.globalAlpha = s.p;
-      sx2.fillStyle = s.c;
-      sx2.beginPath(); sx2.arc(px, py, s.r, 0, TAU); sx2.fill();
-      sx2.globalAlpha = s.p * 0.25;
-      sx2.beginPath(); sx2.arc(px, py, s.r * 2.2, 0, TAU); sx2.fill();
-    }
-    sx2.globalAlpha = 1;
-    this.starLayer = sc;
+    const starCanvas = _makeStarCanvas(sw, sh, this.stars);
+    const starTex = PIXI.Texture.from(starCanvas);
+
+    // gradient
     const gc = document.createElement('canvas');
     gc.width = W; gc.height = H;
     this.gradCanvas = gc;
+    this.bakeGradient(0);
+    this.gradSprite = new PIXI.Sprite(PIXI.Texture.from(gc));
+    bgC.addChild(this.gradSprite);
+
+    // 4-quad star parallax — tile to cover screen with positive offsets too
+    for(let i = 0; i < 4; i++){
+      const sp = new PIXI.Sprite(starTex);
+      this.starSprites.push(sp);
+      bgC.addChild(sp);
+    }
+
+    // grid tiling
+    this.gridSprite = new PIXI.TilingSprite({ texture: _makeGridTexture(), width: W, height: H });
+    bgC.addChild(this.gridSprite);
+
+    // player radial glow (additive blending for cyan hue on dark bg)
+    this.playerGlow = new PIXI.Sprite(_makePlayerGlowTexture());
+    this.playerGlow.anchor.set(0.5);
+    this.playerGlow.visible = false;
+    bgC.addChild(this.playerGlow);
   },
   bakeGradient(hue){
     const gc = this.gradCanvas, gx = gc.getContext('2d');
@@ -270,41 +330,50 @@ export const BG = {
     g.addColorStop(1, '#04050b');
     gx.fillStyle = g; gx.fillRect(0,0,W,H);
     this.gradHue = hue;
+    if(this.gradSprite && this.gradSprite.texture){
+      // Tell PIXI the source canvas changed
+      this.gradSprite.texture.source.update();
+    }
   },
-  draw(){
+  tick(){
     const hue = (G.bgT*8) % 360;
     let dh = Math.abs(hue - this.gradHue);
     if(dh > 180) dh = 360 - dh;
-    if(this.gradHue === -999 || dh > 8) this.bakeGradient(hue);
-    ctx.drawImage(this.gradCanvas, 0, 0);
+    if(dh > 8) this.bakeGradient(hue);
 
+    // star parallax: 4-quad wrap so stars are continuous in any direction
     const sw = this.starLayerW, sh = this.starLayerH;
     const cx = ((G.cam.x*.05) % sw + sw) % sw;
     const cy = ((G.cam.y*.05) % sh + sh) % sh;
-    ctx.globalAlpha = .78 + .22*Math.sin(G.bgT*1.6);
-    ctx.drawImage(this.starLayer, -cx, -cy);
-    if(cx > 0)           ctx.drawImage(this.starLayer, sw - cx, -cy);
-    if(cy > 0)           ctx.drawImage(this.starLayer, -cx, sh - cy);
-    if(cx > 0 && cy > 0) ctx.drawImage(this.starLayer, sw - cx, sh - cy);
-    ctx.globalAlpha = 1;
+    const a = .78 + .22*Math.sin(G.bgT*1.6);
+    const positions = [
+      [-cx, -cy],
+      [sw - cx, -cy],
+      [-cx, sh - cy],
+      [sw - cx, sh - cy],
+    ];
+    for(let i = 0; i < 4; i++){
+      const sp = this.starSprites[i];
+      sp.position.set(positions[i][0], positions[i][1]);
+      sp.alpha = a;
+    }
 
-    const grid = 64;
-    const ox = -((G.cam.x % grid) + grid) % grid;
-    const oy = -((G.cam.y % grid) + grid) % grid;
-    ctx.strokeStyle = 'rgba(60,120,220,.08)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for(let x = ox; x < W; x += grid){ ctx.moveTo(x, 0); ctx.lineTo(x, H); }
-    for(let y = oy; y < H; y += grid){ ctx.moveTo(0, y); ctx.lineTo(W, y); }
-    ctx.stroke();
+    // grid: tilePosition is the offset of the tile pattern
+    if(this.gridSprite){
+      this.gridSprite.tilePosition.x = -G.cam.x;
+      this.gridSprite.tilePosition.y = -G.cam.y;
+    }
 
-    if(G.player){
+    // player glow follows player in screen space (player is camera-centered)
+    if(G.player && this.playerGlow){
       const ps = worldToScreen(G.player.x, G.player.y);
-      const rg = ctx.createRadialGradient(ps.x, ps.y, 30, ps.x, ps.y, 380);
-      rg.addColorStop(0, 'rgba(0,240,255,.18)');
-      rg.addColorStop(1, 'rgba(0,240,255,0)');
-      ctx.fillStyle = rg; ctx.fillRect(0,0,W,H);
+      this.playerGlow.position.set(ps.x, ps.y);
+      this.playerGlow.visible = true;
+    } else if(this.playerGlow){
+      this.playerGlow.visible = false;
     }
   }
 };
+// PIXI is available globally before module script runs (CDN <script> precedes <script type="module">).
+// bgC is created synchronously at core.js module load. So BG.init() is safe at module import.
 BG.init();

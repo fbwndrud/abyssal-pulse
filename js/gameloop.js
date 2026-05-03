@@ -508,6 +508,7 @@ function spawnDirector(){
      PIXI containers, so the screen is black + DOM HUD.
    =================================================================== */
 export function render(){
+  BG.tick();
   const sh = G.shake * 14;
   world.position.set(
     -G.cam.x + (Math.random()-.5)*sh,
