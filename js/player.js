@@ -47,7 +47,7 @@ export function spawnPlayer(classKey){
     passives: {},
     level: 1,
     xp: 0,
-    xpNext: 5,
+    xpNext: 3,
     faceA: 0,
     rot: 0,
     trail: [],

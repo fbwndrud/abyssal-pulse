@@ -208,10 +208,10 @@ export function doLevelUp(forceNoXpReset=false){
   if(!forceNoXpReset && p.xp >= p.xpNext){
     p.xp -= p.xpNext;
     p.level++;
-    // XP curve eased: 1.42→1.30 multiplier, +4→+3 base. Prior curve made
-    // weapon max-out (8 levels each) practically unreachable mid-run.
-    // L1→L15: was 5..1374, now 5..488 (≈3× faster late game).
-    p.xpNext = Math.round(p.xpNext * 1.30 + 3);
+    // XP curve scaled to ~2/3 of previous (start 5→3, base +3→+2).
+    // Pairs with maxLv 8→6 — total XP to max all weapons drops to ~50% of original.
+    // L1=3, L5=22, L10=101, L15=345 (was 5..597 with last curve).
+    p.xpNext = Math.round(p.xpNext * 1.30 + 2);
   }
   AUDIO.level();
   shake(.1); flash('#fff', .25);

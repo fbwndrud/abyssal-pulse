@@ -16,7 +16,7 @@ export const WEAPONS = {
   PULSE: {
     name:'PULSE WAVE', color:C.cyan, kind:'AOE',
     desc:'주기적 충격파로 주변 적 타격.',
-    maxLv:8,
+    maxLv:6,
     baseStats:{ cd:1.6, dmg:24, radius:130, kb:120 },
     icon(ctx,x,y,s){ for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(x,y, s*.18 + i*s*.18, 0, TAU); ctx.strokeStyle=C.cyan; ctx.lineWidth=1.6; ctx.shadowBlur=8; ctx.shadowColor=C.cyan; ctx.globalAlpha=1-i*.25; ctx.stroke(); ctx.globalAlpha=1; } },
     onUpdate(p,w){
@@ -51,7 +51,7 @@ export const WEAPONS = {
   BEAM: {
     name:'BEAM', color:C.gold, kind:'BEAM',
     desc:'회전하는 레이저 빔.',
-    maxLv:8,
+    maxLv:6,
     baseStats:{ rotSpeed:1.4, dmg:42, length:520, width:6, count:1, tick:.12 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.gold; ctx.shadowBlur=10; ctx.shadowColor=C.gold; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x-s*.4,y-s*.4); ctx.lineTo(x+s*.4,y+s*.4); ctx.stroke(); ctx.restore(); },
     onUpdate(p,w){
@@ -97,15 +97,15 @@ export const WEAPONS = {
       }
     },
     levelUp(w,lv){
-      if(lv===4) w.stats.count = 2;
-      if(lv===7) w.stats.count = 3;
-      w.stats.dmg += 10; w.stats.length += 30; w.stats.width += .6;
+      if(lv===3) w.stats.count = 2;
+      if(lv===5) w.stats.count = 3;
+      w.stats.dmg += 12; w.stats.length += 38; w.stats.width += .8;
     },
   },
   ORBIT: {
     name:'ORBIT NODES', color:C.violet, kind:'ORBIT',
     desc:'주변을 도는 발광 노드.',
-    maxLv:8,
+    maxLv:6,
     baseStats:{ count:1, radius:90, rotSpeed:2.2, dmg:18, nodeR:12 },
     icon(ctx,x,y,s){ drawCircle(x,y,s*.2,C.violet,8); for(let i=0;i<3;i++){ const a=(i/3)*TAU; drawCircle(x+Math.cos(a)*s*.3, y+Math.sin(a)*s*.3, s*.08, C.violet, 6, C.violet); } },
     onUpdate(p,w){
@@ -140,14 +140,14 @@ export const WEAPONS = {
       }
     },
     levelUp(w,lv){
-      if(lv===2||lv===4||lv===6||lv===8) w.stats.count++;
-      w.stats.dmg += 6; w.stats.radius += 6;
+      if(lv===2||lv===4||lv===6) w.stats.count++;
+      w.stats.dmg += 8; w.stats.radius += 8;
     },
   },
   HOMING: {
     name:'HOMING SHARDS', color:C.teal, kind:'HOMING',
     desc:'추적하는 다이아몬드 파편.',
-    maxLv:8,
+    maxLv:6,
     baseStats:{ cd:1.0, dmg:28, count:1, speed:340, life:1.6 },
     icon(ctx,x,y,s){ drawDiamond(x,y,s*.25,0,C.teal,10,C.teal); },
     onUpdate(p,w){
@@ -164,14 +164,14 @@ export const WEAPONS = {
       }
     },
     levelUp(w,lv){
-      if(lv===2||lv===4||lv===6||lv===8) w.stats.count++;
-      w.stats.dmg += 10; w.stats.cd *= .95;
+      if(lv===2||lv===4||lv===6) w.stats.count++;
+      w.stats.dmg += 12; w.stats.cd *= .94;
     },
   },
   CROSS: {
     name:'CROSS FIRE', color:C.pink, kind:'BULLET',
     desc:'4방향 십자 발사.',
-    maxLv:8,
+    maxLv:6,
     baseStats:{ cd:.7, dmg:18, speed:420, life:1.0, count:4 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.pink; ctx.shadowBlur=8; ctx.shadowColor=C.pink; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x-s*.35,y); ctx.lineTo(x+s*.35,y); ctx.moveTo(x,y-s*.35); ctx.lineTo(x,y+s*.35); ctx.stroke(); ctx.restore(); },
     onUpdate(p,w){
@@ -187,14 +187,14 @@ export const WEAPONS = {
       }
     },
     levelUp(w,lv){
-      if(lv===4||lv===7) w.stats.count += 2;
-      w.stats.dmg += 6; w.stats.cd *= .94;
+      if(lv===3||lv===5) w.stats.count += 2;
+      w.stats.dmg += 8; w.stats.cd *= .93;
     },
   },
   SHOCK: {
     name:'SHOCKWAVE', color:C.magenta, kind:'AOE',
     desc:'전방 부채꼴 충격파.',
-    maxLv:8,
+    maxLv:6,
     baseStats:{ cd:1.4, dmg:38, radius:200, arc:Math.PI*.7 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.magenta; ctx.shadowBlur=10; ctx.shadowColor=C.magenta; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x-s*.15,y, s*.4, -1.0, 1.0); ctx.stroke(); ctx.restore(); },
     onUpdate(p,w){
@@ -208,12 +208,12 @@ export const WEAPONS = {
         w.timer = s.cd / p.cdMul;
       }
     },
-    levelUp(w,lv){ w.stats.dmg += 12; w.stats.radius += 25; if(lv===5||lv===8) w.stats.arc += .4; },
+    levelUp(w,lv){ w.stats.dmg += 14; w.stats.radius += 30; if(lv===4||lv===6) w.stats.arc += .4; },
   },
   CHAIN: {
     name:'CHAIN BOLT', color:C.lime, kind:'CHAIN',
     desc:'적을 잇는 번개 사슬.',
-    maxLv:8,
+    maxLv:6,
     baseStats:{ cd:1.0, dmg:32, jumps:3, range:280 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.lime; ctx.shadowBlur=10; ctx.shadowColor=C.lime; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x-s*.35,y-s*.3); ctx.lineTo(x-s*.05,y); ctx.lineTo(x+s*.1,y-s*.1); ctx.lineTo(x+s*.35,y+s*.3); ctx.stroke(); ctx.restore(); },
     onUpdate(p,w){
@@ -251,12 +251,12 @@ export const WEAPONS = {
         w.timer = s.cd / p.cdMul;
       }
     },
-    levelUp(w,lv){ if(lv===3||lv===6) w.stats.jumps++; w.stats.dmg += 10; w.stats.range += 30; },
+    levelUp(w,lv){ if(lv===3||lv===5) w.stats.jumps++; w.stats.dmg += 12; w.stats.range += 36; },
   },
   BLADE: {
     name:'SHURIKEN', color:C.cyan, kind:'BULLET',
     desc:'관통하는 회전 칼날.',
-    maxLv:8,
+    maxLv:6,
     baseStats:{ cd:1.0, dmg:30, speed:330, life:1.2, count:1, pierce:3 },
     icon(ctx,x,y,s){ drawStar(x,y,4,s*.4,s*.18,Math.PI/4,C.cyan,10,C.cyan,1.6); },
     onUpdate(p,w){
@@ -274,7 +274,7 @@ export const WEAPONS = {
         w.timer = s.cd / p.cdMul;
       }
     },
-    levelUp(w,lv){ if(lv===3||lv===6) w.stats.count++; if(lv===5||lv===8) w.stats.pierce++; w.stats.dmg += 8; },
+    levelUp(w,lv){ if(lv===3||lv===5) w.stats.count++; if(lv===4||lv===6) w.stats.pierce++; w.stats.dmg += 10; },
   },
   BLACKHOLE: {
     name:'SINGULARITY', color:C.violet, kind:'BLACKHOLE',
