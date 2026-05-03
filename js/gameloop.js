@@ -6,6 +6,7 @@ import {
   rand, clamp, lerp, choice, hsl, pulse, angTo, fmtTime,
   meta, saveMeta, saveMetaLater,
   updateCamera, setBar, announce,
+  app, world,
 } from './core.js';
 import { AUDIO } from './audio.js';
 import {
@@ -501,43 +502,18 @@ function spawnDirector(){
 
 /* ===================================================================
    RENDER
+   - Camera + shake mapped to PIXI world container position.
+   - All visual content (BG, entities, fx, beams, flash) moves into the PIXI
+     scene graph in later migration steps. During Step 1 the world is empty
+     PIXI containers, so the screen is black + DOM HUD.
    =================================================================== */
-// Detect ctx state leaks: count save/restore per frame via a Proxy-like wrapper.
-// If the depth at frame end isn't 0, log once so we can find the culprit.
-let _ctxDepth = 0, _ctxLeakLogged = false;
-const _origSave = ctx.save.bind(ctx);
-const _origRestore = ctx.restore.bind(ctx);
-ctx.save = function(){ _ctxDepth++; return _origSave(); };
-ctx.restore = function(){ if(_ctxDepth > 0) _ctxDepth--; return _origRestore(); };
-
 export function render(){
-  // DEFENSIVE: pop any leaked ctx.save() from prior frames. restore() on an
-  // empty stack is a no-op in canvas, so this is safe.
-  // (We DON'T reset the transform matrix here — that's the resize handler's
-  //  job. Re-setting transform every frame caused misalignment when DPR
-  //  changed without a resize event firing — e.g. opening devtools, picking
-  //  up an item that triggered a brief layout shift, etc.)
-  while(_ctxDepth > 0) ctx.restore();
-
-  const _depthAtFrameStart = _ctxDepth; // should be 0
-  ctx.save();
   const sh = G.shake * 14;
-  ctx.translate((Math.random()-.5)*sh, (Math.random()-.5)*sh);
-  BG.draw();
-  if(G.mode === 'play' || G.mode === 'pause' || G.mode === 'levelup' || G.mode === 'end'){
-    drawWorld();
-  }
-  if(G.flash > 0){
-    ctx.fillStyle = G.flashColor; ctx.globalAlpha = G.flash;
-    ctx.fillRect(0,0,W,H); ctx.globalAlpha = 1;
-  }
-  ctx.restore();
-
-  // Diagnostic: report leak once so we know which function leaked
-  if(_ctxDepth !== _depthAtFrameStart && !_ctxLeakLogged){
-    _ctxLeakLogged = true;
-    console.warn('[ctx-leak] depth grew from', _depthAtFrameStart, 'to', _ctxDepth, '— some draw fn called save() without restore()');
-  }
+  world.position.set(
+    -G.cam.x + (Math.random()-.5)*sh,
+    -G.cam.y + (Math.random()-.5)*sh
+  );
+  if(app.renderer) app.renderer.render(app.stage);
 }
 
 function drawWorld(){

@@ -29,6 +29,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #app{position:relative;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(circle at 50% 60%, #0b1230 0%, #05060d 70%)}
 #shake{position:relative}
 #canvas{display:block;background:#04050b;border-radius:6px;box-shadow:0 0 0 2px #14264a, 0 0 60px rgba(0,240,255,.18), 0 0 120px rgba(255,43,214,.10)}
+#pixi-canvas{display:block;position:absolute;top:0;left:0;background:transparent;border-radius:6px;pointer-events:none}
 .scanlines{pointer-events:none;position:absolute;inset:0;border-radius:6px;background:repeating-linear-gradient(to bottom, rgba(255,255,255,.025) 0 1px, transparent 1px 3px);mix-blend-mode:overlay;opacity:.6}
 .vignette{pointer-events:none;position:absolute;inset:0;border-radius:6px;background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.85) 100%)}
 
@@ -211,13 +212,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 @media (max-width:1000px){
   #canvas{transform:scale(.7);transform-origin:center}
+  #pixi-canvas{transform:scale(.7);transform-origin:center}
 }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="shake">
-    <canvas id="canvas" width="1100" height="700"></canvas>
+    <canvas id="canvas" width="1280" height="720"></canvas>
     <div class="scanlines"></div>
     <div class="vignette"></div>
   </div>
@@ -349,6 +351,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

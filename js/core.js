@@ -3,7 +3,7 @@
    Imported by every other module. Has no game-logic dependencies.
    =================================================================== */
 
-export const W = 1100, H = 700;
+export const W = 1280, H = 720;
 export const WORLD = 16000;
 export const TAU = Math.PI * 2;
 export const TWO_PI = TAU;
@@ -28,7 +28,10 @@ export const fmtTime= s=>{ s=Math.max(0,s|0); return String((s/60)|0).padStart(2
 export const hsl    = (h,s,l,a)=> a==null ? `hsl(${h} ${s}% ${l}%)` : `hsla(${h} ${s}% ${l}% / ${a})`;
 export const pulse  = (t,speed=1)=> .5 + .5*Math.sin(t*speed);
 
-/* ───────── CANVAS / DPR ───────── */
+/* ───────── CANVAS / DPR ─────────
+   Legacy 2D canvas kept only for HUD card icons (ui.js), which use their
+   own per-card <canvas> elements via withDrawCtx. World rendering moved to
+   PIXI (see PIXI APP block below). */
 export const canvas = document.getElementById('canvas');
 export const ctx = canvas.getContext('2d');
 export function resizeCanvas(){
@@ -41,6 +44,36 @@ export function resizeCanvas(){
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
+
+/* ───────── PIXI APP ─────────
+   PIXI is loaded via CDN <script> in index.html, so it's available as a
+   global. We expose the Application + container hierarchy here so other
+   modules can attach sprites/graphics. initPixi() is called from main.js
+   at boot (top-level await). */
+export const app = new PIXI.Application();
+export const bgC         = new PIXI.Container();  // background — no camera transform
+export const world       = new PIXI.Container();  // camera + shake transform applied here
+export const entityLayer = new PIXI.Container();  // enemies / player / pickups / projectiles
+export const fxLayer     = new PIXI.Container();  // particles / rings / shock / lines / fans / text
+export const beamLayer   = new PIXI.Container();  // beams / blackholes (per-frame Graphics redraw)
+export const hudC        = new PIXI.Container();  // PIXI-side HUD (currently empty — DOM HUD handles UI)
+
+export async function initPixi(){
+  const pixiCanvas = document.createElement('canvas');
+  pixiCanvas.id = 'pixi-canvas';
+  document.getElementById('shake').appendChild(pixiCanvas);
+  await app.init({
+    canvas: pixiCanvas,
+    width: W,
+    height: H,
+    backgroundAlpha: 0,
+    resolution: Math.min(window.devicePixelRatio || 1, 2),
+    autoDensity: true,
+    antialias: true,
+  });
+  world.addChild(entityLayer, fxLayer, beamLayer);
+  app.stage.addChild(bgC, world, hudC);
+}
 
 /* ───────── INPUT STATE ─────────
    Input handler wiring lives in main.js (needs refs to togglePause/toggleMute). */

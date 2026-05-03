@@ -4,7 +4,7 @@
    =================================================================== */
 import {
   G, keys, mouse, canvas, W, H, fmtTime, meta,
-  flushMetaIfNeeded, flushMetaNow,
+  flushMetaIfNeeded, flushMetaNow, initPixi,
 } from './core.js';
 import { AUDIO } from './audio.js';
 import { update, render, setLoopHandlers } from './gameloop.js';
@@ -101,14 +101,18 @@ function loop(now){
   }
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(t=>{ lastT = t; requestAnimationFrame(loop); });
 addEventListener('beforeunload', ()=> flushMetaNow());
 addEventListener('visibilitychange', ()=>{ if(document.hidden) flushMetaNow(); });
 
 /* ───────── BOOTSTRAP ─────────
-   Audio context needs a user gesture; bootstrap lazily on first interaction. */
+   Audio context needs a user gesture; bootstrap lazily on first interaction.
+   PIXI must finish .init() (async) before the render loop starts so that
+   app.renderer is defined when render() runs. */
 addEventListener('pointerdown', ()=>{ AUDIO.init().then(()=>{ if(G.mode==='menu') AUDIO.setMode('menu'); }); }, { once:true });
 addEventListener('keydown',     ()=>{ AUDIO.init().then(()=>{ if(G.mode==='menu') AUDIO.setMode('menu'); }); }, { once:true });
+
+await initPixi();
+requestAnimationFrame(t=>{ lastT = t; requestAnimationFrame(loop); });
 showMenu();
 document.getElementById('menu-coins').textContent = meta.coins;
 document.getElementById('menu-best').textContent = fmtTime(meta.bestTime);
