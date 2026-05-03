@@ -87,6 +87,7 @@ function loadMeta(){
   const def = {
     coins: 0, bestTime: 0, runs: 0, wins: 0, kills: 0,
     shop: {hp:0, dmg:0, magnet:0, reroll:0, speed:0, regen:0, start:0, luck:0, armor:0},
+    chips: { owned:{}, equipped:[null,null,null], slots:3 },
     unlocked: ['CIRCLE','TRIANGLE'],
     seenCodex: {weapons:[], passives:[], enemies:[]},
   };
@@ -94,8 +95,16 @@ function loadMeta(){
     const raw = localStorage.getItem(SAVE_KEY);
     if(!raw) return def;
     const s = JSON.parse(raw);
+    const chipsLoaded = s.chips ? {
+      owned: Object.assign({}, def.chips.owned, s.chips.owned || {}),
+      equipped: Array.isArray(s.chips.equipped) ? s.chips.equipped.slice() : def.chips.equipped.slice(),
+      slots: typeof s.chips.slots === 'number' ? s.chips.slots : def.chips.slots,
+    } : def.chips;
+    // Pad equipped to slots length so loop renders all slot cells.
+    while(chipsLoaded.equipped.length < chipsLoaded.slots) chipsLoaded.equipped.push(null);
     return Object.assign(def, s, {
       shop: Object.assign(def.shop, s.shop || {}),
+      chips: chipsLoaded,
       unlocked: s.unlocked && s.unlocked.length ? s.unlocked : def.unlocked,
       seenCodex: Object.assign(def.seenCodex, s.seenCodex || {}),
     });

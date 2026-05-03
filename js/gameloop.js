@@ -13,7 +13,7 @@ import { BG, acquireGraphics } from './render.js';
 import {
   EGRID, _EQ1, _EQ2,
   makeEnt, fxBurst, fxRing, fxText, fxShockwave, fxLine, shake, flash,
-  spawnEnemy, spawnBoss, spawnCoin,
+  spawnEnemy, spawnBoss, spawnCoin, spawnShrine,
   fireProjectile, dealDamage, nearestEnemy,
   detachSprite,
 } from './entities.js';
@@ -22,14 +22,19 @@ import {
   weaponEvoReady, applyEvo, fusionsAvailable, applyFusion,
 } from './player.js';
 import {
-  PASSIVES,
+  PASSIVES, SHRINE_TIMES,
 } from './data.js';
 import { WEAPONS } from './weapons.js';
 
 // Wired by ui.js (avoids hard cycle):
-let _doLevelUp = null, _endRun = null, _updateHUD = null, _openChestPick = null;
-export function setLoopHandlers({ doLevelUp, endRun, updateHUD, openChestPick }){
-  _doLevelUp = doLevelUp; _endRun = endRun; _updateHUD = updateHUD; _openChestPick = openChestPick;
+let _doLevelUp = null, _endRun = null, _updateHUD = null, _openChestPick = null, _openShrinePick = null;
+// Per-frame weapon-update error counter — bounds noisy console spam when one
+// weapon's onUpdate throws repeatedly. Without this declaration the catch
+// itself re-throws ReferenceError, breaking the entity loop on every frame.
+let _wpnErrCount = 0;
+export function setLoopHandlers({ doLevelUp, endRun, updateHUD, openChestPick, openShrinePick }){
+  _doLevelUp = doLevelUp; _endRun = endRun; _updateHUD = updateHUD;
+  _openChestPick = openChestPick; _openShrinePick = openShrinePick;
 }
 
 /* ===================================================================
@@ -78,6 +83,15 @@ export function update(){
   if(p._boostCdr > 0)    { p._boostCdr    -= G.dt; if(p._boostCdr <= 0) p._boostCdrMul = 1; }
   if(p._boostDmg > 0)    { p._boostDmg    -= G.dt; if(p._boostDmg <= 0) p._boostDmgMul = 1; }
   if(p._boostInvuln > 0) { p._boostInvuln -= G.dt; p.invuln = Math.max(p.invuln, .12); }
+  if(p._streakActive > 0){ p._streakActive -= G.dt; if(p._streakActive <= 0) p._streakActive = 0; }
+  // DASH CHIP: periodic auto-iframe burst.
+  if(p._autoDashOn){
+    p._autoDashTimer = (p._autoDashTimer == null ? p._autoDashCd : p._autoDashTimer) - G.dt;
+    if(p._autoDashTimer <= 0){
+      p.invuln = Math.max(p.invuln, .4);
+      p._autoDashTimer = p._autoDashCd;
+    }
+  }
   const _origDmg = p.dmgMul, _origCd = p.cdMul;
   if(p._boostDmgMul && p._boostDmgMul !== 1) p.dmgMul = _origDmg * p._boostDmgMul;
   if(p._boostCdrMul && p._boostCdrMul !== 1) p.cdMul  = _origCd  * p._boostCdrMul;
@@ -198,7 +212,7 @@ export function update(){
       }
       if(d < p.r + e.r){
         if(e.type==='xp'){ const gained = Math.round(e.amount * (p.xpGainMul||1)); p.xp += gained; AUDIO.pickup(e.x); fxText(e.x,e.y,'+'+gained, e.color); }
-        else if(e.type==='coin'){ G.coinsRun++; meta.coins++; saveMetaLater(); AUDIO.pickup(e.x); fxText(e.x,e.y,'◆',C.gold); }
+        else if(e.type==='coin'){ const m = p.coinMul||1; const amt = Math.floor(m) + (Math.random() < (m - Math.floor(m)) ? 1 : 0) || 1; G.coinsRun += amt; meta.coins += amt; saveMetaLater(); AUDIO.pickup(e.x); fxText(e.x,e.y, amt>1?('◆×'+amt):'◆', C.gold); }
         else if(e.type==='heart'){ p.hp = Math.min(p.maxHp, p.hp + 25); AUDIO.heal(); fxText(e.x,e.y,'+25 HP', C.red); }
         else if(e.type==='magnet'){ G.superMagnetTimer = 8; AUDIO.pickup(); announce('MAGNET ACTIVE', 1); }
         else if(e.type==='freeze'){ G.freezeTimer = 5; AUDIO.freeze(); announce('TIME FREEZE', 1); }
@@ -220,6 +234,15 @@ export function update(){
         // Chest now opens a 3-item pick screen instead of auto-applying a random one.
         if(_openChestPick) _openChestPick();
         else if(_doLevelUp) _doLevelUp(true);
+      }
+    }
+    else if(e.type === 'shrine'){
+      const d = Math.hypot(e.x - p.x, e.y - p.y);
+      if(d < p.r + e.r){
+        e.alive = false;
+        AUDIO.level();
+        announce('◈ 제단 활성화 ◈', 1.4);
+        if(_openShrinePick) _openShrinePick();
       }
     }
     if(G.superMagnetTimer > 0) G.superMagnetTimer -= G.dt;
@@ -291,6 +314,7 @@ export function update(){
   G.flash = Math.max(0, G.flash - G.dt * .8);
   if(G.comboTimer > 0){ G.comboTimer -= G.dt; if(G.comboTimer <= 0) G.combo = 0; }
   spawnDirector();
+  shrineDirector();
   // Pause boss interval timer during a fight — otherwise a long boss kill
   // burns the cooldown and the next boss spawns the instant the previous
   // one dies, giving zero breather. (Player feedback: "back-to-back bosses".)
@@ -699,21 +723,51 @@ function _syncEntitySprite(e){
 /* ===================================================================
    SPAWN DIRECTOR
    =================================================================== */
-// Active-enemy cap. Horde density comes from close pressure, not unbounded
-// population growth. 250 is well below the PixiJS or Canvas frame budget and
-// keeps fusion-weapon onUpdate cost (which scans EGRID per node) bounded.
-const ENEMY_CAP = 250;
+// Active-enemy cap, ramped by run time so late game (10min+) actually feels
+// dense. Was a flat 250 — that saturated at 4min and made minutes 10-30 feel
+// strangely safe (per balance audit). 250→400 ramp over 0~10min.
+function _enemyCap(t){
+  const r = Math.min(1, t / 600);
+  return Math.round(250 + 150 * r);
+}
+// SHRINE director — spawns a single shrine at each SHRINE_TIMES checkpoint.
+// G._shrinesSpawned is a Set of seconds-of-trigger so a checkpoint never
+// double-spawns. Shrine appears just off-screen so the player walks toward it
+// rather than being startled by a sudden mid-screen pickup.
+function shrineDirector(){
+  if(!G.player || G.bossActive) return;
+  if(!G._shrinesSpawned) G._shrinesSpawned = new Set();
+  for(const t of SHRINE_TIMES){
+    if(G.t >= t && !G._shrinesSpawned.has(t)){
+      G._shrinesSpawned.add(t);
+      const a = Math.random() * TAU;
+      const r = 360;
+      const x = G.player.x + Math.cos(a) * r;
+      const y = G.player.y + Math.sin(a) * r;
+      spawnShrine(x, y);
+      // Make sure player notices.
+      try {
+        const minStr = Math.floor(t/60) + '분';
+        // announce already imported elsewhere — use direct DOM if not.
+        const el = document.getElementById('announce');
+        if(el){ el.textContent = '◈ NEON SHRINE 등장 (' + minStr + ') ◈'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), 2500); }
+      } catch(e){}
+    }
+  }
+}
 function spawnDirector(){
   G.spawnTimer -= G.dt;
   if(G.spawnTimer > 0) return;
   const t = G.t;
   // Base cadence + count. During a boss fight, slow spawns by 2x and halve count
   // so the boss is the focus instead of a wall of adds.
+  // Floor 0.18→0.10 lets late-game pressure scale further (was saturating at
+  // 6min; now stays climbing through ~9min when it caps).
   const bossSlow = G.bossActive ? 2.0 : 1.0;
-  G.spawnTimer = Math.max(.18, 1.6 - t*.0040) * bossSlow;
+  G.spawnTimer = Math.max(.10, 1.6 - t*.0040) * bossSlow;
   // Hard cap — at the cap, skip the entire tick. Late-game pressure comes
   // from elite mix + boss patterns, not raw population.
-  const room = ENEMY_CAP - EGRID.enemies.length;
+  const room = _enemyCap(t) - EGRID.enemies.length;
   if(room <= 0) return;
   let n = clamp(Math.round(1 + t*.045), 1, 14);
   if(G.bossActive) n = Math.max(1, Math.floor(n * 0.5));
@@ -738,7 +792,7 @@ function spawnDirector(){
   }
   // Swarm bursts also respect the cap.
   if(min > 4 && Math.random() < .15){
-    const burstRoom = Math.max(0, ENEMY_CAP - EGRID.enemies.length);
+    const burstRoom = Math.max(0, _enemyCap(G.t) - EGRID.enemies.length);
     const burstN = Math.min(22, burstRoom);
     for(let i=0;i<burstN;i++){
       const a = Math.random()*TAU;

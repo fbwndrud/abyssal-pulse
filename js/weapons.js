@@ -71,7 +71,7 @@ export const WEAPONS = {
       // (e.g., VOID LANCE 3→1) so stale higher-index beams aren't rendered
       // at frozen positions.
       if(!w.beams) w.beams = [];
-      if(w.beams.length !== s.count) w.beams.length = s.count;
+      const _bc = Math.max(0, Math.round(s.count||0)); if(w.beams.length !== _bc) w.beams.length = _bc;
       for(let b=0;b<s.count;b++){
         let a = w.angle + (b * TAU/s.count);
         // PRISM RAY: each beam wobbles randomly
@@ -106,7 +106,7 @@ export const WEAPONS = {
     name:'ORBIT NODES', color:C.violet, kind:'ORBIT',
     desc:'주변을 도는 발광 노드.',
     maxLv:6,
-    baseStats:{ count:1, radius:90, rotSpeed:2.2, dmg:18, nodeR:12 },
+    baseStats:{ count:2, radius:90, rotSpeed:2.2, dmg:18, nodeR:12 },
     icon(ctx,x,y,s){ drawCircle(x,y,s*.2,C.violet,8); for(let i=0;i<3;i++){ const a=(i/3)*TAU; drawCircle(x+Math.cos(a)*s*.3, y+Math.sin(a)*s*.3, s*.08, C.violet, 6, C.violet); } },
     onUpdate(p,w){
       const s = w.stats;
@@ -556,7 +556,7 @@ export const FUSIONS = {
       const damageThisFrame = w.tickT <= 0;
       if(damageThisFrame) w.tickT = tickEvery;
       if(!w.beams) w.beams = [];
-      if(w.beams.length !== s.count) w.beams.length = s.count;
+      const _bc = Math.max(0, Math.round(s.count||0)); if(w.beams.length !== _bc) w.beams.length = _bc;
       const col = w.color || C.gold;
       // Same hit-tracking pattern as base BEAM — capture all enemies that
       // overlap any beam frame so fast crossers aren't missed.
@@ -729,7 +729,7 @@ export const FUSIONS = {
       const damageThisFrame = w.tickT <= 0;
       if(damageThisFrame) w.tickT = tickEvery;
       if(!w.beams) w.beams = [];
-      if(w.beams.length !== s.count) w.beams.length = s.count;
+      const _bc = Math.max(0, Math.round(s.count||0)); if(w.beams.length !== _bc) w.beams.length = _bc;
       const col = w.color || C.magenta;
       // Same hit-tracking as base BEAM: beam-line and tip-area hits accumulate
       // every frame so fast crossers aren't missed; flushed on each tick.
@@ -975,7 +975,7 @@ export const FUSIONS = {
       const damageThisFrame = w.tickT <= 0;
       if(damageThisFrame) w.tickT = tickEvery;
       if(!w.beams) w.beams = [];
-      if(w.beams.length !== s.count) w.beams.length = s.count;
+      const _bc = Math.max(0, Math.round(s.count||0)); if(w.beams.length !== _bc) w.beams.length = _bc;
       const col = w.color || C.gold;
       // Cross-frame hit tracking — see base BEAM for rationale.
       if(!w._tickHits) w._tickHits = new Set();

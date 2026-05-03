@@ -9,22 +9,22 @@ import { AUDIO } from './audio.js';
 import {
   makeEnt, fxBurst, fxRing, fxText, shake, flash,
   spawnXP, spawnCoin, spawnHeart, spawnMagnet, spawnFreeze, spawnChest, spawnEnemy,
-  setOnKillHook,
+  setOnKillHook, dealDamage,
 } from './entities.js';
 import {
   getCircleTexture, getPolygonTexture, acquireSprite, releaseSprite,
   acquireGraphics, releaseGraphics,
 } from './render.js';
 import {
-  CLASSES, PASSIVES, ITEMS, ITEM_TIERS, SYNERGIES, itemsByTier,
+  CLASSES, PASSIVES, ITEMS, ITEM_TIERS, SYNERGIES, GLYPHS, CHIPS, itemsByTier,
 } from './data.js';
 import { WEAPONS, EVOLUTIONS, FUSIONS, findFusion } from './weapons.js';
 
 // doLevelUp lives in ui.js. Avoid a hard import (would create a tighter cycle);
 // ui.js wires it via setLevelUpHandler at boot.
-let _doLevelUp = null, _endRun = null;
-export function setUiHandlers({ doLevelUp, endRun }){
-  _doLevelUp = doLevelUp; _endRun = endRun;
+let _doLevelUp = null, _endRun = null, _openGlyphPick = null;
+export function setUiHandlers({ doLevelUp, endRun, openGlyphPick }){
+  _doLevelUp = doLevelUp; _endRun = endRun; _openGlyphPick = openGlyphPick;
 }
 
 /* ───────── PLAYER SPAWN ───────── */
@@ -45,6 +45,7 @@ export function spawnPlayer(classKey){
     invuln: 1.5,
     weapons: [],
     passives: {},
+    glyphs: [],
     level: 1,
     xp: 0,
     xpNext: 3,
@@ -96,11 +97,23 @@ export function spawnPlayer(classKey){
       applyItem(p, pick.id);
     }
   }
+  // CHIPSET: apply equipped chip effects. Each equipped slot fires its chip's
+  // apply(p, stackLevel). Stack level comes from meta.chips.owned[id] (1+).
+  // Chips that depend on weapons (e.g. PULSE CHIP) read p.weapons inside apply.
+  if(meta.chips && Array.isArray(meta.chips.equipped)){
+    for(const chipId of meta.chips.equipped){
+      if(!chipId) continue;
+      const chip = CHIPS[chipId]; if(!chip) continue;
+      const lv = meta.chips.owned[chipId] || 1;
+      try { chip.apply(p, lv); } catch(e) { console.warn('chip apply failed', chipId, e); }
+    }
+  }
   return p;
 }
 
 export function addWeapon(p, key){
-  if(p.weapons.length >= 6) return false;
+  const cap = 6 + (p._weaponSlotBonus || 0);
+  if(p.weapons.length >= cap) return false;
   if(p.weapons.find(w=>w.key===key)) return false;
   const def = WEAPONS[key];
   if(!def) return false;
@@ -110,6 +123,11 @@ export function addWeapon(p, key){
   updateSynergies(p);
   return true;
 }
+// Integer-typed weapon stats: applying card-rarity mult to these can produce
+// fractional values (e.g. count: 2 → 2.95) which break code that expects ints
+// (Array.length assignments throw "Invalid array length"). Round these after
+// the mult-scaling step instead of treating them as continuous values.
+const _INT_STATS = new Set(['count', 'jumps', 'splits', 'pierce', 'fork', 'multi']);
 export function levelWeapon(p, key, mult){
   const w = p.weapons.find(w=>w.key===key); if(!w) return false;
   if(w.level >= w.def.maxLv) return false;
@@ -124,14 +142,19 @@ export function levelWeapon(p, key, mult){
       if(delta !== 0) w.stats[k] = before[k] + delta * mult;
     }
   }
+  // Coerce integer stats — both for the case above (mult-scaling broke it) and
+  // for any levelUp curve that drifts via float math.
+  for(const k of _INT_STATS){
+    if(typeof w.stats[k] === 'number') w.stats[k] = Math.max(0, Math.round(w.stats[k]));
+  }
   return true;
 }
 export function addPassive(p, key, mult){
   const def = PASSIVES[key];
   const lv = (p.passives[key]||0) + 1;
   if(lv > def.maxLv) return false;
-  // Per-level stat boost — modest (smaller than original since maxLv compressed
-  // 5→3). Items remain the primary stat lever.
+  // Per-level stat boost. mult comes from card rarity (1.0~2.4). maxLv 2 means
+  // 2 picks fully maxes a passive — fast evolution gating is the goal.
   if(typeof def.apply === 'function') def.apply(p, mult || 1);
   p.passives[key] = lv;
   // Max-level milestone: evolution gate unlocked + flavor burst.
@@ -155,7 +178,28 @@ export function damagePlayer(amount){
   AUDIO.damage();
   fxBurst(p.x, p.y, C.red, 16, 200, 3, .5);
   fxText(p.x, p.y - p.r - 6, '-' + Math.round(amount), C.red);
+  // THORN CHIP: nearby enemies eat reactive damage when player is hit.
+  if(p._thornDmg && p._thornR){
+    const r = p._thornR;
+    for(const e of G.ents){
+      if(e.type !== 'enemy' || !e.alive) continue;
+      const d2 = (e.x-p.x)*(e.x-p.x) + (e.y-p.y)*(e.y-p.y);
+      if(d2 <= r*r) dealDamage(e, p._thornDmg, C.red);
+    }
+    fxRing(p.x, p.y, C.red, r, .4);
+  }
   if(p.hp <= 0){
+    // PHOENIX CORE chip: spend a revive instead of dying.
+    if(p.revives && p.revives > 0){
+      p.revives--;
+      p.hp = Math.round(p.maxHp * 0.6);
+      p.invuln = 2.5;
+      fxBurst(p.x, p.y, C.gold, 60, 360, 5, 1.0);
+      fxRing(p.x, p.y, C.gold, 220, .9);
+      shake(.6); flash(C.gold, .6);
+      announce('★ PHOENIX REVIVE', 2.4);
+      return;
+    }
     p.hp = 0;
     if(_endRun) _endRun(false);
   }
@@ -254,6 +298,13 @@ export function applyFusion(p, fuseKey){
   const [hi, lo] = idxA > idxB ? [idxA, idxB] : [idxB, idxA];
   p.weapons.splice(hi, 1);
   p.weapons.splice(lo, 1);
+  // Mark source weapons as consumed so pickLevelupCards never re-offers them
+  // as 'weap_new'. Without this, the freed weapon slot creates two re-offered
+  // base weapons next level-up (since they're "missing" again). Permanent
+  // exclusion — fused weapons are gone for the rest of the run.
+  if(!p._fusedSources) p._fusedSources = new Set();
+  p._fusedSources.add(fuse.sourceA);
+  p._fusedSources.add(fuse.sourceB);
   // Add the fused weapon at Lv 1 (with its own key so other code never confuses it
   // with a base WEAPONS entry; pause/codex match against fuse.id).
   const inst = {
@@ -318,6 +369,17 @@ export function dropItem(x, y, luck, tierBias, kindFilter){
   if(!it) return null;
   return makeEnt({type:'item', x, y, vx:rand(-60,60), vy:rand(-60,60), r:11, color:ITEM_TIERS[it.tier].color, glow:ITEM_TIERS[it.tier].glow, item:it, life:30, maxLife:30});
 }
+export function applyGlyph(p, glyphId){
+  const g = GLYPHS[glyphId]; if(!g) return;
+  g.apply(p);
+  if(!p.glyphs) p.glyphs = [];
+  p.glyphs.push(glyphId);
+  fxBurst(p.x, p.y, g.color, 32, 240, 4, .55);
+  fxRing(p.x, p.y, g.color, 110, .6);
+  shake(.25); flash(g.color, .25);
+  AUDIO.level();
+  announce('▽ 글리프 · ' + g.name, 1.8);
+}
 export function applyItem(p, itemId){
   const it = ITEMS[itemId]; if(!it) return;
   it.apply(p);
@@ -349,9 +411,13 @@ setOnKillHook(function onKill(e){
   // — items felt too common, drowning out other pickup feedback.
   const HEART_CAP = .015, ITEM_MOB_CAP = .004, ITEM_ELITE_CAP = .04;
   if(e.isBoss){
-    // Boss reward = chest only. Chest opens to a 3-relic pick screen.
-    // Relics are gated to bosses so they feel like meaningful milestones.
+    // Boss reward = chest (relic) + immediate glyph pick. Two-stage: glyph picks
+    // open right away (modal pause), chest is left in the world to pick up after
+    // the modal closes. Calling synchronously avoids a race where the player
+    // grabs the chest within a setTimeout window — that would let openGlyphPick
+    // overwrite G.weaponPickPool while a chest pick is open.
     spawnChest(e.x, e.y);
+    if(_openGlyphPick) _openGlyphPick();
   } else if(Math.random() < Math.min(HEART_CAP, .003 + pLuck*.01)){
     spawnHeart(e.x, e.y);
   } else if(Math.random() < .002){

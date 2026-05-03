@@ -13,13 +13,16 @@ import {
 } from './entities.js';
 import {
   CLASSES, PASSIVES, ENEMIES, UPGRADE_TIERS, SHOP_ITEMS,
-  ITEMS, ITEM_TIERS,
+  ITEMS, ITEM_TIERS, GLYPHS,
+  CHIPS, CHIP_TIERS, CHIP_PULL_COST, CHIP_PULL10_COST, CHIP_SLOT_COSTS, CHIP_DEFAULT_SLOTS,
+  rollChip,
+  SHRINES, rollShrineCards, shrineCost,
   rollUpgradeTier, rollTierMult,
 } from './data.js';
 import { WEAPONS, EVOLUTIONS, FUSIONS } from './weapons.js';
 import {
   spawnPlayer, addWeapon, levelWeapon, addPassive, applyEvo, weaponEvoReady,
-  updateSynergies, applyItem, pickRandomItem,
+  updateSynergies, applyItem, applyGlyph, pickRandomItem,
   fusionsAvailable, applyFusion, setUiHandlers,
 } from './player.js';
 
@@ -208,12 +211,13 @@ export function doLevelUp(forceNoXpReset=false){
   if(!forceNoXpReset && p.xp >= p.xpNext){
     p.xp -= p.xpNext;
     p.level++;
-    // Log-cap XP curve: exponential up to ~250, then plateau.
-    // Without the cap, late game (L15+) demanded 400+ XP/level — multiple
-    // minutes between level-ups. Cap keeps the picking flow steady so the
-    // player gets weapon/passive choices throughout the run.
-    // L1=3, L5=22, L10=101, L13≈250(cap), L20=250.
-    p.xpNext = Math.min(Math.round(p.xpNext * 1.30 + 2), 250);
+    // Steeper curve + higher cap. Previous (×1.30, cap 250 at L13) plateaued
+    // too early — by 4-5min the player was leveling every few seconds, drowning
+    // the run in modal pop-ups and freezing combat flow. New curve keeps growing
+    // through L18 so late-game pacing feels like 1 level / 30~90s instead of
+    // multiple per minute.
+    // L1=3, L5=24, L10=126, L13=318, L15=584, L16=790, L17=900(cap).
+    p.xpNext = Math.min(Math.round(p.xpNext * 1.35 + 2), 900);
   }
   AUDIO.level();
   shake(.1); flash('#fff', .25);
@@ -226,21 +230,41 @@ export function doLevelUp(forceNoXpReset=false){
   document.getElementById('reroll-cost').textContent = G.rerollCost;
   renderLevelupCards();
 }
+// Permanent stat-up cards — only injected late-game when the regular pool dries
+// up (all weapons maxed + all passives maxed). Without these, late-run level-ups
+// served only heal/gold (the dead-card bug from the balance audit). Now players
+// keep growing past the content cap, but the +%/level is small (5-12% scaled by
+// rarity) so it doesn't trivialize the mid-game weapon/passive picks.
+const STAT_UPS = {
+  dmg:   { label:'+ POWER',   tag:'STAT', color:C.red,    desc:'전 무기 데미지 영구 +5%',
+           apply:(p,m)=>{ p.dmgMul *= (1 + .05*m); } },
+  area:  { label:'+ REACH',   tag:'STAT', color:C.violet, desc:'효과 범위 영구 +5%',
+           apply:(p,m)=>{ p.areaMul *= (1 + .05*m); } },
+  cd:    { label:'+ CADENCE', tag:'STAT', color:C.gold,   desc:'발사 속도 영구 +5%',
+           apply:(p,m)=>{ p.cdMul *= (1 + .05*m); } },
+  speed: { label:'+ HASTE',   tag:'STAT', color:C.cyan,   desc:'이동 속도 영구 +4%',
+           apply:(p,m)=>{ p.speed *= (1 + .04*m); } },
+  hp:    { label:'+ SOUL',    tag:'STAT', color:C.lime,   desc:'최대 HP 영구 +15, 회복',
+           apply:(p,m)=>{ const inc = Math.round(15*m); p.maxHp += inc; p.hp = Math.min(p.maxHp, p.hp + inc); } },
+};
 function pickLevelupCards(p, n=3){
   // Evolutions and fusions auto-trigger from gameloop._autoEvoFuse — no longer
   // surfaced as level-up cards. Cards offer weap_new / weap_up / pas / heal /
-  // gold only.
+  // gold / stat_up.
   const pool = [];
   for(const w of p.weapons){
     if(w.level < w.def.maxLv){
       pool.push({type:'weap_up', key:w.key, weight: 6});
     }
   }
-  if(p.weapons.length < 6){
+  const weapCap = 6 + (p._weaponSlotBonus || 0);
+  if(p.weapons.length < weapCap){
     for(const k in WEAPONS){
-      if(!p.weapons.find(w=>w.key===k)){
-        pool.push({type:'weap_new', key:k, weight: 5});
-      }
+      if(p.weapons.find(w=>w.key===k)) continue;
+      // Skip weapons that were consumed by a previous fusion — re-offering
+      // them feels broken since the player intentionally "spent" them.
+      if(p._fusedSources && p._fusedSources.has(k)) continue;
+      pool.push({type:'weap_new', key:k, weight: 5});
     }
   }
   for(const k in PASSIVES){
@@ -251,6 +275,17 @@ function pickLevelupCards(p, n=3){
   }
   pool.push({type:'heal', weight:2});
   pool.push({type:'gold', weight:2});
+  // Late-game injection: when regular content is exhausted, surface permanent
+  // stat-ups so picks remain meaningful past the content cap.
+  const allWeapMax = p.weapons.length >= 6 && p.weapons.every(w => w.level >= w.def.maxLv);
+  const allPasMax = Object.keys(PASSIVES).every(k => (p.passives[k]||0) >= PASSIVES[k].maxLv);
+  const lateGame = allWeapMax && allPasMax;
+  const partialLate = !lateGame && (allWeapMax || allPasMax);
+  if(lateGame){
+    for(const k in STAT_UPS) pool.push({type:'stat_up', stat:k, weight:10});
+  } else if(partialLate){
+    for(const k in STAT_UPS) pool.push({type:'stat_up', stat:k, weight:3});
+  }
 
   const out = [];
   const used = new Set();
@@ -270,10 +305,20 @@ function pickLevelupCards(p, n=3){
     out.push(chosen);
   }
 
+  // GOLDEN PROMISE shrine: next level-up's cards are all guaranteed LEGEND tier.
+  // One-shot — flag clears after fulfilment.
+  const forceLegend = p._guaranteeLegend;
+  if(forceLegend) p._guaranteeLegend = false;
   for(const card of out){
-    card.tier = rollUpgradeTier(p.luck);
-    card.mult = rollTierMult(card.tier);
-    card.rarity = card.tier.key;
+    if(forceLegend){
+      card.tier = UPGRADE_TIERS.legend;
+      card.mult = rollTierMult(card.tier);
+      card.rarity = 'legend';
+    } else {
+      card.tier = rollUpgradeTier(p.luck);
+      card.mult = rollTierMult(card.tier);
+      card.rarity = card.tier.key;
+    }
   }
   return out;
 }
@@ -312,6 +357,11 @@ function renderLevelupCards(){
       const heal = Math.round(p.maxHp * 0.5 * mult);
       desc = `HP +${heal} <span style="color:#7d96b4">(50%${mult!==1?` ×${mult.toFixed(2)}`:''})</span>`;
     }
+    else if(card.type === 'stat_up'){
+      const su = STAT_UPS[card.stat];
+      title = su.label; tag = su.tag; color = su.color;
+      desc = `<span style="color:#cfeaff">${su.desc}${mult!==1?` <span style="color:#9eff5b">×${mult.toFixed(2)}</span>`:''}</span>`;
+    }
     else if(card.type === 'gold'){
       title = 'CORE CACHE'; tag='GOLD'; color=C.gold;
       const amt = Math.round(10 * mult);
@@ -330,15 +380,31 @@ function renderLevelupCards(){
       tag = it.kind === 'relic' ? '◈ 유물' : '◇ 아이템';
       desc = `<span style="color:#cfeaff">${it.desc}</span><br><span style="color:#7d96b4">${it.kind === 'relic' ? '영구 효과' : '일회성 사용'}</span>`;
     }
+    else if(card.type === 'glyph_pick'){
+      const g = card.glyph;
+      const stackCount = (p.glyphs||[]).filter(id => id === g.id).length;
+      title = g.name; color = g.color; tag = '▽ 글리프';
+      const stackLabel = stackCount > 0 ? `<br><span style="color:#9eff5b">현재 ${stackCount}중첩 — 픽 시 누적</span>` : '<br><span style="color:#9eff5b">이번 런 영구 (보스 처치 보상)</span>';
+      desc = `<span style="color:#cfeaff">${g.desc}</span>${stackLabel}`;
+    }
+    else if(card.type === 'shrine_pick'){
+      const s = card.shrine;
+      const affordable = meta.coins >= card.cost;
+      title = s.name; color = s.color; tag = '◈ 제단';
+      const costLine = `<br><span style="color:${affordable?'#ffd400':'#ff6464'};font-weight:900">◆ ${card.cost} ${affordable?'':'(코인 부족)'}</span>`;
+      desc = `<span style="color:#cfeaff">${s.desc}</span>${costLine}`;
+    }
     else if(card.type === 'fuse'){
       const f = card.fuse;
       title = f.name; color = f.color; tag = '★ FUSE';
       desc = `${f.desc}<br><span style="color:#ffd96b">재료: ${f.sourceA} + ${f.sourceB}</span><br><span style="color:#9eff5b">두 무기 흡수 → Lv.1 새 무기</span>`;
     }
-    el.className = 'card rarity-' + rarityClass + (card.type==='evolve'?' evo':'') + (card.type==='fuse'?' fuse':'');
+    el.className = 'card rarity-' + rarityClass + (card.type==='evolve'?' evo':'') + (card.type==='fuse'?' fuse':'') + (card.type==='glyph_pick'?' glyph':'') + (card.type==='shrine_pick'?' shrine':'');
     let tierLabel;
     if(card.type === 'evolve') tierLabel = `<div class="tier-label" style="color:#00e5ff;text-shadow:0 0 14px rgba(0,229,255,.9)">▲ EVOLVE · 진화</div>`;
     else if(card.type === 'fuse') tierLabel = `<div class="tier-label" style="color:#ff3dcb;text-shadow:0 0 14px rgba(255,61,203,.9)">★ FUSE · 융합</div>`;
+    else if(card.type === 'glyph_pick') tierLabel = `<div class="tier-label" style="color:${card.glyph.color};text-shadow:0 0 14px ${card.glyph.color}">▽ GLYPH · 보스 보상</div>`;
+    else if(card.type === 'shrine_pick') tierLabel = `<div class="tier-label" style="color:${card.shrine.color};text-shadow:0 0 14px ${card.shrine.color}">◈ SHRINE · 즉시 헌납</div>`;
     else if(card.type === 'pas') tierLabel = `<div class="tier-label" style="color:${PASSIVES[card.key].color};text-shadow:0 0 10px ${PASSIVES[card.key].color}">◇ GATE · 진화 게이트</div>`;
     else if(card.tier) tierLabel = `<div class="tier-label" style="color:${card.tier.color};text-shadow:0 0 10px ${card.tier.glow}">${card.tier.label}${(card.mult && card.mult !== 1)?' · ×'+card.mult.toFixed(2):''}</div>`;
     else tierLabel = '';
@@ -353,7 +419,22 @@ function renderLevelupCards(){
     const cv = el.querySelector('canvas');
     const cx = cv.getContext('2d');
     cx.translate(32, 32);
-    if(card.type === 'item_pick'){
+    if(card.type === 'glyph_pick'){
+      const g = card.glyph;
+      cx.strokeStyle = g.color; cx.shadowColor = g.color; cx.shadowBlur = 18; cx.lineWidth = 2.6;
+      // Inverted triangle "glyph" frame
+      cx.beginPath();
+      cx.moveTo(-22, -16); cx.lineTo(22, -16); cx.lineTo(0, 22); cx.closePath(); cx.stroke();
+      if(g.icon) g.icon(cx, 0, 0, 56);
+    } else if(card.type === 'shrine_pick'){
+      const s = card.shrine;
+      cx.strokeStyle = s.color; cx.shadowColor = s.color; cx.shadowBlur = 20; cx.lineWidth = 3;
+      // Shrine: hexagon outline + central dot.
+      cx.beginPath();
+      for(let k=0;k<6;k++){ const a = k*TAU/6 - Math.PI/2; const xx = Math.cos(a)*22, yy = Math.sin(a)*22; if(k===0) cx.moveTo(xx,yy); else cx.lineTo(xx,yy); }
+      cx.closePath(); cx.stroke();
+      cx.fillStyle = s.color; cx.beginPath(); cx.arc(0, 0, 6, 0, TAU); cx.fill();
+    } else if(card.type === 'item_pick'){
       const it = card.item;
       const tcol = ITEM_TIERS[it.tier].color;
       cx.strokeStyle = tcol; cx.shadowColor = tcol; cx.shadowBlur = 14; cx.lineWidth = 2.4;
@@ -406,6 +487,13 @@ function renderLevelupCards(){
     } else if(card.type === 'gold'){
       cx.fillStyle = C.gold; cx.shadowColor = C.gold; cx.shadowBlur = 14;
       cx.beginPath(); cx.moveTo(0,-16); cx.lineTo(16,0); cx.lineTo(0,16); cx.lineTo(-16,0); cx.fill();
+    } else if(card.type === 'stat_up'){
+      const su = STAT_UPS[card.stat];
+      cx.strokeStyle = su.color; cx.shadowColor = su.color; cx.shadowBlur = 16; cx.lineWidth = 3;
+      cx.fillStyle = su.color; cx.beginPath();
+      // big up-arrow
+      cx.moveTo(0,-22); cx.lineTo(16,-2); cx.lineTo(8,-2); cx.lineTo(8,22); cx.lineTo(-8,22); cx.lineTo(-8,-2); cx.lineTo(-16,-2); cx.closePath();
+      cx.fill();
     }
   }
 }
@@ -427,6 +515,24 @@ function applyLevelupCard(card){
     announce('▲ EVOLVE · ' + card.evo.name, 3);
   }
   else if(card.type === 'item_pick'){ applyItem(p, card.item.id); }
+  else if(card.type === 'glyph_pick'){ applyGlyph(p, card.glyph.id); }
+  else if(card.type === 'shrine_pick'){
+    if(meta.coins < card.cost){
+      // Refuse — replay the same modal so player can pick another or skip.
+      AUDIO.hit?.();
+      announce('◆ 코인 부족', 1.2);
+      return;
+    }
+    meta.coins -= card.cost; saveMeta();
+    card.shrine.apply(p);
+    const col = card.shrine.color;
+    flash(col, .55); shake(.45);
+    fxBurst(p.x, p.y, col, 40, 280, 4, .7);
+    fxRing(p.x, p.y, col, 160, .7);
+    AUDIO.level();
+    announce('◈ ' + card.shrine.name, 2.2);
+    updateSynergies(p);
+  }
   else if(card.type === 'fuse'){
     applyFusion(p, card.fuseKey);
     const col = (card.fuse && card.fuse.color) || '#ff3dcb';
@@ -439,10 +545,53 @@ function applyLevelupCard(card){
   }
   else if(card.type === 'heal'){ p.hp = Math.min(p.maxHp, p.hp + p.maxHp*.5 * mult); }
   else if(card.type === 'gold'){ const amt = Math.round(10 * mult); G.coinsRun += amt; meta.coins += amt; saveMeta(); }
+  else if(card.type === 'stat_up'){ STAT_UPS[card.stat].apply(p, mult); }
   updateSynergies(p);
   document.getElementById('levelup-overlay').classList.add('hidden');
   G.mode = 'play';
   if(p.xp >= p.xpNext){ setTimeout(()=> doLevelUp(false), 80); }
+}
+/* Shrine pick — mid-run coin sink. 3 of N effect cards, each with a coin
+   cost scaled by current run time. Player picks one if affordable, or skips
+   (free) — even skipping consumes the shrine.
+   =================================================================== */
+export function openShrinePick(){
+  const p = G.player; if(!p) return;
+  const cards = rollShrineCards(3).map(s => ({
+    type:'shrine_pick', shrine:s, cost: shrineCost(s.baseCost, G.t), rarity:'epic',
+  }));
+  if(cards.length === 0) return;
+  AUDIO.level();
+  G.mode = 'levelup';
+  G.rerollCost = 3;
+  G.weaponPickPool = cards;
+  document.getElementById('levelup-overlay').classList.remove('hidden');
+  document.getElementById('reroll-cost').textContent = G.rerollCost;
+  renderLevelupCards();
+}
+/* Glyph pick — opens the level-up overlay with 3 random GLYPH cards.
+   Triggered by killEnemy on boss death (separate from chest pick). Glyphs are
+   run-only globals (not saved to meta), and the same glyph can be picked again
+   on later boss kills (stack). */
+export function openGlyphPick(){
+  const p = G.player; if(!p) return;
+  const all = Object.values(GLYPHS);
+  if(all.length === 0) return;
+  const pool = all.slice();
+  const cards = [];
+  const want = Math.min(3, pool.length);
+  while(cards.length < want){
+    const idx = Math.floor(Math.random() * pool.length);
+    const g = pool.splice(idx, 1)[0];
+    cards.push({type:'glyph_pick', glyph:g, rarity:'epic'});
+  }
+  AUDIO.level();
+  G.mode = 'levelup';
+  G.rerollCost = 3;
+  G.weaponPickPool = cards;
+  document.getElementById('levelup-overlay').classList.remove('hidden');
+  document.getElementById('reroll-cost').textContent = G.rerollCost;
+  renderLevelupCards();
 }
 /* Chest pick — opens the level-up overlay with 3 random RELIC cards (boss-only).
    Relics are gated to boss chests so they feel like a milestone. */
@@ -673,6 +822,7 @@ export function startRun(classKey){
   clearAllWorldSprites();
   G.ents = []; G.t = 0; G.spawnTimer = 0; G.combo=0; G.comboTimer=0;
   G.killCount = 0; G.coinsRun = 0; G.bossActive=null; G.bossTimer = 0; G.bossCount = 0;
+  G._shrinesSpawned = null;  // re-seed each run so SHRINEs respawn
   G.endReason = null; G.rerollCost = 3;
   G.classChosen = classKey;
   G.cam = {x:0, y:0, zoom:1, tx:0, ty:0};
@@ -861,6 +1011,241 @@ function buildShop(){
 export function openShop(){ closeOverlay('menu-overlay'); document.getElementById('shop-overlay').classList.remove('hidden'); buildShop(); }
 
 /* ===================================================================
+   CHIPSET LAB — gacha + inventory + slot equip + manual fusion.
+   meta.chips.owned[id] = stack level (1+, 1 from raw pull, +1 from fusion).
+   meta.chips.equipped[i] = chipId|null. Fixed length = meta.chips.slots.
+   Manual fusion: 3 owned at same level → 1 owned at level+1 (consumes 3,
+   refunds nothing — keeps every pull meaningful). Auto-unequips fused chips.
+   =================================================================== */
+function _chipCardHtml(chip, opts={}){
+  const tier = CHIP_TIERS[chip.tier];
+  const stack = opts.stack || 0;
+  const equippedTag = opts.equippedSlot != null ? `<div class="cequip">▣ ${opts.equippedSlot+1}</div>` : '';
+  const stackTag = stack > 1 ? `<div class="cstack">×${stack}</div>` : '';
+  const cls = 'chip tier-' + chip.tier + (opts.equipped ? ' equipped' : '') + (opts.fuseReady ? ' fuse-ready' : '') + (opts.empty ? ' empty' : '');
+  const fuseBtn = opts.fuseReady ? `<div class="cfuse" data-fuse="${chip.id}">★ FUSE → ${_CHIP_TIER_NEXT[chip.tier] ? CHIP_TIERS[_CHIP_TIER_NEXT[chip.tier]].label : '?'}</div>` : '';
+  // Effective-strength hint when stack > 1 — players can read "+5%/Lv" but a
+  // ×4 stack means +20%, which is non-obvious without math. We surface a
+  // small "현재" line that scales linear-equivalent values out of the desc.
+  const effLine = stack > 1 ? `<div style="font-size:9px;color:#9eff5b;font-weight:700;letter-spacing:.08em">${opts.equipped ? '현재' : '장착 시'} Lv ${stack} (효과 ×${stack})</div>` : '';
+  return `<div class="${cls}" data-chip="${chip.id}" data-action="${opts.action||''}" data-slot="${opts.equippedSlot ?? ''}" title="${chip.name} — ${chip.desc}${stack>1?` · Lv ${stack}`:''}">
+    ${equippedTag}${stackTag}
+    <div class="cn" style="color:${tier.color}">${chip.name}</div>
+    <div class="cd">${chip.desc}</div>
+    ${effLine}
+    <div style="font-size:9px;color:${tier.color};letter-spacing:.12em;font-weight:700">${tier.label}</div>
+    ${fuseBtn}
+  </div>`;
+}
+function _emptySlotHtml(slotIdx){
+  return `<div class="chip empty" data-action="empty-slot" data-slot="${slotIdx}" style="width:160px">
+    <div class="cn" style="color:#5d7290">EMPTY SLOT ${slotIdx+1}</div>
+    <div class="cd" style="color:#5d7290">인벤토리에서 칩을 클릭해 장착</div>
+  </div>`;
+}
+function _chipFlash(name, tierKey){
+  const tier = CHIP_TIERS[tierKey];
+  const el = document.getElementById('chipset-pull-result');
+  // Higher tiers get a stronger glow + outline + tier prefix sigil.
+  const sigil = tierKey === 'legendary' ? '★ ' : tierKey === 'epic' ? '◈ ' : tierKey === 'rare' ? '◇ ' : '· ';
+  const outline = tierKey === 'legendary' ? `outline:3px solid ${tier.color};box-shadow:0 0 26px ${tier.color}` :
+                  tierKey === 'epic' ? `outline:2px solid ${tier.color};box-shadow:0 0 16px ${tier.color}` : '';
+  const desc = CHIPS[Object.keys(CHIPS).find(k=>CHIPS[k].name===name)]?.desc || '';
+  el.innerHTML += `<div class="chip tier-${tierKey}" style="pointer-events:none;${outline}">
+    <div class="cn" style="color:${tier.color}">${sigil}${name}</div>
+    <div class="cd" style="font-size:10px">${desc}</div>
+    <div style="font-size:9px;color:${tier.color};letter-spacing:.12em;font-weight:700">${tier.label}</div>
+  </div>`;
+}
+export function chipsetPull(n){
+  const cost = n === 10 ? CHIP_PULL10_COST : CHIP_PULL_COST;
+  if(meta.coins < cost){ AUDIO.hit?.(); return; }
+  meta.coins -= cost;
+  document.getElementById('chipset-pull-result').innerHTML = '';
+  const newOwned = [];
+  for(let i = 0; i < n; i++){
+    const chip = rollChip();
+    if(!chip) continue;
+    meta.chips.owned[chip.id] = (meta.chips.owned[chip.id] || 0) + 1;
+    newOwned.push(chip);
+    _chipFlash(chip.name, chip.tier);
+  }
+  saveMeta();
+  AUDIO.level?.();
+  buildChipset();
+}
+export function chipsetBuySlot(){
+  const slots = meta.chips.slots || CHIP_DEFAULT_SLOTS;
+  const idx = slots - CHIP_DEFAULT_SLOTS; // 0 → first expansion (slot 4)
+  if(idx >= CHIP_SLOT_COSTS.length) return;
+  const cost = CHIP_SLOT_COSTS[idx];
+  if(meta.coins < cost) return;
+  meta.coins -= cost;
+  meta.chips.slots = slots + 1;
+  meta.chips.equipped.push(null);
+  saveMeta();
+  buildChipset();
+}
+function chipsetEquip(chipId){
+  // If already equipped (any slot), do nothing — clicking same chip in inventory
+  // shouldn't re-equip into another slot. Player must explicitly unequip first.
+  const eq = meta.chips.equipped;
+  if(eq.includes(chipId)){
+    _chipsetToast('이미 장착된 칩', '#9ab5d0');
+    return;
+  }
+  const empty = eq.indexOf(null);
+  if(empty < 0){
+    // Slots full — refuse and tell the player. No silent overwrite.
+    _chipsetToast('슬롯이 가득 참 — 장착된 칩을 먼저 클릭해 빼세요', '#ff6464');
+    return;
+  }
+  eq[empty] = chipId;
+  saveMeta();
+  buildChipset();
+}
+// Lightweight transient message in the pull-result strip.
+function _chipsetToast(msg, color='#ffd400'){
+  const el = document.getElementById('chipset-pull-result');
+  if(!el) return;
+  el.innerHTML = `<div style="padding:18px 22px;border:1px dashed ${color};border-radius:8px;color:${color};font-size:12px;letter-spacing:.16em;font-weight:700">${msg}</div>`;
+}
+function chipsetUnequip(slot){
+  meta.chips.equipped[slot] = null;
+  saveMeta();
+  buildChipset();
+}
+// Tier ladder for fusion. legendary doesn't fuse further (returns null).
+const _CHIP_TIER_NEXT = { common:'rare', rare:'epic', epic:'legendary', legendary:null };
+function _pickRandomChipOfTier(tier){
+  const pool = Object.values(CHIPS).filter(c => c.tier === tier);
+  if(!pool.length) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function chipsetFuse(chipId){
+  // Real fusion: 3 chips of same id → 1 random chip of next tier.
+  // Consumes the source chip stacks entirely (owned[id] -= 3) and adds 1 to
+  // the new chip's owned count. Auto-unequips the source if its owned hits 0
+  // and it was equipped (so a stale equipped slot doesn't reference a chip
+  // the player no longer owns).
+  const src = CHIPS[chipId]; if(!src) return;
+  if((meta.chips.owned[chipId] || 0) < 3) return;
+  const nextTier = _CHIP_TIER_NEXT[src.tier];
+  if(!nextTier){
+    // legendary: no fuse target. Just refund some coins so it isn't a trap.
+    meta.coins += 200;
+    saveMeta();
+    buildChipset();
+    return;
+  }
+  const newChip = _pickRandomChipOfTier(nextTier);
+  if(!newChip) return;
+  meta.chips.owned[chipId] -= 3;
+  if(meta.chips.owned[chipId] <= 0){
+    delete meta.chips.owned[chipId];
+    // Unequip if currently slotted
+    const idx = meta.chips.equipped.indexOf(chipId);
+    if(idx >= 0) meta.chips.equipped[idx] = null;
+  }
+  meta.chips.owned[newChip.id] = (meta.chips.owned[newChip.id] || 0) + 1;
+  saveMeta();
+  // Visual feedback: flash the result in pull-result area.
+  const tier = CHIP_TIERS[newChip.tier];
+  document.getElementById('chipset-pull-result').innerHTML =
+    `<div class="chip tier-${newChip.tier}" style="pointer-events:none;outline:3px solid ${tier.color};box-shadow:0 0 24px ${tier.color}">
+      <div class="cn" style="color:${tier.color}">★ FUSE → ${newChip.name}</div>
+      <div class="cd" style="font-size:10px">${newChip.desc}</div>
+      <div style="font-size:9px;color:${tier.color};letter-spacing:.12em;font-weight:700">${tier.label}</div>
+    </div>`;
+  AUDIO.level?.();
+  buildChipset();
+}
+function buildChipset(){
+  document.getElementById('chipset-coins').textContent = meta.coins;
+  // Slot info + buy button state
+  const slots = meta.chips.slots || CHIP_DEFAULT_SLOTS;
+  const expansionIdx = slots - CHIP_DEFAULT_SLOTS;
+  const slotBtn = document.getElementById('slot-btn');
+  if(expansionIdx >= CHIP_SLOT_COSTS.length){
+    slotBtn.textContent = '+ 슬롯 (MAX)';
+    slotBtn.disabled = true;
+  } else {
+    const cost = CHIP_SLOT_COSTS[expansionIdx];
+    slotBtn.textContent = `+ 슬롯 → ${slots+1} (◆ ${cost})`;
+    slotBtn.disabled = meta.coins < cost;
+  }
+  document.getElementById('chipset-slot-info').textContent = `${slots} slots`;
+  // Equipped grid
+  const eqRoot = document.getElementById('chipset-equipped');
+  let html = '';
+  for(let i = 0; i < slots; i++){
+    const chipId = meta.chips.equipped[i];
+    if(!chipId){ html += _emptySlotHtml(i); }
+    else {
+      const chip = CHIPS[chipId];
+      if(!chip){ html += _emptySlotHtml(i); continue; }
+      const stack = meta.chips.owned[chipId] || 1;
+      html += _chipCardHtml(chip, {stack, equippedSlot:i, equipped:true, action:'unequip'});
+    }
+  }
+  eqRoot.innerHTML = html;
+  // Inventory grid — sorted by tier (legend → common), then stack desc, then name.
+  // Without sorting, chips appear in JSON-key order which feels random as the
+  // pull list grows, making fuse-ready stacks hard to spot.
+  const invRoot = document.getElementById('chipset-inventory');
+  const ownedIds = Object.keys(meta.chips.owned).filter(id => meta.chips.owned[id] > 0);
+  if(ownedIds.length === 0){
+    invRoot.innerHTML = `<div style="color:#5d7290;padding:20px;font-size:12px">아직 칩이 없습니다. 위에서 가챠를 돌리세요.</div>`;
+  } else {
+    const tierRank = { legendary:0, epic:1, rare:2, common:3 };
+    ownedIds.sort((a, b) => {
+      const ca = CHIPS[a], cb = CHIPS[b];
+      if(!ca || !cb) return 0;
+      const ta = tierRank[ca.tier] ?? 9, tb = tierRank[cb.tier] ?? 9;
+      if(ta !== tb) return ta - tb;
+      const sa = meta.chips.owned[a], sb = meta.chips.owned[b];
+      if(sa !== sb) return sb - sa;
+      return ca.name.localeCompare(cb.name);
+    });
+    invRoot.innerHTML = ownedIds.map(id => {
+      const chip = CHIPS[id]; if(!chip) return '';
+      const stack = meta.chips.owned[id];
+      const isEquipped = meta.chips.equipped.includes(id);
+      const fuseReady = stack >= 3;
+      return _chipCardHtml(chip, {stack, equipped:isEquipped, fuseReady, action: fuseReady ? 'fuse-or-equip' : 'equip'});
+    }).join('');
+  }
+  // Wire clicks via delegation (rebuild on every change so no leak).
+  eqRoot.onclick = ev => {
+    const card = ev.target.closest('.chip'); if(!card) return;
+    const slot = parseInt(card.dataset.slot, 10);
+    if(!isNaN(slot) && card.dataset.action === 'unequip') chipsetUnequip(slot);
+  };
+  invRoot.onclick = ev => {
+    // FUSE button takes priority — checks first.
+    const fuseBtn = ev.target.closest('[data-fuse]');
+    if(fuseBtn){ ev.stopPropagation(); chipsetFuse(fuseBtn.dataset.fuse); return; }
+    const card = ev.target.closest('.chip'); if(!card) return;
+    const id = card.dataset.chip; if(!id) return;
+    chipsetEquip(id);
+  };
+  // Pull button states
+  document.getElementById('pull1-btn').disabled = meta.coins < CHIP_PULL_COST;
+  document.getElementById('pull10-btn').disabled = meta.coins < CHIP_PULL10_COST;
+}
+export function openChipset(){
+  closeOverlay('menu-overlay');
+  document.getElementById('chipset-overlay').classList.remove('hidden');
+  // Friendly empty-state hint — without this the 90px result strip just looked
+  // like dead space when the player first arrives.
+  document.getElementById('chipset-pull-result').innerHTML =
+    `<div style="padding:18px 22px;border:1px dashed rgba(255,61,203,.4);border-radius:8px;color:#9ab5d0;font-size:11px;letter-spacing:.16em;font-weight:700;text-align:center">
+      ◇ 가챠로 칩을 뽑은 후 인벤에서 슬롯에 장착하세요 · 같은 칩 ×3 → ★ FUSE 로 다음 등급 변환
+    </div>`;
+  buildChipset();
+}
+
+/* ===================================================================
    CODEX
    =================================================================== */
 function buildCodex(){
@@ -884,6 +1269,11 @@ function buildCodex(){
     const f = FUSIONS[fk];
     html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${f.color}">· <b>${f.name}</b> <span style="color:#9ab5d0">= ${f.sourceA} + ${f.sourceB} — ${f.desc}</span></div>`;
   }
+  html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">▽ GLYPHS — 보스 처치 시 1장 픽 (스택 가능, 한 런 영구)</div>';
+  for(const gk in GLYPHS){
+    const g = GLYPHS[gk];
+    html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${g.color}">· <b>${g.name}</b> <span style="color:#9ab5d0">${g.desc}</span></div>`;
+  }
   html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">ENEMIES</div>';
   for(const k in ENEMIES){
     const d = ENEMIES[k];
@@ -894,4 +1284,4 @@ function buildCodex(){
 export function openCodex(){ closeOverlay('menu-overlay'); document.getElementById('codex-overlay').classList.remove('hidden'); buildCodex(); }
 
 // Wire player.js so applyItem (consumable forced level-up) and damagePlayer (death) can invoke us.
-setUiHandlers({ doLevelUp, endRun });
+setUiHandlers({ doLevelUp, endRun, openGlyphPick, openShrinePick });

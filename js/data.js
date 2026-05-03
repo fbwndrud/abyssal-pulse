@@ -22,30 +22,34 @@ export const CLASSES = {
    (so Lv 1-2 picks aren't dead picks), AND Lv 3 unlocks the evolution gate.
    13-pick evolution slog → ~7-9 picks. Items still carry primary stat scaling.
    =================================================================== */
+// maxLv compressed 3→2 (per balance audit) so evolution gates open faster — a
+// run now reliably hits 2~3 evolutions instead of 1. Per-level magnitudes were
+// scaled up to keep the total stat gain comparable (POWER 8%→12%/Lv etc), so
+// fully maxed passives still feel meaningful, just reached sooner.
 export const PASSIVES = {
-  POWER:   { name:'POWER',   color:C.red,    desc:'화력 — 데미지 +8%/Lv. Lv.3 시 화력 진화 해금', maxLv:3,
-             apply:(p,lv)=>{ p.dmgMul *= (1 + .08*lv); },
+  POWER:   { name:'POWER',   color:C.red,    desc:'화력 — 데미지 +12%/Lv. Lv.2 시 화력 진화 해금', maxLv:2,
+             apply:(p,lv)=>{ p.dmgMul *= (1 + .12*lv); },
              lv3Reward: p => { p._boostDmg = 8; p._boostDmgMul = 1.5; } },
-  HASTE:   { name:'HASTE',   color:C.cyan,   desc:'기동 — 이동 +6%/Lv. Lv.3 시 기동 진화 해금', maxLv:3,
-             apply:(p,lv)=>{ p.speed *= (1 + .06*lv); },
+  HASTE:   { name:'HASTE',   color:C.cyan,   desc:'기동 — 이동 +9%/Lv. Lv.2 시 기동 진화 해금', maxLv:2,
+             apply:(p,lv)=>{ p.speed *= (1 + .09*lv); },
              lv3Reward: p => { p._boostSpd = 8; p._boostSpdMul = 1.4; } },
-  CADENCE: { name:'CADENCE', color:C.gold,   desc:'연사 — 쿨감 +6%/Lv. Lv.3 시 연사 진화 해금', maxLv:3,
-             apply:(p,lv)=>{ p.cdMul *= (1 + .06*lv); },
+  CADENCE: { name:'CADENCE', color:C.gold,   desc:'연사 — 쿨감 +9%/Lv. Lv.2 시 연사 진화 해금', maxLv:2,
+             apply:(p,lv)=>{ p.cdMul *= (1 + .09*lv); },
              lv3Reward: p => { p._boostCdr = 8; p._boostCdrMul = 1.3; } },
-  REACH:   { name:'REACH',   color:C.violet, desc:'범위 — 효과 범위 +8%/Lv. Lv.3 시 범위 진화 해금', maxLv:3,
-             apply:(p,lv)=>{ p.areaMul *= (1 + .08*lv); },
+  REACH:   { name:'REACH',   color:C.violet, desc:'범위 — 효과 범위 +12%/Lv. Lv.2 시 범위 진화 해금', maxLv:2,
+             apply:(p,lv)=>{ p.areaMul *= (1 + .12*lv); },
              lv3Reward: p => { p.hp = p.maxHp; } },
-  ARMOR:   { name:'ARMOR',   color:C.teal,   desc:'방어 — 피해 감소 +4%/Lv. Lv.3 시 방어 진화 해금', maxLv:3,
-             apply:(p,lv)=>{ p.dr += .04*lv; },
+  ARMOR:   { name:'ARMOR',   color:C.teal,   desc:'방어 — 피해 감소 +6%/Lv. Lv.2 시 방어 진화 해금', maxLv:2,
+             apply:(p,lv)=>{ p.dr += .06*lv; },
              lv3Reward: p => { p._boostInvuln = 4; } },
-  SOUL:    { name:'SOUL',    color:C.lime,   desc:'생명 — 최대HP +12, 재생 +0.25/Lv. Lv.3 시 생명 진화 해금', maxLv:3,
-             apply:(p,lv)=>{ p.maxHp += 12*lv; p.hp += 12*lv; p.regen += .25*lv; },
+  SOUL:    { name:'SOUL',    color:C.lime,   desc:'생명 — 최대HP +18, 재생 +0.4/Lv. Lv.2 시 생명 진화 해금', maxLv:2,
+             apply:(p,lv)=>{ p.maxHp += 18*lv; p.hp += 18*lv; p.regen += .4*lv; },
              lv3Reward: p => { p.hp = p.maxHp; } },
-  MAGNET:  { name:'MAGNET',  color:C.pink,   desc:'유인 — 픽업 범위 +20%/Lv. Lv.3 시 유인 진화 해금', maxLv:3,
-             apply:(p,lv)=>{ p.magnet *= (1 + .20*lv); },
+  MAGNET:  { name:'MAGNET',  color:C.pink,   desc:'유인 — 픽업 범위 +30%/Lv. Lv.2 시 유인 진화 해금', maxLv:2,
+             apply:(p,lv)=>{ p.magnet *= (1 + .30*lv); },
              lv3Reward: ()=> { G.superMagnetTimer = 10; } },
-  LUCK:    { name:'LUCK',    color:C.magenta,desc:'행운 — 드랍/희귀 +6%/Lv. Lv.3 시 행운 진화 해금', maxLv:3,
-             apply:(p,lv)=>{ p.luck += .06*lv; },
+  LUCK:    { name:'LUCK',    color:C.magenta,desc:'행운 — 드랍/희귀 +9%/Lv. Lv.2 시 행운 진화 해금', maxLv:2,
+             apply:(p,lv)=>{ p.luck += .09*lv; },
              lv3Reward: p => { p._boostDmg = 8; p._boostDmgMul = 1.3; } },
 };
 
@@ -240,11 +244,11 @@ export const ITEMS = {
   plating:   { id:'plating',   name:'NEON PLATING', kind:'relic', tier:'common',    desc:'최대 HP +20%, 재생 +0.5',
                apply: p => { const boost = Math.round(p.maxHp*.20); p.maxHp += boost; p.hp += boost; p.regen += .5; },
                icon:(cx,x,y,s)=>I.plate(cx,x,y,s,'#b0bccc') },
-  magcoil:   { id:'magcoil',   name:'MAG COIL',     kind:'relic', tier:'common',    desc:'픽업 범위 +55%',
-               apply: p => { p.magnet *= 1.55; },
+  magcoil:   { id:'magcoil',   name:'MAG COIL',     kind:'relic', tier:'common',    desc:'픽업 범위 +55%, 코인 픽업 시 +1 가산',
+               apply: p => { p.magnet *= 1.55; p.coinMul = (p.coinMul||1) + .35; },
                icon:(cx,x,y,s)=>I.magnet(cx,x,y,s,C.pink) },
-  siphon:    { id:'siphon',    name:'LIFE SIPHON',  kind:'relic', tier:'rare',      desc:'처치 시 12% 확률 +4 HP',
-               apply: p => { p.killHealChance = (p.killHealChance||0) + .12; p.killHealAmt = Math.max(p.killHealAmt||0, 4); },
+  siphon:    { id:'siphon',    name:'LIFE SIPHON',  kind:'relic', tier:'rare',      desc:'처치 시 25% 확률 +8 HP, 보스 처치 시 +50 HP',
+               apply: p => { p.killHealChance = (p.killHealChance||0) + .25; p.killHealAmt = Math.max(p.killHealAmt||0, 8); p.bossHeal = (p.bossHeal||0) + 50; },
                icon:(cx,x,y,s)=>I.drop(cx,x,y,s,C.lime) },
   amplifier: { id:'amplifier', name:'AMPLIFIER',    kind:'relic', tier:'rare',      desc:'피해 +22%',
                apply: p => { p.dmgMul *= 1.22; },
@@ -345,6 +349,208 @@ export const SYNERGIES = {
   }
 };
 
+/* ───────── SHRINES ─────────
+   Mid-run coin sinks. SHRINE entity spawns at 5/10/15min (configurable in
+   gameloop). Picking it opens a 3-of-N card pick that costs ◆ to confirm —
+   the cost scales with run-time so a long run actually drains its bank.
+   Effects are run-only flags consumed by spawnPlayer-style hooks that are
+   *already* installed (dmgMul / cdMul / maxHp / weapons.length cap raise).
+   =================================================================== */
+export const SHRINES = {
+  damage:    { id:'damage',    name:'BLOOD COVENANT',  color:C.red,    baseCost:500,
+               desc:'전 무기 데미지 +25% (런 영구)',
+               apply:(p)=>{ p.dmgMul *= 1.25; } },
+  rapid:     { id:'rapid',     name:'OVERCLOCK PACT',  color:C.gold,   baseCost:500,
+               desc:'발사 속도 +20% (런 영구)',
+               apply:(p)=>{ p.cdMul *= 1.20; } },
+  weapSlot:  { id:'weapSlot',  name:'EXTRA SLOT',      color:C.violet, baseCost:800,
+               desc:'무기 슬롯 +1 (현재 max 6 → 7)',
+               apply:(p)=>{ p._weaponSlotBonus = (p._weaponSlotBonus||0) + 1; } },
+  fortress:  { id:'fortress',  name:'FORTRESS HEART',  color:C.lime,   baseCost:600,
+               desc:'최대 HP +50% & 풀 회복',
+               apply:(p)=>{ const inc = Math.round(p.maxHp * .5); p.maxHp += inc; p.hp = p.maxHp; } },
+  legendCard:{ id:'legendCard',name:'GOLDEN PROMISE',  color:C.gold,   baseCost:1200,
+               desc:'다음 레벨업 카드 LEGEND 등급 보장',
+               apply:(p)=>{ p._guaranteeLegend = true; } },
+  greedRun:  { id:'greedRun',  name:'GOLD RUSH',       color:C.gold,   baseCost:400,
+               desc:'코인 픽업 ×2 (런 한정)',
+               apply:(p)=>{ p.coinMul = (p.coinMul||1) + 1.0; } },
+  shieldRun: { id:'shieldRun', name:'AEGIS WARD',      color:C.cyan,   baseCost:600,
+               desc:'피해 감소 +20% & 8초 무적',
+               apply:(p)=>{ p.dr = Math.min(.85, p.dr + .20); p._boostInvuln = Math.max(p._boostInvuln||0, 8); } },
+};
+export function rollShrineCards(n=3){
+  const all = Object.values(SHRINES);
+  const pool = all.slice();
+  const out = [];
+  while(out.length < n && pool.length){
+    const idx = Math.floor(Math.random() * pool.length);
+    out.push(pool.splice(idx, 1)[0]);
+  }
+  return out;
+}
+export function shrineCost(baseCost, runSeconds){
+  // Long runs drain more — every 5 minutes adds 100% to base cost.
+  const min = Math.max(0, runSeconds / 60);
+  const scale = 1 + (min / 5);
+  return Math.ceil(baseCost * scale);
+}
+export const SHRINE_TIMES = [300, 600, 900]; // seconds — 5/10/15 min
+
+/* ───────── GLYPHS ─────────
+   Boss-drop only. After killing a boss, player picks 1 of 3 glyphs.
+   Glyphs are global, run-only (not saved to meta), and stack (same glyph
+   can be picked multiple times). Each apply is straight stat-mul on the
+   player so all weapons/items see it. Boss-bane / greed / vampire reach
+   into player flags consumed by dealDamage / coin pickup / killEnemy.
+   =================================================================== */
+const G_ICONS = {
+  power(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=14; cx.lineWidth=2.4;
+    const r=s*.34; cx.beginPath();
+    cx.moveTo(x,y-r); cx.lineTo(x+r*.8,y+r*.4); cx.lineTo(x-r*.8,y+r*.4); cx.closePath(); cx.stroke();
+    cx.fillStyle=col; cx.beginPath(); cx.arc(x,y+r*.05,s*.07,0,TAU); cx.fill(); cx.restore(); },
+  rapid(cx,x,y,s,col){ cx.save(); cx.fillStyle=col; cx.shadowColor=col; cx.shadowBlur=14;
+    const r=s*.34; cx.beginPath();
+    cx.moveTo(x-r*.5,y-r); cx.lineTo(x+r*.5,y-r*.2); cx.lineTo(x,y-r*.2);
+    cx.lineTo(x+r*.5,y+r); cx.lineTo(x-r*.5,y+r*.2); cx.lineTo(x,y+r*.2);
+    cx.closePath(); cx.fill(); cx.restore(); },
+  wide(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=14; cx.lineWidth=2.4;
+    for(let i=0;i<3;i++){ cx.beginPath(); cx.arc(x,y,s*(.14 + i*.10),0,TAU); cx.globalAlpha=1-i*.25; cx.stroke(); }
+    cx.globalAlpha=1; cx.restore(); },
+  vampire(cx,x,y,s,col){ cx.save(); cx.fillStyle=col; cx.shadowColor=col; cx.shadowBlur=14; const r=s*.30;
+    cx.beginPath(); cx.moveTo(x,y-r*.3);
+    cx.bezierCurveTo(x-r*1.5,y-r*1.5,x-r*2,y+r*.4,x,y+r*1.4);
+    cx.bezierCurveTo(x+r*2,y+r*.4,x+r*1.5,y-r*1.5,x,y-r*.3);
+    cx.fill();
+    cx.fillStyle='#000'; cx.beginPath();
+    cx.moveTo(x+r*.4,y+r*.2); cx.lineTo(x+r*1.0,y+r*.6); cx.lineTo(x+r*.7,y+r*1.1);
+    cx.closePath(); cx.fill(); cx.restore(); },
+  boss(cx,x,y,s,col){ cx.save(); cx.strokeStyle=col; cx.shadowColor=col; cx.shadowBlur=14; cx.lineWidth=3;
+    const r=s*.32;
+    cx.beginPath(); cx.arc(x,y,r,0,TAU); cx.stroke();
+    cx.beginPath(); cx.moveTo(x-r*.7,y-r*.7); cx.lineTo(x+r*.7,y+r*.7); cx.stroke();
+    cx.beginPath(); cx.moveTo(x+r*.7,y-r*.7); cx.lineTo(x-r*.7,y+r*.7); cx.stroke(); cx.restore(); },
+  greed(cx,x,y,s,col){ cx.save(); cx.fillStyle=col; cx.shadowColor=col; cx.shadowBlur=14;
+    const r=s*.30; cx.beginPath();
+    cx.moveTo(x,y-r); cx.lineTo(x+r,y); cx.lineTo(x,y+r); cx.lineTo(x-r,y); cx.closePath(); cx.fill();
+    cx.fillStyle='#000'; cx.font='bold ' + Math.round(s*.28) + 'px monospace';
+    cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('◆', x, y); cx.restore(); },
+};
+export const GLYPHS = {
+  power: { id:'power', name:'POWER GLYPH', color:C.cyan,
+    desc:'전 무기 데미지 +20%',
+    apply: p => { p.dmgMul *= 1.20; },
+    icon:(cx,x,y,s)=>G_ICONS.power(cx,x,y,s,C.cyan) },
+  rapid: { id:'rapid', name:'RAPID GLYPH', color:C.gold,
+    desc:'발사 속도 +18%',
+    apply: p => { p.cdMul *= 1.18; },
+    icon:(cx,x,y,s)=>G_ICONS.rapid(cx,x,y,s,C.gold) },
+  wide:  { id:'wide',  name:'WIDE GLYPH',  color:C.violet,
+    desc:'효과 범위 +22%',
+    apply: p => { p.areaMul *= 1.22; },
+    icon:(cx,x,y,s)=>G_ICONS.wide(cx,x,y,s,C.violet) },
+  vampire: { id:'vampire', name:'VAMPIRE GLYPH', color:C.lime,
+    desc:'처치 시 8% 확률 +6 HP',
+    apply: p => {
+      p.killHealChance = (p.killHealChance||0) + .08;
+      p.killHealAmt = Math.max(p.killHealAmt||0, 6);
+    },
+    icon:(cx,x,y,s)=>G_ICONS.vampire(cx,x,y,s,C.lime) },
+  bossBane: { id:'bossBane', name:'BOSS BANE', color:C.red,
+    desc:'보스 적에게 +35% 데미지',
+    apply: p => { p.bossDmgMul = (p.bossDmgMul||1) * 1.35; },
+    icon:(cx,x,y,s)=>G_ICONS.boss(cx,x,y,s,C.red) },
+  greed: { id:'greed', name:'GREED GLYPH', color:C.gold,
+    desc:'코인 +50% 가산, 픽업 범위 +30%',
+    apply: p => { p.coinMul = (p.coinMul||1) * 1.5; p.magnet *= 1.30; },
+    icon:(cx,x,y,s)=>G_ICONS.greed(cx,x,y,s,C.gold) },
+};
+
+/* ───────── CHIPSET ─────────
+   Permanent gacha chips bought with ◆. Stored in meta.chips.
+   Schema:
+     meta.chips.owned[id] = stackLevel       (1+ once owned; 2+ from fusion)
+     meta.chips.equipped  = [id, id, null...] (length = slots)
+     meta.chips.slots     = N                (default 3, expandable via gacha-page)
+   Effects fire from spawnPlayer (player.js applyChips). Tier weights mirror
+   ITEM_TIERS for visual consistency. Single-pull = ◆100, 10-pull = ◆900
+   (10% off bulk). Slot expansion = 500/1500/4500/...
+   Same chip pulled again -> stack +1 (effect *= stackMul of that chip).
+   Three of same stack -> manual fusion to next tier (lose 3, gain 1 stronger).
+   =================================================================== */
+export const CHIP_TIERS = {
+  common:    { key:'common',    color:'#b0bccc', glow:'rgba(176,188,204,.6)', weight:65, label:'COMMON' },
+  rare:      { key:'rare',      color:C.cyan,    glow:'rgba(0,240,255,.85)',  weight:25, label:'RARE' },
+  epic:      { key:'epic',      color:C.violet,  glow:'rgba(155,92,255,.95)', weight: 8, label:'EPIC' },
+  legendary: { key:'legendary', color:C.gold,    glow:'rgba(255,212,0,1)',    weight: 2, label:'LEGEND' },
+};
+// Chip definitions. Each apply(p, lv) is run once at spawn for each equipped
+// stack-level. Effects intentionally smaller than relics so 6-slot full-build
+// caps around +30~40% global — keeps run challenge alive (per balance agent).
+export const CHIPS = {
+  // ── COMMON ──
+  pulseChip:  { id:'pulseChip',  name:'PULSE CHIP',     tier:'common', desc:'PULSE 보유 시 데미지 +6%/Lv',
+                apply:(p,lv)=>{ if(p.weapons.find(w=>w.key==='PULSE')) p.dmgMul *= (1 + .06*lv); } },
+  beamChip:   { id:'beamChip',   name:'BEAM CHIP',      tier:'common', desc:'BEAM 보유 시 범위 +8%/Lv',
+                apply:(p,lv)=>{ if(p.weapons.find(w=>w.key==='BEAM')) p.areaMul *= (1 + .08*lv); } },
+  warmStart:  { id:'warmStart',  name:'WARM START',     tier:'common', desc:'시작 시 +20 HP/Lv',
+                apply:(p,lv)=>{ p.maxHp += 20*lv; p.hp += 20*lv; } },
+  scavenger:  { id:'scavenger',  name:'SCAVENGER',      tier:'common', desc:'아이템 드랍 운 +5%/Lv',
+                apply:(p,lv)=>{ p.luck = (p.luck||0) + .05*lv; } },
+  spikeShoes: { id:'spikeShoes', name:'SPIKE SHOES',    tier:'common', desc:'이동 속도 +5%/Lv',
+                apply:(p,lv)=>{ p.speed *= (1 + .05*lv); } },
+  // ── RARE ──
+  bossHunter: { id:'bossHunter', name:'BOSS HUNTER',    tier:'rare',   desc:'보스 데미지 +12%/Lv',
+                apply:(p,lv)=>{ p.bossDmgMul = (p.bossDmgMul||1) * (1 + .12*lv); } },
+  killStreak: { id:'killStreak', name:'KILL STREAK',    tier:'rare',   desc:'처치 20마다 5초간 +10%/Lv 데미지',
+                apply:(p,lv)=>{ p._killStreakBonus = (p._killStreakBonus||0) + .10*lv; p._killStreakNeed = 20; p._killStreakDur = 5; } },
+  ironPlate:  { id:'ironPlate',  name:'IRON PLATE',     tier:'rare',   desc:'피해 감소 +3%/Lv',
+                apply:(p,lv)=>{ p.dr = Math.min(.85, (p.dr||0) + .03*lv); } },
+  greedChip:  { id:'greedChip',  name:'GREED CHIP',     tier:'rare',   desc:'코인 +25%/Lv 가산',
+                apply:(p,lv)=>{ p.coinMul = (p.coinMul||1) * (1 + .25*lv); } },
+  vampChip:   { id:'vampChip',   name:'VAMPIRE CHIP',   tier:'rare',   desc:'처치 시 +5% 확률/Lv +3HP',
+                apply:(p,lv)=>{ p.killHealChance = (p.killHealChance||0) + .05*lv; p.killHealAmt = Math.max(p.killHealAmt||0, 3); } },
+  // ── EPIC ──
+  overdrive:  { id:'overdrive',  name:'OVERDRIVE CHIP', tier:'epic',   desc:'발사 속도 +8%/Lv',
+                apply:(p,lv)=>{ p.cdMul *= (1 + .08*lv); } },
+  amplifier:  { id:'amplifier',  name:'AMPLIFIER CHIP', tier:'epic',   desc:'전 무기 데미지 +9%/Lv',
+                apply:(p,lv)=>{ p.dmgMul *= (1 + .09*lv); } },
+  rangeChip:  { id:'rangeChip',  name:'RANGE EXTENDER', tier:'epic',   desc:'범위 +10%/Lv',
+                apply:(p,lv)=>{ p.areaMul *= (1 + .10*lv); } },
+  // ── LEGEND ──
+  singularity:{ id:'singularity',name:'SINGULARITY CHIP', tier:'legendary', desc:'데미지+15%, 쿨감-8%/Lv',
+                apply:(p,lv)=>{ p.dmgMul *= (1 + .15*lv); p.cdMul *= (1 + .08*lv); } },
+  phoenixCore:{ id:'phoenixCore',name:'PHOENIX CORE',     tier:'legendary', desc:'런당 1회 부활 (Lv2: 2회)',
+                apply:(p,lv)=>{ p.revives = (p.revives||0) + lv; } },
+  // ── EXPANSION (B-3) — 5 new chips for variety ──
+  thornChip:  { id:'thornChip',  name:'THORN CHIP',     tier:'rare',   desc:'피격 시 반경 100 적에 30/Lv 데미지',
+                apply:(p,lv)=>{ p._thornDmg = (p._thornDmg||0) + 30*lv; p._thornR = 100; } },
+  dashChip:   { id:'dashChip',   name:'DASH CHIP',      tier:'epic',   desc:'10초마다 자동 회피 1회 (무적 0.4초)',
+                apply:(p,lv)=>{ p._autoDashCd = (p._autoDashCd||10) / lv; p._autoDashOn = true; } },
+  frostChip:  { id:'frostChip',  name:'FROST CHIP',     tier:'rare',   desc:'적 처치 시 5% 확률/Lv로 주변 둔화',
+                apply:(p,lv)=>{ p._frostKillChance = (p._frostKillChance||0) + .05*lv; } },
+  startCoinChip:{id:'startCoinChip',name:'STARTUP CACHE',tier:'common',desc:'시작 시 +50 코인/Lv (런 한정)',
+                apply:(p,lv)=>{ G.coinsRun = (G.coinsRun||0) + 50*lv; } },
+  comboChip:  { id:'comboChip',  name:'COMBO CHIP',     tier:'epic',   desc:'×10 콤보마다 데미지 +3%/Lv (캡 +30%)',
+                apply:(p,lv)=>{ p._comboBonusPer10 = (p._comboBonusPer10||0) + .03*lv; p._comboBonusCap = 0.30; } },
+};
+export const CHIP_PULL_COST = 100;
+export const CHIP_PULL10_COST = 900;
+export const CHIP_SLOT_COSTS = [500, 1500, 4500, 10000]; // slot 4, 5, 6, 7
+export const CHIP_DEFAULT_SLOTS = 3;
+export function chipsByTier(tier){ return Object.values(CHIPS).filter(c => c.tier === tier); }
+export function rollChipTier(){
+  let total = 0; for(const k in CHIP_TIERS) total += CHIP_TIERS[k].weight;
+  let r = Math.random() * total;
+  for(const k in CHIP_TIERS){ r -= CHIP_TIERS[k].weight; if(r <= 0) return k; }
+  return 'common';
+}
+export function rollChip(){
+  const tier = rollChipTier();
+  const pool = chipsByTier(tier);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 /* ───────── SHOP ───────── */
 export const SHOP_ITEMS = [
   {key:'hp',     name:'+ HP',         desc:'시작 HP +20', max:8, costFn: lv => 10 + lv*5 },
@@ -355,5 +561,5 @@ export const SHOP_ITEMS = [
   {key:'armor',  name:'PLATING',      desc:'피해 감소 +4%', max:6, costFn: lv => 16 + lv*8 },
   {key:'reroll', name:'REROLL +',     desc:'레벨업 리롤 비용 -1', max:3, costFn: lv => 30 + lv*15 },
   {key:'luck',   name:'LUCK',         desc:'드랍/희귀 가산 +10%', max:5, costFn: lv => 22 + lv*10 },
-  {key:'start',  name:'PRELOADED',    desc:'시작 시 무작위 유물 1개씩 자동 장착', max:2, costFn: lv => 60 + lv*40 },
+  {key:'start',  name:'PRELOADED',    desc:'시작 시 무작위 유물 1개씩 자동 장착', max:5, costFn: lv => 60 + lv*40 },
 ];

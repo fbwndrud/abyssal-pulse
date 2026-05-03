@@ -11,15 +11,17 @@ import { BG } from './render.js';
 import { AUDIO } from './audio.js';
 import { update, render, setLoopHandlers } from './gameloop.js';
 import {
-  doLevelUp, endRun, updateHUD, openChestPick,
+  doLevelUp, endRun, updateHUD, openChestPick, openGlyphPick, openShrinePick,
   showMenu, togglePause, toggleMute,
   openClassPicker, openShop, openCodex,
+  openChipset, chipsetPull, chipsetBuySlot,
   rerollLevelup, skipLevelup, returnToMenu, restartRun,
   confirmAbandon, closeOverlay,
 } from './ui.js';
+import { spawnBoss, killEnemy, spawnShrine } from './entities.js';
 
 // Wire gameloop.js → ui.js handlers (avoids hard cycle at module level)
-setLoopHandlers({ doLevelUp, endRun, updateHUD, openChestPick });
+setLoopHandlers({ doLevelUp, endRun, updateHUD, openChestPick, openShrinePick });
 
 /* ───────── DEV ERROR OVERLAY ─────────
    Surfaces uncaught errors as a visible banner so we can debug without devtools. */
@@ -119,7 +121,7 @@ showMenu();
 
 // Dev-mode handles for in-browser inspection (browser automation, REPL).
 // Same module instances the page uses; safe to read via window.__dev.
-window.__dev = { G, app, world, bgC, entityLayer, fxLayer, beamLayer, hudC, BG };
+window.__dev = { G, app, world, bgC, entityLayer, fxLayer, beamLayer, hudC, BG, spawnBoss, killEnemy, openGlyphPick, openShrinePick, spawnShrine, update, render };
 document.getElementById('menu-coins').textContent = meta.coins;
 document.getElementById('menu-best').textContent = fmtTime(meta.bestTime);
 document.getElementById('menu-runs').textContent = meta.runs;
@@ -130,6 +132,7 @@ document.getElementById('menu-runs').textContent = meta.runs;
    explicitly attach the handler set used by the overlays. */
 Object.assign(window, {
   openClassPicker, openShop, openCodex,
+  openChipset, chipsetPull, chipsetBuySlot,
   rerollLevelup, skipLevelup,
   returnToMenu, restartRun,
   togglePause, confirmAbandon,

@@ -28,7 +28,7 @@ function _autoAttachSprite(e){
     case 'proj':      _attachProjectileSprite(e); e.__sprKind = 'tex'; break;
     case 'ebullet':   _attachEnemyBulletSprite(e); e.__sprKind = 'tex'; break;
     case 'xp': case 'coin': case 'heart': case 'magnet':
-    case 'freeze': case 'chest': case 'item':
+    case 'freeze': case 'chest': case 'item': case 'shrine':
       _attachPickupSprite(e); e.__sprKind = 'tex'; break;
     case 'fx':        _attachFxParticleSprite(e); break;
     case 'ring': case 'shock': case 'line': case 'fan':
@@ -286,6 +286,18 @@ export function flash(color,a=.4){ G.flash = a; G.flashColor = color; }
 /* ───────── COMBAT HELPERS ───────── */
 export function dealDamage(e, dmg, color='#fff'){
   if(!e.alive) return;
+  if(e.isBoss && G.player && G.player.bossDmgMul) dmg *= G.player.bossDmgMul;
+  // KILL STREAK chip: while the streak buff timer is active, every dealt
+  // damage is multiplied. Buff is applied + ticked in killEnemy + gameloop.
+  if(G.player && (G.player._streakActive||0) > 0 && G.player._killStreakBonus){
+    dmg *= (1 + G.player._killStreakBonus);
+  }
+  // COMBO CHIP: every 10 combo gives +X% dmg, capped.
+  if(G.player && G.player._comboBonusPer10 && G.combo > 0){
+    const tiers = Math.floor(G.combo / 10);
+    const bonus = Math.min(G.player._comboBonusCap || 0.30, tiers * G.player._comboBonusPer10);
+    if(bonus > 0) dmg *= (1 + bonus);
+  }
   dmg = Math.round(dmg);
   e.hp -= dmg;
   e.hitFlash = .12;
@@ -311,12 +323,35 @@ export function killEnemy(e){
   G.killCount++;
   G.combo++;
   G.comboTimer = 2.2;
+  // KILL STREAK chip: every Nth kill activates a temporary dmg buff.
+  if(G.player && G.player._killStreakBonus && G.player._killStreakNeed){
+    G.player._streakKills = (G.player._streakKills||0) + 1;
+    if(G.player._streakKills >= G.player._killStreakNeed){
+      G.player._streakKills = 0;
+      G.player._streakActive = G.player._killStreakDur || 5;
+      fxRing(G.player.x, G.player.y, C.gold, 110, .55);
+    }
+  }
+  // FROST CHIP: chance to slow nearby enemies on kill.
+  if(G.player && G.player._frostKillChance && Math.random() < G.player._frostKillChance){
+    const list = EGRID.query(e.x, e.y, 140, _EQ1);
+    for(let i = 0; i < list.length; i++){
+      const o = list[i]; if(!o.alive || o === e) continue;
+      applySlow(o, .55, 1.4);
+    }
+    fxRing(e.x, e.y, '#aaffff', 130, .35);
+  }
   if(G.player && G.player.killHealChance && Math.random() < G.player.killHealChance){
     const amt = G.player.killHealAmt || 0;
     if(amt > 0){
       G.player.hp = Math.min(G.player.maxHp, G.player.hp + amt);
       fxRing(G.player.x, G.player.y, C.lime, 36, .25);
     }
+  }
+  // SIPHON relic: boss kills heal a flat amount on top of the per-kill chance.
+  if(e.isBoss && G.player && G.player.bossHeal){
+    G.player.hp = Math.min(G.player.maxHp, G.player.hp + G.player.bossHeal);
+    fxRing(G.player.x, G.player.y, C.lime, 90, .55);
   }
   fxBurst(e.x, e.y, e.color, e.isBoss?42:14, e.isBoss?340:200, e.isBoss?5:3, .6);
   fxRing(e.x, e.y, e.color, e.isBoss?160:e.r*3.5, e.isBoss?.7:.45);
@@ -533,4 +568,9 @@ export function spawnFreeze(x,y){
 }
 export function spawnChest(x,y){
   makeEnt({type:'chest', x, y, r:14, color:C.gold, life:120, maxLife:120});
+}
+export function spawnShrine(x,y){
+  // Mid-run coin sink. Long life so the player can finish the current cluster
+  // before walking over. Color is violet to read distinct from chest gold.
+  return makeEnt({type:'shrine', x, y, r:22, color:C.violet, life:90, maxLife:90});
 }
