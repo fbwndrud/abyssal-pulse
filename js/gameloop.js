@@ -19,6 +19,7 @@ import {
 } from './entities.js';
 import {
   damagePlayer, applyItem, dropItem,
+  weaponEvoReady, applyEvo, fusionsAvailable, applyFusion,
 } from './player.js';
 import {
   PASSIVES,
@@ -96,6 +97,7 @@ export function update(){
     }
   }
   p.dmgMul = _origDmg; p.cdMul = _origCd; p.speed = _origSp;
+  _autoEvoFuse(p);
   // entity update
   const ents = G.ents;
   const freezeMul = G.freezeTimer > 0 ? .15 : 1;
@@ -501,6 +503,35 @@ function updateProjectile(pr){
     }
   }
 }
+/* ───────── AUTO-EVO / AUTO-FUSE ─────────
+   Polls every 0.5s. Once a weapon hits maxLv + required passive at maxLv, the
+   evolution fires automatically with the dramatic FX baked into applyEvo (no
+   extra "EVOLVE" card on the next level-up). Fusions trigger when both
+   source weapons are evolved + maxLv. A short hitstop frames the moment so
+   it doesn't feel like a silent stat swap. */
+function _autoEvoFuse(p){
+  if(p._autoEvoT == null) p._autoEvoT = 0;
+  p._autoEvoT -= G.dt;
+  if(p._autoEvoT > 0) return;
+  p._autoEvoT = 0.5;
+  // Fusion first — it consumes source weapons, so do it before re-checking evo.
+  const fuses = fusionsAvailable(p);
+  if(fuses.length){
+    applyFusion(p, fuses[0]);
+    G.hitstop = Math.max(G.hitstop, 0.35);
+    return;
+  }
+  for(const w of p.weapons){
+    if(w.evolved || w.level < w.def.maxLv) continue;
+    const ready = weaponEvoReady(p, w);
+    if(ready.length){
+      applyEvo(p, w.key, ready[0].id);
+      G.hitstop = Math.max(G.hitstop, 0.3);
+      return;
+    }
+  }
+}
+
 function updateEnemyBullets(){
   const p = G.player;
   const ents = G.ents;

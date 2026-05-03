@@ -208,10 +208,12 @@ export function doLevelUp(forceNoXpReset=false){
   if(!forceNoXpReset && p.xp >= p.xpNext){
     p.xp -= p.xpNext;
     p.level++;
-    // XP curve scaled to ~2/3 of previous (start 5→3, base +3→+2).
-    // Pairs with maxLv 8→6 — total XP to max all weapons drops to ~50% of original.
-    // L1=3, L5=22, L10=101, L15=345 (was 5..597 with last curve).
-    p.xpNext = Math.round(p.xpNext * 1.30 + 2);
+    // Log-cap XP curve: exponential up to ~250, then plateau.
+    // Without the cap, late game (L15+) demanded 400+ XP/level — multiple
+    // minutes between level-ups. Cap keeps the picking flow steady so the
+    // player gets weapon/passive choices throughout the run.
+    // L1=3, L5=22, L10=101, L13≈250(cap), L20=250.
+    p.xpNext = Math.min(Math.round(p.xpNext * 1.30 + 2), 250);
   }
   AUDIO.level();
   shake(.1); flash('#fff', .25);
@@ -225,25 +227,9 @@ export function doLevelUp(forceNoXpReset=false){
   renderLevelupCards();
 }
 function pickLevelupCards(p, n=3){
-  // Gather all ready evolution paths (one card per path).
-  const evoReady = [];
-  for(const w of p.weapons){
-    const paths = weaponEvoReady(p, w);
-    for(const e of paths){
-      evoReady.push({type:'evolve', key:w.key, evo:e});
-    }
-  }
-  // Gather available fusions (both source weapons evolved + maxLv).
-  const fuseReady = [];
-  for(const fk of fusionsAvailable(p)){
-    fuseReady.push({type:'fuse', fuseKey: fk, fuse: FUSIONS[fk], rarity:'legend'});
-  }
-  // Card layout: BASE_N slots host evolution + normal cards (they compete).
-  // Fusions are EXTRA slots appended on top so they never displace a
-  // build-progress pick — picking fusion = pure bonus.
-  const BASE_N = n;
-  const FUSE_CAP = 3;
-
+  // Evolutions and fusions auto-trigger from gameloop._autoEvoFuse — no longer
+  // surfaced as level-up cards. Cards offer weap_new / weap_up / pas / heal /
+  // gold only.
   const pool = [];
   for(const w of p.weapons){
     if(w.level < w.def.maxLv){
@@ -267,12 +253,8 @@ function pickLevelupCards(p, n=3){
   pool.push({type:'gold', weight:2});
 
   const out = [];
-  // Step 1: evolutions take base slots first (real build choice).
-  for(const e of evoReady){ if(out.length < BASE_N) out.push(e); }
-
-  // Step 2: fill remaining base slots from the weighted normal pool.
   const used = new Set();
-  while(out.length < BASE_N){
+  while(out.length < n){
     let total = 0;
     for(const x of pool){ if(!used.has(x)) total += x.weight * (1 + p.luck*.5); }
     if(total === 0) break;
@@ -288,25 +270,10 @@ function pickLevelupCards(p, n=3){
     out.push(chosen);
   }
 
-  // Step 3: fusion cards as EXTRA slots, appended after base is filled.
-  for(const f of fuseReady){
-    if(out.length >= BASE_N + FUSE_CAP) break;
-    out.push(f);
-  }
-
   for(const card of out){
-    if(card.type === 'evolve'){
-      card.tier = UPGRADE_TIERS.legend;
-      card.mult = 1;
-      card.rarity = 'evo';
-    } else if(card.type === 'fuse'){
-      card.tier = UPGRADE_TIERS.legend;
-      card.mult = 1;
-    } else {
-      card.tier = rollUpgradeTier(p.luck);
-      card.mult = rollTierMult(card.tier);
-      card.rarity = card.tier.key;
-    }
+    card.tier = rollUpgradeTier(p.luck);
+    card.mult = rollTierMult(card.tier);
+    card.rarity = card.tier.key;
   }
   return out;
 }
