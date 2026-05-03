@@ -4,7 +4,7 @@
    Installs the kill hook in entities.js so killEnemy can drop XP/items
    without entities.js having to import data.js.
    =================================================================== */
-import { G, C, TAU, rand, meta, saveMeta, saveMetaLater, announce } from './core.js';
+import { G, W, H, C, TAU, rand, meta, saveMeta, saveMetaLater, announce } from './core.js';
 import { AUDIO } from './audio.js';
 import {
   makeEnt, fxBurst, fxRing, fxText, shake, flash,
@@ -52,6 +52,13 @@ export function spawnPlayer(classKey){
   p.maxHp += meta.shop.hp * 20;
   p.hp = p.maxHp;
   G.player = p;
+  // Snap camera to the player on spawn — without this the run starts with
+  // the camera at (0,0) lerping toward the player, which leaves the player
+  // visibly off-center for the first ~1 second.
+  G.cam.x = p.x - W/2;
+  G.cam.y = p.y - H/2;
+  G.cam.tx = G.cam.x;
+  G.cam.ty = G.cam.y;
   // PRELOADED shop bonus: auto-apply N random relics at start (one per upgrade level).
   // Relics only (consumables wouldn't make sense here — they're transient).
   const startCount = meta.shop.start || 0;
@@ -163,18 +170,9 @@ export function applyEvo(p, weaponKey, evoId){
 /* ───────── FUSION ─────────
    A fusion is offered when both source weapons are EVOLVED and at maxLv.
    Picking it removes both source weapons and adds the fused weapon at Lv 1.
-   The fused weapon's onUpdate is delegated to the closest base-weapon kind,
-   reading its merged baseStats. Per-fusion behavior polish is a later task. */
-const FUSED_ONUPDATE_BY_KIND = {
-  AOE: 'PULSE',
-  SHOCK: 'SHOCK',
-  BEAM: 'BEAM',
-  ORBIT: 'ORBIT',
-  HOMING: 'HOMING',
-  BULLET: 'BLADE',
-  BLACKHOLE: 'BLACKHOLE',
-  CHAIN: 'CHAIN',
-};
+   Each fusion in weapons.js defines its own onUpdate so the resulting
+   weapon expresses both source identities — Lv 1 is intentionally tuned
+   to feel stronger than the two source maxLv evolutions combined. */
 function _fusionGenericIcon(color){
   return (ctx, x, y, s) => {
     ctx.save();
@@ -211,8 +209,6 @@ export function fusionsAvailable(p){
 }
 export function applyFusion(p, fuseKey){
   const fuse = FUSIONS[fuseKey]; if(!fuse) return;
-  const baseKey = FUSED_ONUPDATE_BY_KIND[fuse.kind] || 'PULSE';
-  const baseDef = WEAPONS[baseKey];
   const def = {
     name: fuse.name,
     color: fuse.color,
@@ -220,8 +216,8 @@ export function applyFusion(p, fuseKey){
     desc: fuse.desc,
     maxLv: fuse.maxLv || 6,
     baseStats: fuse.baseStats,
-    icon: _fusionGenericIcon(fuse.color),
-    onUpdate: baseDef.onUpdate,
+    icon: fuse.icon || _fusionGenericIcon(fuse.color),
+    onUpdate: fuse.onUpdate,
     levelUp: fuse.levelUp,
   };
   // Remove both source weapons (in descending index so splice is safe)
@@ -268,8 +264,10 @@ export function updateSynergies(p){
   }
 }
 
-/* ───────── ITEMS ───────── */
-export function pickRandomItem(luck, tierBias){
+/* ───────── ITEMS ─────────
+   kindFilter: 'relic' or 'consumable' to restrict the pool. Used so bosses
+   only drop relics (chest pick) and mobs only drop consumables. */
+export function pickRandomItem(luck, tierBias, kindFilter){
   const tiers = tierBias || ['common','rare','legendary'];
   const L = Math.max(0, luck||0);
   const weights = {
@@ -283,12 +281,13 @@ export function pickRandomItem(luck, tierBias){
   if((r -= weights.common) <= 0) pickTier = 'common';
   else if((r -= weights.rare) <= 0) pickTier = 'rare';
   else pickTier = 'legendary';
-  const pool = itemsByTier(pickTier);
+  const tieredPool = itemsByTier(pickTier);
+  const pool = kindFilter ? tieredPool.filter(it => it.kind === kindFilter) : tieredPool;
   if(!pool.length) return null;
   return pool[Math.floor(Math.random()*pool.length)];
 }
-export function dropItem(x, y, luck, tierBias){
-  const it = pickRandomItem(luck, tierBias);
+export function dropItem(x, y, luck, tierBias, kindFilter){
+  const it = pickRandomItem(luck, tierBias, kindFilter);
   if(!it) return null;
   return makeEnt({type:'item', x, y, vx:rand(-60,60), vy:rand(-60,60), r:11, color:ITEM_TIERS[it.tier].color, glow:ITEM_TIERS[it.tier].glow, item:it, life:30, maxLife:30});
 }
@@ -318,22 +317,27 @@ setOnKillHook(function onKill(e){
     spawnCoin(e.x, e.y);
   }
   const pLuck = G.player ? G.player.luck : 0;
+  // Drop rate caps — luck never breaks the game economy.
+  const HEART_CAP = .015, ITEM_MOB_CAP = .008, ITEM_ELITE_CAP = .08;
   if(e.isBoss){
-    // Boss reward = chest only. Chest opens to a 3-item pick screen.
-    // (Was: chest + 1 guaranteed item + 50% chance 2nd item — caused item spam.)
+    // Boss reward = chest only. Chest opens to a 3-relic pick screen.
+    // Relics are gated to bosses so they feel like meaningful milestones.
     spawnChest(e.x, e.y);
-  } else if(Math.random() < .003 + pLuck*.01){
+  } else if(Math.random() < Math.min(HEART_CAP, .003 + pLuck*.01)){
     spawnHeart(e.x, e.y);
   } else if(Math.random() < .002){
     spawnMagnet(e.x, e.y);
   } else if(Math.random() < .0008){
     spawnFreeze(e.x, e.y);
+  } else if(Math.random() < Math.min(ITEM_MOB_CAP, .0015 + pLuck*.003)){
+    // Regular mobs: small chance of a consumable item. Relics never drop here.
+    dropItem(e.x, e.y, pLuck, ['common','rare'], 'consumable');
   }
   // Elite (HEX/OCT) drop chance — bumped slightly back to 3% since passives no
-  // longer give stat boosts; items now carry the stat scaling load.
+  // longer give stat boosts; consumable items now carry the stat scaling load.
   if(!e.isBoss && (e.kind === 'HEX' || e.kind === 'OCT')){
-    if(Math.random() < .03 + pLuck*.025){
-      dropItem(e.x, e.y, pLuck, ['common','rare']);
+    if(Math.random() < Math.min(ITEM_ELITE_CAP, .03 + pLuck*.025)){
+      dropItem(e.x, e.y, pLuck, ['common','rare'], 'consumable');
     }
   }
   if(e.def && e.def.onDeath === 'split'){

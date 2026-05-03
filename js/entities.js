@@ -80,6 +80,14 @@ export function fxRing(x,y,color,size=60,life=.4){
   makeEnt({type:'ring', x, y, color, r:8, maxR:size, life, maxLife:life});
 }
 export function fxText(x,y,text,color='#fff',big=false){
+  // Damage-number budget: under heavy load, skip most non-boss numbers.
+  // Boss damage (big=true) and crits stay readable; mob damage is noise.
+  const n = G.ents.length;
+  if(!big){
+    if(n > 1200) return;
+    if(n > 800 && Math.random() > .3) return;
+    if(n > 500 && Math.random() > .6) return;
+  }
   makeEnt({type:'text', x, y, text, color, life:.7, maxLife:.7, vy:-50, big});
 }
 export function fxLine(x1,y1,x2,y2,color,life=.18,width=2){
@@ -289,12 +297,15 @@ export function spawnBoss(typeKey){
   const y = G.player.y + Math.sin(a)*distSpawn;
   // Gentler scaling: first boss at 110s ≈ 0.81x, was 0.84x with old curve.
   // Later bosses still grow, just less steeply.
+  // BOSS_HP_MUL: bosses were getting one-shot through evolved/fusion builds —
+  // 10× HP makes the encounter actually last and pattern phases land.
   const tier = .45 + G.t/360;
+  const BOSS_HP_MUL = 10;
   const e = makeEnt({
     type:'enemy', kind:typeKey, def, isBoss:true,
     x, y, vx:0, vy:0,
     sides:def.sides, color:def.color, r:def.r,
-    hp: def.hp * tier, maxHp: def.hp * tier,
+    hp: def.hp * tier * BOSS_HP_MUL, maxHp: def.hp * tier * BOSS_HP_MUL,
     speed: def.speed,
     dmg: def.dmg * Math.sqrt(tier),
     xp: def.xp, gold: def.gold,

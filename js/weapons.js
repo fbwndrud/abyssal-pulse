@@ -8,8 +8,8 @@ import { drawCircle, drawDiamond, drawPolygon, drawStar } from './render.js';
 import {
   EGRID, _EQ1,
   firePulse, fireProjectile, fireFanShock, spawnBlackhole,
-  fxBurst, fxLine,
-  dealDamage, nearestEnemy, nearestEnemyExcept, pointSegDist,
+  fxBurst, fxLine, fxRing,
+  dealDamage, applySlow, nearestEnemy, nearestEnemyExcept, pointSegDist,
 } from './entities.js';
 
 export const WEAPONS = {
@@ -519,68 +519,269 @@ export const EVOLUTIONS = {
 
 /* ===================================================================
    FUSIONS — combine two evolved weapons into a new one at Lv 1.
-   Fusion offered as a card when BOTH weapons are at maxLv AND BOTH evolved.
-   Picking the fusion card removes both source weapons from the loadout
-   and adds the fused weapon at Lv 1 (frees a slot).
+   Fusion offered as a card when BOTH weapons are at maxLv AND BOTH evolved,
+   appended as an EXTRA slot (does not displace base build-progress cards).
+   Picking removes both source weapons and adds the fused weapon at Lv 1.
 
-   STATUS: Data-only in this iteration. Fused weapons inherit the source A's
-   onUpdate (kind-based fallback) — proper per-fusion behavior is Phase 2.
-   The data is in place so we can wire each fusion's onUpdate independently.
+   Each fusion defines its own onUpdate so the resulting weapon expresses
+   both source identities — Lv 1 is balanced to feel stronger than the two
+   source maxLv evolutions combined (justify the trade), then scales via
+   its own levelUp curve.
    =================================================================== */
 export const FUSIONS = {
   'BEAM+PRISM': {
     id:'FUSE_PRISM_HALO', name:'PRISM HALO', color:C.gold, kind:'BEAM',
-    desc:'무지개 회전 빔 — 적중 시 분열탄',
+    desc:'무지개 회전 빔 — 적중 시 분열탄 비산',
     sourceA:'BEAM', sourceB:'PRISM',
     baseStats:{ rotSpeed:2.0, dmg:60, length:600, width:9, count:4, tick:.10, splits:2 },
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=14; w.stats.length+=30; if(lv===2||lv===4) w.stats.count++; if(lv===3||lv===5) w.stats.splits++; },
     extra:{splitOnTick:true},
+    onUpdate(p,w){
+      w.angle = (w.angle||0) + w.stats.rotSpeed * G.dt;
+      w.tickT = (w.tickT||0) - G.dt;
+      const s = w.stats;
+      const tickEvery = s.tick / p.cdMul;
+      const damageThisFrame = w.tickT <= 0;
+      if(damageThisFrame) w.tickT = tickEvery;
+      if(!w.beams) w.beams = [];
+      const col = w.color || C.gold;
+      for(let b=0;b<s.count;b++){
+        const a = w.angle + (b * TAU/s.count);
+        const ex = p.x + Math.cos(a)*s.length;
+        const ey = p.y + Math.sin(a)*s.length;
+        w.beams[b] = {x1:p.x,y1:p.y,x2:ex,y2:ey,life:G.dt};
+        if(damageThisFrame){
+          const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
+          for(let li = 0; li < list.length; li++){
+            const e = list[li];
+            if(!e.alive) continue;
+            const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
+            if(d <= e.r + s.width){
+              dealDamage(e, s.dmg * p.dmgMul, col);
+              fxBurst(e.x,e.y,col,4,120,2.2,.22);
+              // Each beam tick spawns a prism shard from the hit — splits on impact.
+              const shardA = a + (Math.random()-.5) * .8;
+              fireProjectile(e.x, e.y, shardA, 280, s.dmg * p.dmgMul * .35, .9, col, 'prism', {splits:s.splits});
+            }
+          }
+        }
+      }
+    },
   },
   'BLACKHOLE+ORBIT': {
     id:'FUSE_VOID_PULSAR', name:'VOID PULSAR', color:C.violet, kind:'ORBIT',
-    desc:'궤도 노드가 중력장을 끌고 회전',
+    desc:'궤도 노드 각각이 중력장을 끌며 회전',
     sourceA:'BLACKHOLE', sourceB:'ORBIT',
     baseStats:{ count:3, radius:120, rotSpeed:2.0, dmg:30, nodeR:18, pull:90, pullR:90 },
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=8; w.stats.radius+=8; if(lv===2||lv===4) w.stats.count++; if(lv===3||lv===5) w.stats.pull+=30; },
     extra:{nodesPullEnemies:true},
+    onUpdate(p,w){
+      const s = w.stats;
+      w.angle = (w.angle||0) + s.rotSpeed * G.dt * p.cdMul;
+      if(!w.lastNodes) w.lastNodes = [];
+      const col = w.color || C.violet;
+      // Single query at the larger of pull/nodeR — distance below splits roles.
+      const pullR40 = s.pullR + 40;
+      for(let i=0;i<s.count;i++){
+        const a = w.angle + (i*TAU/s.count);
+        const nx = p.x + Math.cos(a)*s.radius * p.areaMul;
+        const ny = p.y + Math.sin(a)*s.radius * p.areaMul;
+        const list = EGRID.query(nx, ny, pullR40, _EQ1);
+        for(let li = 0; li < list.length; li++){
+          const e = list[li];
+          if(!e.alive) continue;
+          const dx = nx-e.x, dy = ny-e.y;
+          const d2 = dx*dx + dy*dy;
+          if(!e.isBoss && d2 < pullR40*pullR40){
+            const dist = Math.sqrt(d2) + .01;
+            const force = s.pull * (1 - dist/pullR40) * G.dt;
+            e.vx += (dx/dist) * force;
+            e.vy += (dy/dist) * force;
+          }
+          const rr = e.r + s.nodeR;
+          if(d2 < rr*rr){
+            const tag = 'vp_'+w.id+'_'+i;
+            if(!e.hitOrbit) e.hitOrbit = {};
+            if((e.hitOrbit[tag]||0) <= 0){
+              dealDamage(e, s.dmg * p.dmgMul, col);
+              fxBurst(e.x,e.y,col,8,160,2.4,.25);
+              e.hitOrbit[tag] = .35;
+            }
+          }
+        }
+        w.lastNodes[i] = {x:nx, y:ny};
+      }
+      const el = EGRID.enemies;
+      for(let ei = 0; ei < el.length; ei++){
+        const e = el[ei];
+        if(e.hitOrbit){ for(const k in e.hitOrbit) e.hitOrbit[k] -= G.dt; }
+      }
+    },
   },
   'PULSE+SHOCK': {
     id:'FUSE_SEISMIC_BLOOM', name:'SEISMIC BLOOM', color:C.red, kind:'AOE',
-    desc:'전방위 충격 + 후속 잔진',
+    desc:'전방위 충격 + 후속 잔진의 연쇄',
     sourceA:'PULSE', sourceB:'SHOCK',
     baseStats:{ cd:1.4, dmg:60, radius:230, kb:200, aftershockR:140, aftershockDmg:30, aftershockDelay:.35 },
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=14; w.stats.radius+=16; w.stats.aftershockR+=12; if(lv===3||lv===5) w.stats.aftershockDmg+=12; },
     extra:{doublePulse:true},
+    onUpdate(p,w){
+      w.timer = (w.timer||0) - G.dt;
+      if(!w.pendingPulses) w.pendingPulses = [];
+      for(let i = w.pendingPulses.length - 1; i >= 0; i--){
+        const pp = w.pendingPulses[i];
+        pp.t -= G.dt;
+        if(pp.t <= 0){
+          firePulse(pp.x, pp.y, pp.r, pp.dmg, pp.kb, {color: pp.col});
+          fxRing(pp.x, pp.y, pp.col, pp.r * .7, .35);
+          w.pendingPulses.splice(i, 1);
+        }
+      }
+      if(w.timer <= 0){
+        const s = w.stats;
+        const col = w.color || C.red;
+        firePulse(p.x, p.y, s.radius * p.areaMul, s.dmg * p.dmgMul, s.kb, {color: col});
+        fxRing(p.x, p.y, col, s.radius * p.areaMul, .55);
+        // Aftershock waves spreading outward
+        w.pendingPulses.push({
+          x: p.x, y: p.y, t: s.aftershockDelay,
+          r: s.aftershockR * p.areaMul,
+          dmg: s.aftershockDmg * p.dmgMul, kb: s.kb * .5, col,
+        });
+        w.pendingPulses.push({
+          x: p.x, y: p.y, t: s.aftershockDelay * 2,
+          r: s.aftershockR * p.areaMul * 1.4,
+          dmg: s.aftershockDmg * p.dmgMul * .7, kb: s.kb * .35, col,
+        });
+        w.timer = s.cd / p.cdMul;
+      }
+    },
   },
   'CHAIN+HOMING': {
     id:'FUSE_TESLA_SWARM', name:'TESLA SWARM', color:C.cyan, kind:'HOMING',
-    desc:'추적 전구체 — 적중 시 연쇄 방전',
+    desc:'추적 전구체 — 발사 직후 연쇄 방전',
     sourceA:'CHAIN', sourceB:'HOMING',
     baseStats:{ cd:.85, dmg:42, count:2, speed:360, life:1.8, jumps:3, jumpRange:200, jumpDmg:.7 },
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=10; if(lv===2||lv===4) w.stats.count++; if(lv===3||lv===5) w.stats.jumps++; w.stats.jumpRange+=12; },
     extra:{onHitChain:true},
+    onUpdate(p,w){
+      w.timer = (w.timer||0) - G.dt;
+      if(w.timer<=0){
+        const s = w.stats;
+        const col = w.color || C.cyan;
+        const target = nearestEnemy(p);
+        for(let i=0;i<s.count;i++){
+          const a = target ? angTo(p, target) : Math.random()*TAU;
+          const ang = a + (i - (s.count-1)/2) * .25;
+          fireProjectile(p.x, p.y, ang, s.speed, s.dmg * p.dmgMul, s.life * p.areaMul, col, 'homing', {target, turn:7});
+        }
+        // Companion chain bolt arcs from the player into the swarm.
+        if(target){
+          let from = p; const hit = new Set();
+          for(let j=0;j<s.jumps;j++){
+            const tgt = nearestEnemyExcept(from, hit, s.jumpRange);
+            if(!tgt) break;
+            fxLine(from.x, from.y, tgt.x, tgt.y, col, .3, 3.5);
+            dealDamage(tgt, s.dmg * p.dmgMul * s.jumpDmg * (1 - j*.1), col);
+            fxBurst(tgt.x, tgt.y, col, 6, 130, 2, .22);
+            hit.add(tgt); from = tgt;
+          }
+          AUDIO.laser(target.x);
+        }
+        w.timer = s.cd / p.cdMul;
+      }
+    },
   },
   'BEAM+BLACKHOLE': {
     id:'FUSE_EVENT_LANCE', name:'EVENT LANCE', color:C.magenta, kind:'BEAM',
-    desc:'특이점 빔 — 끝점에서 흡인',
+    desc:'특이점 빔 — 끝점에서 적을 흡인하며 폭발',
     sourceA:'BEAM', sourceB:'BLACKHOLE',
     baseStats:{ rotSpeed:1.0, dmg:70, length:560, width:10, count:1, tick:.10, tipPull:200, tipR:80, tipDmg:14 },
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=16; w.stats.length+=28; w.stats.tipR+=8; if(lv===3||lv===5) w.stats.count++; },
     extra:{tipSingularity:true},
+    onUpdate(p,w){
+      w.angle = (w.angle||0) + w.stats.rotSpeed * G.dt;
+      w.tickT = (w.tickT||0) - G.dt;
+      const s = w.stats;
+      const tickEvery = s.tick / p.cdMul;
+      const damageThisFrame = w.tickT <= 0;
+      if(damageThisFrame) w.tickT = tickEvery;
+      if(!w.beams) w.beams = [];
+      const col = w.color || C.magenta;
+      for(let b=0;b<s.count;b++){
+        const a = w.angle + (b * TAU/s.count);
+        const ex = p.x + Math.cos(a)*s.length;
+        const ey = p.y + Math.sin(a)*s.length;
+        w.beams[b] = {x1:p.x,y1:p.y,x2:ex,y2:ey,life:G.dt};
+        // Tip pull (every frame)
+        const tipR = s.tipR * p.areaMul;
+        const tipList = EGRID.query(ex, ey, tipR + 40, _EQ1);
+        for(let li = 0; li < tipList.length; li++){
+          const e = tipList[li];
+          if(!e.alive || e.isBoss) continue;
+          const dx = ex-e.x, dy = ey-e.y;
+          const dist = Math.sqrt(dx*dx + dy*dy) + .01;
+          if(dist < tipR + 40){
+            const force = s.tipPull * (1 - dist/(tipR+40)) * G.dt;
+            e.vx += (dx/dist) * force;
+            e.vy += (dy/dist) * force;
+          }
+        }
+        if(damageThisFrame){
+          // Beam line damage
+          const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
+          for(let li = 0; li < list.length; li++){
+            const e = list[li];
+            if(!e.alive) continue;
+            const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
+            if(d <= e.r + s.width){
+              dealDamage(e, s.dmg * p.dmgMul, col);
+              fxBurst(e.x,e.y,col,4,110,2.2,.2);
+            }
+          }
+          // Tip area damage
+          for(let li = 0; li < tipList.length; li++){
+            const e = tipList[li];
+            if(!e.alive) continue;
+            const dd = (e.x-ex)*(e.x-ex) + (e.y-ey)*(e.y-ey);
+            if(dd < (e.r + tipR)*(e.r + tipR)){
+              dealDamage(e, s.tipDmg * p.dmgMul, col);
+            }
+          }
+          fxRing(ex, ey, col, tipR, .18);
+        }
+      }
+    },
   },
   'BLADE+CROSS': {
     id:'FUSE_SHURIKEN_CROSS', name:'SHURIKEN CROSS', color:C.lime, kind:'BULLET',
-    desc:'십자 패턴 관통 수리검',
+    desc:'십자 패턴 관통 수리검 — 회전하며 적을 가른다',
     sourceA:'BLADE', sourceB:'CROSS',
     baseStats:{ cd:.65, dmg:38, count:4, speed:380, life:1.4, pierce:4 },
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=9; if(lv===2||lv===4) w.stats.count+=2; if(lv===3||lv===5) w.stats.pierce++; w.stats.speed+=12; },
     extra:{boomerang:true, crossPattern:true},
+    onUpdate(p,w){
+      w.timer = (w.timer||0) - G.dt;
+      if(w.timer<=0){
+        const s = w.stats;
+        const col = w.color || C.lime;
+        const target = nearestEnemy(p);
+        const aimA = target ? angTo(p, target) : (w.spin||0);
+        // Cross pattern: shuriken evenly distributed in TAU around aim.
+        for(let i=0;i<s.count;i++){
+          const a = aimA + (i / s.count) * TAU;
+          fireProjectile(p.x, p.y, a, s.speed, s.dmg * p.dmgMul, s.life, col, 'shuriken', {pierce:s.pierce, spin:Math.random()*TAU});
+        }
+        w.spin = (w.spin||0) + .3;
+        w.timer = s.cd / p.cdMul;
+      }
+    },
   },
   'HOMING+PRISM': {
     id:'FUSE_SPECTRAL_SHARDS', name:'SPECTRAL SHARDS', color:C.pink, kind:'HOMING',
@@ -590,6 +791,21 @@ export const FUSIONS = {
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=10; if(lv===2||lv===4) w.stats.count++; if(lv===3||lv===5) w.stats.splits++; },
     extra:{splitsAlsoHome:true},
+    onUpdate(p,w){
+      w.timer = (w.timer||0) - G.dt;
+      if(w.timer<=0){
+        const s = w.stats;
+        const col = w.color || C.pink;
+        for(let i=0;i<s.count;i++){
+          const target = nearestEnemy(p);
+          const a = target ? angTo(p, target) : Math.random()*TAU;
+          const ang = a + (i - (s.count-1)/2) * .2;
+          // Prism kind splits on death — combined with target hint behaves as homing+split.
+          fireProjectile(p.x, p.y, ang, s.speed, s.dmg * p.dmgMul, s.life * p.areaMul, col, 'prism', {splits:s.splits, target, turn:5});
+        }
+        w.timer = s.cd / p.cdMul;
+      }
+    },
   },
   'ORBIT+PULSE': {
     id:'FUSE_RESONANT_RING', name:'RESONANT RING', color:C.teal, kind:'ORBIT',
@@ -599,6 +815,46 @@ export const FUSIONS = {
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=8; w.stats.pulseDmg+=10; w.stats.pulseR+=8; if(lv===2||lv===4) w.stats.count++; },
     extra:{nodesEmitPulse:true},
+    onUpdate(p,w){
+      const s = w.stats;
+      w.angle = (w.angle||0) + s.rotSpeed * G.dt * p.cdMul;
+      w.pulseT = (w.pulseT||0) - G.dt;
+      const doPulseTick = w.pulseT <= 0;
+      if(doPulseTick) w.pulseT = s.pulseCd / p.cdMul;
+      if(!w.lastNodes) w.lastNodes = [];
+      const col = w.color || C.teal;
+      for(let i=0;i<s.count;i++){
+        const a = w.angle + (i*TAU/s.count);
+        const nx = p.x + Math.cos(a)*s.radius * p.areaMul;
+        const ny = p.y + Math.sin(a)*s.radius * p.areaMul;
+        const list = EGRID.query(nx, ny, s.nodeR + 40, _EQ1);
+        for(let li = 0; li < list.length; li++){
+          const e = list[li];
+          if(!e.alive) continue;
+          const dd = (e.x-nx)*(e.x-nx) + (e.y-ny)*(e.y-ny);
+          const rr = (e.r + s.nodeR);
+          if(dd < rr*rr){
+            const tag = 'rr_'+w.id+'_'+i;
+            if(!e.hitOrbit) e.hitOrbit = {};
+            if((e.hitOrbit[tag]||0) <= 0){
+              dealDamage(e, s.dmg * p.dmgMul, col);
+              fxBurst(e.x,e.y,col,6,140,2.2,.22);
+              e.hitOrbit[tag] = .35;
+            }
+          }
+        }
+        if(doPulseTick){
+          firePulse(nx, ny, s.pulseR * p.areaMul, s.pulseDmg * p.dmgMul, 80, {color: col});
+          fxRing(nx, ny, col, s.pulseR * p.areaMul * .7, .35);
+        }
+        w.lastNodes[i] = {x:nx, y:ny};
+      }
+      const el = EGRID.enemies;
+      for(let ei = 0; ei < el.length; ei++){
+        const e = el[ei];
+        if(e.hitOrbit){ for(const k in e.hitOrbit) e.hitOrbit[k] -= G.dt; }
+      }
+    },
   },
   'CHAIN+SHOCK': {
     id:'FUSE_THUNDER_ARC', name:'THUNDER ARC', color:C.cyan, kind:'SHOCK',
@@ -608,6 +864,44 @@ export const FUSIONS = {
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=14; w.stats.radius+=14; if(lv===3||lv===5) w.stats.jumps++; w.stats.jumpRange+=12; },
     extra:{fanThenChain:true},
+    onUpdate(p,w){
+      w.timer = (w.timer||0) - G.dt;
+      if(w.timer<=0){
+        const s = w.stats;
+        const col = w.color || C.cyan;
+        const aim = nearestEnemy(p);
+        const a = aim ? angTo(p, aim) : (p.faceA||0);
+        // Fan shock first — uses native cone hit logic.
+        fireFanShock(p.x, p.y, a, s.radius * p.areaMul, s.arc, s.dmg * p.dmgMul, {color: col});
+        // Then seed chain jumps from up to 3 enemies in the cone.
+        const list = EGRID.query(p.x, p.y, s.radius * p.areaMul + 40, _EQ1);
+        const seeds = [];
+        for(let li = 0; li < list.length && seeds.length < 3; li++){
+          const e = list[li];
+          if(!e.alive) continue;
+          const dx = e.x - p.x, dy = e.y - p.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if(dist > s.radius * p.areaMul + e.r) continue;
+          let da = Math.atan2(dy, dx) - a;
+          while(da > Math.PI) da -= TAU;
+          while(da < -Math.PI) da += TAU;
+          if(Math.abs(da) <= s.arc/2 + .1) seeds.push(e);
+        }
+        for(const seed of seeds){
+          let from = seed;
+          const hit = new Set([seed]);
+          for(let j=0;j<s.jumps;j++){
+            const tgt = nearestEnemyExcept(from, hit, s.jumpRange);
+            if(!tgt) break;
+            fxLine(from.x, from.y, tgt.x, tgt.y, col, .3, 3);
+            dealDamage(tgt, s.dmg * p.dmgMul * s.jumpDmg * (1 - j*.1), col);
+            fxBurst(tgt.x, tgt.y, col, 6, 130, 2, .22);
+            hit.add(tgt); from = tgt;
+          }
+        }
+        w.timer = s.cd / p.cdMul;
+      }
+    },
   },
   'BLADE+HOMING': {
     id:'FUSE_PHANTOM_EDGE', name:'PHANTOM EDGE', color:C.white, kind:'BULLET',
@@ -617,6 +911,21 @@ export const FUSIONS = {
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=10; if(lv===2||lv===4) w.stats.count++; if(lv===3||lv===5) w.stats.pierce++; w.stats.turn+=.3; },
     extra:{curveTrack:true},
+    onUpdate(p,w){
+      w.timer = (w.timer||0) - G.dt;
+      if(w.timer<=0){
+        const s = w.stats;
+        const col = w.color || C.white;
+        const target = nearestEnemy(p);
+        const aimA = target ? angTo(p, target) : Math.random()*TAU;
+        for(let i=0;i<s.count;i++){
+          const spread = (i - (s.count-1)/2) * .35;
+          const a = aimA + spread;
+          fireProjectile(p.x, p.y, a, s.speed, s.dmg * p.dmgMul, s.life, col, 'shuriken', {pierce:s.pierce, spin:Math.random()*TAU, target, turn:s.turn});
+        }
+        w.timer = s.cd / p.cdMul;
+      }
+    },
   },
   'BEAM+CROSS': {
     id:'FUSE_STAR_FORGE', name:'STAR FORGE', color:C.gold, kind:'BEAM',
@@ -626,6 +935,36 @@ export const FUSIONS = {
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=11; w.stats.length+=28; w.stats.width+=1; if(lv===3||lv===5) w.stats.count+=2; },
     extra:{fixedCross:true},
+    onUpdate(p,w){
+      // Slow rotation gives the cross a subtle drift while keeping the
+      // "fixed cardinal axes" feel of CROSS.
+      w.angle = (w.angle||0) + w.stats.rotSpeed * G.dt;
+      w.tickT = (w.tickT||0) - G.dt;
+      const s = w.stats;
+      const tickEvery = s.tick / p.cdMul;
+      const damageThisFrame = w.tickT <= 0;
+      if(damageThisFrame) w.tickT = tickEvery;
+      if(!w.beams) w.beams = [];
+      const col = w.color || C.gold;
+      for(let b=0;b<s.count;b++){
+        const a = w.angle + (b * TAU/s.count);
+        const ex = p.x + Math.cos(a)*s.length;
+        const ey = p.y + Math.sin(a)*s.length;
+        w.beams[b] = {x1:p.x,y1:p.y,x2:ex,y2:ey,life:G.dt};
+        if(damageThisFrame){
+          const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
+          for(let li = 0; li < list.length; li++){
+            const e = list[li];
+            if(!e.alive) continue;
+            const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
+            if(d <= e.r + s.width){
+              dealDamage(e, s.dmg * p.dmgMul, col);
+              fxBurst(e.x,e.y,col,4,110,2.2,.2);
+            }
+          }
+        }
+      }
+    },
   },
   'BLACKHOLE+PRISM': {
     id:'FUSE_KALEIDO_VOID', name:'KALEIDO VOID', color:C.violet, kind:'BLACKHOLE',
@@ -635,24 +974,143 @@ export const FUSIONS = {
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=4; w.stats.radius+=12; w.stats.burstDmg+=8; if(lv===2||lv===4) w.stats.burstCount+=4; if(lv===5) w.stats.burstSplits++; },
     extra:{collapseBurst:true},
+    onUpdate(p,w){
+      w.timer = (w.timer||0) - G.dt;
+      // Self-tracked collapse bursts fire just after each blackhole's lifetime.
+      if(!w.pendingBursts) w.pendingBursts = [];
+      for(let i = w.pendingBursts.length - 1; i >= 0; i--){
+        const pb = w.pendingBursts[i];
+        pb.t -= G.dt;
+        if(pb.t <= 0){
+          for(let j = 0; j < pb.count; j++){
+            const a = (j / pb.count) * TAU + Math.random()*.18;
+            fireProjectile(pb.x, pb.y, a, pb.speed, pb.dmg, 1.4, pb.color, 'prism', {splits: pb.splits});
+          }
+          fxRing(pb.x, pb.y, pb.color, 90, .55);
+          fxBurst(pb.x, pb.y, pb.color, 30, 240, 4, .55);
+          w.pendingBursts.splice(i, 1);
+        }
+      }
+      if(w.timer<=0){
+        const s = w.stats;
+        const col = w.color || C.violet;
+        const aim = nearestEnemy(p);
+        const tx = aim ? aim.x : p.x + rand(-200,200);
+        const ty = aim ? aim.y : p.y + rand(-200,200);
+        spawnBlackhole(tx, ty, s.radius * p.areaMul, s.life * p.areaMul, s.pull, s.dmg * p.dmgMul);
+        w.pendingBursts.push({
+          x: tx, y: ty,
+          t: s.life * p.areaMul + .05,
+          count: s.burstCount, dmg: s.burstDmg * p.dmgMul,
+          speed: s.burstSpeed, splits: s.burstSplits, color: col,
+        });
+        w.timer = s.cd / p.cdMul;
+      }
+    },
   },
   'CROSS+SHOCK': {
     id:'FUSE_QUAD_BLAST', name:'QUAD BLAST', color:C.red, kind:'SHOCK',
-    desc:'사방향 부채꼴 충격파 동시',
+    desc:'사방향 부채꼴 충격파 동시 발사',
     sourceA:'CROSS', sourceB:'SHOCK',
     baseStats:{ cd:1.5, dmg:42, radius:180, arc:Math.PI*.5, dirs:4 },
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=11; w.stats.radius+=14; w.stats.arc+=.08; if(lv===5) w.stats.dirs+=4; },
     extra:{quadCone:true},
+    onUpdate(p,w){
+      w.timer = (w.timer||0) - G.dt;
+      if(w.timer<=0){
+        const s = w.stats;
+        const col = w.color || C.red;
+        const baseA = w.spin || 0;
+        for(let i=0;i<s.dirs;i++){
+          const a = baseA + (i / s.dirs) * TAU;
+          fireFanShock(p.x, p.y, a, s.radius * p.areaMul, s.arc, s.dmg * p.dmgMul, {color: col});
+        }
+        w.spin = (w.spin||0) + .3;
+        w.timer = s.cd / p.cdMul;
+      }
+    },
   },
   'CHAIN+ORBIT': {
     id:'FUSE_COIL_HALO', name:'COIL HALO', color:C.teal, kind:'ORBIT',
-    desc:'궤도 노드 사이 항시 전류',
+    desc:'궤도 노드 사이 항시 전류 — 노드에서 체인 방전',
     sourceA:'CHAIN', sourceB:'ORBIT',
     baseStats:{ count:3, radius:110, rotSpeed:2.2, dmg:22, nodeR:12, arcDmg:18, arcTick:.18, jumps:2, jumpRange:180 },
     maxLv:6,
     levelUp:(w,lv)=>{ w.stats.dmg+=6; w.stats.arcDmg+=8; if(lv===2||lv===4) w.stats.count++; if(lv===3||lv===5) w.stats.jumps++; },
     extra:{interNodeArc:true, jumpFromNodes:true},
+    onUpdate(p,w){
+      const s = w.stats;
+      w.angle = (w.angle||0) + s.rotSpeed * G.dt * p.cdMul;
+      w.arcT = (w.arcT||0) - G.dt;
+      const doArc = w.arcT <= 0;
+      if(doArc) w.arcT = s.arcTick / p.cdMul;
+      if(!w.lastNodes) w.lastNodes = [];
+      const col = w.color || C.teal;
+      const nodes = [];
+      for(let i=0;i<s.count;i++){
+        const a = w.angle + (i*TAU/s.count);
+        const nx = p.x + Math.cos(a)*s.radius * p.areaMul;
+        const ny = p.y + Math.sin(a)*s.radius * p.areaMul;
+        nodes.push({x: nx, y: ny});
+        const list = EGRID.query(nx, ny, s.nodeR + 40, _EQ1);
+        for(let li = 0; li < list.length; li++){
+          const e = list[li];
+          if(!e.alive) continue;
+          const dd = (e.x-nx)*(e.x-nx) + (e.y-ny)*(e.y-ny);
+          const rr = (e.r + s.nodeR);
+          if(dd < rr*rr){
+            const tag = 'ch_'+w.id+'_'+i;
+            if(!e.hitOrbit) e.hitOrbit = {};
+            if((e.hitOrbit[tag]||0) <= 0){
+              dealDamage(e, s.dmg * p.dmgMul, col);
+              e.hitOrbit[tag] = .35;
+            }
+          }
+        }
+        w.lastNodes[i] = {x:nx, y:ny};
+      }
+      // Inter-node arcs (visual every frame, damage on tick).
+      for(let i = 0; i < nodes.length; i++){
+        const a = nodes[i], b = nodes[(i+1) % nodes.length];
+        fxLine(a.x, a.y, b.x, b.y, col, .12, 2);
+        if(doArc){
+          const list = EGRID.queryLine(a.x, a.y, b.x, b.y, 30, _EQ1);
+          for(let li = 0; li < list.length; li++){
+            const e = list[li];
+            if(!e.alive) continue;
+            const d = pointSegDist(e.x,e.y, a.x,a.y, b.x,b.y);
+            if(d <= e.r + 18){
+              dealDamage(e, s.arcDmg * p.dmgMul * .5, col);
+            }
+          }
+        }
+      }
+      // Chain jumps from each node into the field.
+      if(doArc){
+        for(let i = 0; i < nodes.length; i++){
+          const start = nodes[i];
+          const seed = nearestEnemyExcept({x:start.x, y:start.y}, new Set(), s.jumpRange * .7);
+          if(!seed) continue;
+          let from = seed;
+          const hit = new Set([seed]);
+          fxLine(start.x, start.y, from.x, from.y, col, .25, 2.2);
+          dealDamage(from, s.arcDmg * p.dmgMul * .5, col);
+          for(let j = 0; j < s.jumps; j++){
+            const tgt = nearestEnemyExcept(from, hit, s.jumpRange);
+            if(!tgt) break;
+            fxLine(from.x, from.y, tgt.x, tgt.y, col, .25, 2);
+            dealDamage(tgt, s.arcDmg * p.dmgMul * .4, col);
+            hit.add(tgt); from = tgt;
+          }
+        }
+      }
+      const el = EGRID.enemies;
+      for(let ei = 0; ei < el.length; ei++){
+        const e = el[ei];
+        if(e.hitOrbit){ for(const k in e.hitOrbit) e.hitOrbit[k] -= G.dt; }
+      }
+    },
   },
 };
 

@@ -213,6 +213,9 @@ export function doLevelUp(forceNoXpReset=false){
   AUDIO.level();
   shake(.1); flash('#fff', .25);
   G.mode = 'levelup';
+  // Reroll cost resets every level-up — within a single screen rerolls still
+  // compound, but progressing to the next level starts fresh at the base cost.
+  G.rerollCost = 3;
   G.weaponPickPool = pickLevelupCards(p, 3);
   document.getElementById('levelup-overlay').classList.remove('hidden');
   document.getElementById('reroll-cost').textContent = G.rerollCost;
@@ -232,9 +235,12 @@ function pickLevelupCards(p, n=3){
   for(const fk of fusionsAvailable(p)){
     fuseReady.push({type:'fuse', fuseKey: fk, fuse: FUSIONS[fk], rarity:'legend'});
   }
-  // Bump card count when many evos/fusions are ready. Cap at 6.
-  const specialCount = evoReady.length + fuseReady.length;
-  if(specialCount >= 2) n = Math.min(6, specialCount + 1);
+  // Card layout: BASE_N slots host evolution + normal cards (they compete).
+  // Fusions are EXTRA slots appended on top so they never displace a
+  // build-progress pick — picking fusion = pure bonus.
+  const BASE_N = n;
+  const FUSE_CAP = 3;
+
   const pool = [];
   for(const w of p.weapons){
     if(w.level < w.def.maxLv){
@@ -258,14 +264,12 @@ function pickLevelupCards(p, n=3){
   pool.push({type:'gold', weight:2});
 
   const out = [];
-  // Fusions go first (they're the rarest/biggest payoff). Then evolutions.
-  // Total special cards capped at n-1 so a non-special always shows up too.
-  for(const f of fuseReady){ if(out.length < n - 1) out.push(f); }
-  const evoSlots = Math.max(0, (n - 1) - out.length);
-  for(let i=0; i < Math.min(evoReady.length, evoSlots); i++){ out.push(evoReady[i]); }
+  // Step 1: evolutions take base slots first (real build choice).
+  for(const e of evoReady){ if(out.length < BASE_N) out.push(e); }
 
+  // Step 2: fill remaining base slots from the weighted normal pool.
   const used = new Set();
-  while(out.length < n){
+  while(out.length < BASE_N){
     let total = 0;
     for(const x of pool){ if(!used.has(x)) total += x.weight * (1 + p.luck*.5); }
     if(total === 0) break;
@@ -281,11 +285,20 @@ function pickLevelupCards(p, n=3){
     out.push(chosen);
   }
 
+  // Step 3: fusion cards as EXTRA slots, appended after base is filled.
+  for(const f of fuseReady){
+    if(out.length >= BASE_N + FUSE_CAP) break;
+    out.push(f);
+  }
+
   for(const card of out){
     if(card.type === 'evolve'){
       card.tier = UPGRADE_TIERS.legend;
       card.mult = 1;
       card.rarity = 'evo';
+    } else if(card.type === 'fuse'){
+      card.tier = UPGRADE_TIERS.legend;
+      card.mult = 1;
     } else {
       card.tier = rollUpgradeTier(p.luck);
       card.mult = rollTierMult(card.tier);
@@ -442,13 +455,14 @@ function applyLevelupCard(card){
   G.mode = 'play';
   if(p.xp >= p.xpNext){ setTimeout(()=> doLevelUp(false), 80); }
 }
-/* Chest pick — opens the level-up overlay with 3 random item cards. Player must pick one. */
+/* Chest pick — opens the level-up overlay with 3 random RELIC cards (boss-only).
+   Relics are gated to boss chests so they feel like a milestone. */
 export function openChestPick(){
   const p = G.player; if(!p) return;
   const seen = new Set();
   const cards = [];
   for(let attempts = 0; attempts < 40 && cards.length < 3; attempts++){
-    const it = pickRandomItem((p.luck||0) + .2, ['common','rare','legendary']);
+    const it = pickRandomItem((p.luck||0) + .2, ['common','rare','legendary'], 'relic');
     if(it && !seen.has(it.id)){
       seen.add(it.id);
       cards.push({type:'item_pick', item:it, rarity: it.tier === 'legendary' ? 'legend' : it.tier});
@@ -457,6 +471,8 @@ export function openChestPick(){
   if(cards.length === 0) return;
   AUDIO.level();
   G.mode = 'levelup';
+  // Reroll cost also resets here so chest rerolls don't carry from prior level-ups.
+  G.rerollCost = 3;
   G.weaponPickPool = cards;
   document.getElementById('levelup-overlay').classList.remove('hidden');
   document.getElementById('reroll-cost').textContent = G.rerollCost;

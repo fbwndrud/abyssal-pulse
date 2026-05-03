@@ -450,6 +450,10 @@ function updateEnemyBullets(){
 /* ===================================================================
    SPAWN DIRECTOR
    =================================================================== */
+// Active-enemy cap. Horde density comes from close pressure, not unbounded
+// population growth. 250 is well below the PixiJS or Canvas frame budget and
+// keeps fusion-weapon onUpdate cost (which scans EGRID per node) bounded.
+const ENEMY_CAP = 250;
 function spawnDirector(){
   G.spawnTimer -= G.dt;
   if(G.spawnTimer > 0) return;
@@ -458,8 +462,13 @@ function spawnDirector(){
   // so the boss is the focus instead of a wall of adds.
   const bossSlow = G.bossActive ? 2.0 : 1.0;
   G.spawnTimer = Math.max(.18, 1.6 - t*.0040) * bossSlow;
+  // Hard cap — at the cap, skip the entire tick. Late-game pressure comes
+  // from elite mix + boss patterns, not raw population.
+  const room = ENEMY_CAP - EGRID.enemies.length;
+  if(room <= 0) return;
   let n = clamp(Math.round(1 + t*.045), 1, 14);
   if(G.bossActive) n = Math.max(1, Math.floor(n * 0.5));
+  n = Math.min(n, room);
   const min = t/60;
   const pool = ['TRI'];
   if(min > .3) pool.push('TRI');
@@ -478,8 +487,11 @@ function spawnDirector(){
     const y = G.player.y + Math.sin(a)*r;
     spawnEnemy(choice(pool), x, y);
   }
+  // Swarm bursts also respect the cap.
   if(min > 4 && Math.random() < .15){
-    for(let i=0;i<22;i++){
+    const burstRoom = Math.max(0, ENEMY_CAP - EGRID.enemies.length);
+    const burstN = Math.min(22, burstRoom);
+    for(let i=0;i<burstN;i++){
       const a = Math.random()*TAU;
       const r = rand(440, 620);
       spawnEnemy('SWARM', G.player.x + Math.cos(a)*r, G.player.y + Math.sin(a)*r);

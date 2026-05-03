@@ -110,13 +110,18 @@ export const G = {
   freezeTimer: 0,
 };
 
-/* ───────── CAMERA ───────── */
+/* ───────── CAMERA ─────────
+   Frame-rate-independent exponential follow. Original code used a fixed
+   lerp factor 0.14 which under-shoots when fps drops; raising it to a
+   dt-aware exponential keeps the player visually centered at any FPS.
+   Initial spawn snap (in player.js) avoids the (0,0)→target ramp-in. */
 export function updateCamera(){
   if(!G.player) return;
   G.cam.tx = G.player.x - W/2;
   G.cam.ty = G.player.y - H/2;
-  G.cam.x = lerp(G.cam.x, G.cam.tx, .14);
-  G.cam.y = lerp(G.cam.y, G.cam.ty, .14);
+  const k = 1 - Math.pow(1 - .14, G.dt * 60);
+  G.cam.x = lerp(G.cam.x, G.cam.tx, k);
+  G.cam.y = lerp(G.cam.y, G.cam.ty, k);
 }
 export function worldToScreen(x,y){ return {x:x-G.cam.x, y:y-G.cam.y}; }
 export function screenToWorld(x,y){ return {x:x+G.cam.x, y:y+G.cam.y}; }
