@@ -53,9 +53,10 @@ window.addEventListener('resize', resizeCanvas);
 export const app = new PIXI.Application();
 export const bgC         = new PIXI.Container();  // background — no camera transform
 export const world       = new PIXI.Container();  // camera + shake transform applied here
+export const bhLayer     = new PIXI.Container();  // blackholes — UNDER entities so pull-in is visible
 export const entityLayer = new PIXI.Container();  // enemies / player / pickups / projectiles
 export const fxLayer     = new PIXI.Container();  // particles / rings / shock / lines / fans / text
-export const beamLayer   = new PIXI.Container();  // beams / blackholes (per-frame Graphics redraw)
+export const beamLayer   = new PIXI.Container();  // beams / orbit nodes (per-frame Graphics redraw)
 export const hudC        = new PIXI.Container();  // PIXI-side HUD (currently empty — DOM HUD handles UI)
 
 export async function initPixi(){
@@ -71,7 +72,7 @@ export async function initPixi(){
     autoDensity: true,
     antialias: true,
   });
-  world.addChild(entityLayer, fxLayer, beamLayer);
+  world.addChild(bhLayer, entityLayer, fxLayer, beamLayer);
   app.stage.addChild(bgC, world, hudC);
 }
 

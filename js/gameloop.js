@@ -591,12 +591,10 @@ function _syncEntitySprite(e){
   }
   else if(e.type === 'blackhole'){
     sp.clear();
-    // Dark core layered circles (radial-gradient approximation).
+    // Single dark core (no inner purple ring — flat one-color disk).
     sp.circle(e.x, e.y, e.r);
-    sp.fill({ color: 0x000000, alpha: .85 });
-    sp.circle(e.x, e.y, e.r * .55);
-    sp.fill({ color: 0x280850, alpha: .9 });
-    // 5 violet event-horizon spirals
+    sp.fill({ color: 0x000000, alpha: .9 });
+    // 5 violet event-horizon spirals on top
     const t = e.t;
     for(let i = 0; i < 5; i++){
       const ang0 = t*4 + i*TAU/5;

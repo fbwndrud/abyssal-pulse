@@ -3,7 +3,7 @@
    This is the bottom of the game-logic stack: weapons.js calls into here
    (firePulse / fireProjectile / fxBurst / etc), and player.js calls dealDamage.
    =================================================================== */
-import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce, entityLayer, fxLayer, beamLayer } from './core.js';
+import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce, entityLayer, fxLayer, beamLayer, bhLayer } from './core.js';
 import { AUDIO } from './audio.js';
 import {
   getCircleTexture, getPolygonTexture, getStarTexture, getDiamondTexture,
@@ -32,7 +32,7 @@ function _autoAttachSprite(e){
     case 'fx':        _attachFxParticleSprite(e); break;
     case 'ring': case 'shock': case 'line': case 'fan':
                       _attachFxGraphics(e, fxLayer); break;
-    case 'blackhole': _attachFxGraphics(e, beamLayer); break;
+    case 'blackhole': _attachFxGraphics(e, bhLayer); break;
     case 'text':      _attachFxText(e); break;
   }
 }
