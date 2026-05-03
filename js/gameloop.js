@@ -2,16 +2,14 @@
    GAMELOOP — update + render + spawn director + entity-type updates.
    =================================================================== */
 import {
-  G, W, H, TAU, C, RUN_LENGTH_SEC, ctx, keys,
+  G, W, H, TAU, C, RUN_LENGTH_SEC, keys,
   rand, clamp, lerp, choice, hsl, pulse, angTo, fmtTime,
   meta, saveMeta, saveMetaLater,
   updateCamera, setBar, announce,
-  app, world,
+  app, world, hudC,
 } from './core.js';
 import { AUDIO } from './audio.js';
-import {
-  drawCircle, drawDiamond, drawPolygon, drawStar, withDrawCtx, BG,
-} from './render.js';
+import { BG, acquireGraphics } from './render.js';
 import {
   EGRID, _EQ1, _EQ2,
   makeEnt, fxBurst, fxRing, fxText, fxShockwave, fxLine, shake, flash,
@@ -669,11 +667,17 @@ function spawnDirector(){
 
 /* ===================================================================
    RENDER
-   - Camera + shake mapped to PIXI world container position.
-   - All visual content (BG, entities, fx, beams, flash) moves into the PIXI
-     scene graph in later migration steps. During Step 1 the world is empty
-     PIXI containers, so the screen is black + DOM HUD.
+   - BG.tick (parallax/grid/glow position updates)
+   - camera + shake → world container position
+   - flash overlay (full-screen color rect on hudC, alpha = G.flash)
    =================================================================== */
+let _flashGfx = null;
+function _ensureFlashGfx(){
+  if(_flashGfx) return _flashGfx;
+  _flashGfx = acquireGraphics();
+  hudC.addChild(_flashGfx);
+  return _flashGfx;
+}
 export function render(){
   BG.tick();
   const sh = G.shake * 14;
@@ -681,310 +685,12 @@ export function render(){
     -G.cam.x + (Math.random()-.5)*sh,
     -G.cam.y + (Math.random()-.5)*sh
   );
+  const flashGfx = _ensureFlashGfx();
+  flashGfx.clear();
+  if(G.flash > 0){
+    flashGfx.rect(0, 0, W, H);
+    flashGfx.fill({ color: G.flashColor || '#ffffff', alpha: G.flash });
+  }
   if(app.renderer) app.renderer.render(app.stage);
 }
 
-function drawWorld(){
-  ctx.save();
-  ctx.translate(-G.cam.x, -G.cam.y);
-
-  // Off-screen culling — radius-aware, 200px margin. Bypassed on bad camera coords.
-  const camOk = Number.isFinite(G.cam.x) && Number.isFinite(G.cam.y);
-  const cx0 = G.cam.x - 200, cx1 = G.cam.x + W + 200;
-  const cy0 = G.cam.y - 200, cy1 = G.cam.y + H + 200;
-  const vis = camOk
-    ? (e)=> { const r = e.r || 30; return (e.x + r) >= cx0 && (e.x - r) <= cx1 && (e.y + r) >= cy0 && (e.y - r) <= cy1; }
-    : ()=> true;
-
-  // Loop-level try/catch (faster than per-entity wrap). Each pass is independent —
-  // if one pass throws, others still run. Logs first 20 distinct draw failures.
-  const passes = [
-    ()=> { for(const e of G.ents) if(e.type==='blackhole' && e.alive && vis(e)) drawBlackhole(e); },
-    ()=> { for(const e of G.ents) if((e.type==='xp'||e.type==='coin'||e.type==='heart'||e.type==='magnet'||e.type==='freeze'||e.type==='chest'||e.type==='item') && vis(e)) drawPickup(e); },
-    ()=> { const el = EGRID.enemies; for(let i=0;i<el.length;i++){ const e = el[i]; if(vis(e)) drawEnemy(e); } },
-    ()=> { if(G.player) drawPlayer(G.player); },
-    ()=> { for(const e of G.ents) if(e.type==='proj' && e.alive && vis(e)) drawProjectile(e); },
-    ()=> { for(const e of G.ents) if(e.type==='ebullet' && e.alive && vis(e)) drawEnemyBullet(e); },
-    ()=> { if(G.player) drawBeams(G.player); },
-    ()=> { if(G.player) drawOrbits(G.player); },
-    ()=> {
-      for(const e of G.ents){
-        if(!vis(e)) continue;
-        if(e.type==='fx') drawFxParticle(e);
-        else if(e.type==='ring') drawFxRing(e);
-        else if(e.type==='shock') drawFxShock(e);
-        else if(e.type==='line') drawFxLine(e);
-        else if(e.type==='fan') drawFan(e);
-      }
-    },
-    ()=> { for(const e of G.ents) if(e.type==='text' && vis(e)) drawText(e); },
-  ];
-  for(let pi = 0; pi < passes.length; pi++){
-    try { passes[pi](); }
-    catch(err){ if(_drawErrCount < 20){ _drawErrCount++; console.warn('[drawWorld pass'+pi+']', err?.message||err); } }
-  }
-
-  ctx.restore();
-}
-let _drawErrCount = 0;
-let _wpnErrCount = 0;
-
-function drawPlayer(p){
-  ctx.save();
-  ctx.strokeStyle = p.color;
-  ctx.shadowBlur = 4; ctx.shadowColor = p.color;
-  ctx.lineCap = 'round';
-  for(let i=0;i<p.trail.length-1;i++){
-    const a = p.trail[i], b = p.trail[i+1];
-    const t = i / p.trail.length;
-    ctx.globalAlpha = t * .5;
-    ctx.lineWidth = 1 + t*4;
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-  }
-  ctx.restore();
-  const halo = pulse(G.realT, 4) * .4 + .6;
-  ctx.save();
-  const hg = ctx.createRadialGradient(p.x, p.y, p.r, p.x, p.y, p.r*4);
-  hg.addColorStop(0, p.color); hg.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.globalAlpha = .25 * halo;
-  ctx.fillStyle = hg;
-  ctx.beginPath(); ctx.arc(p.x, p.y, p.r*4, 0, TAU); ctx.fill();
-  ctx.restore();
-  if(p.sides === 0){
-    drawCircle(p.x, p.y, p.r, p.color, 22, hsl(180,80,8,.6), 2.6);
-    drawCircle(p.x, p.y, p.r*.45, '#fff', 18, p.color, 1.4);
-  } else {
-    drawPolygon(p.x, p.y, p.sides, p.r, p.rot, p.color, 20, 'rgba(0,0,0,.4)', 2.4);
-    drawCircle(p.x, p.y, p.r*.35, '#fff', 12, p.color, 1.2);
-  }
-  if(p.invuln > 0 && (Math.floor(G.realT*16)%2===0)){
-    drawCircle(p.x, p.y, p.r+4, '#fff', 18, 'rgba(0,0,0,0)', 1.5);
-  }
-}
-
-function drawEnemy(e){
-  const flashOn = e.hitFlash > 0;
-  const col = flashOn ? '#fff' : e.color;
-  const fillCol = flashOn ? 'rgba(255,255,255,.6)' : 'rgba(8,14,30,.55)';
-  const r = e.r;
-  if(e.isBoss){
-    const rg = ctx.createRadialGradient(e.x,e.y,r*.4, e.x,e.y, r*3);
-    rg.addColorStop(0, e.color); rg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.save(); ctx.globalAlpha = .25 + pulse(G.realT,3)*.15;
-    ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(e.x,e.y, r*3, 0, TAU); ctx.fill(); ctx.restore();
-  }
-  if(e.isDiamond){
-    drawDiamond(e.x, e.y, r, e.rot, col, 6, fillCol);
-  } else if(e.sides === 0){
-    drawCircle(e.x, e.y, r, col, 6, fillCol, 2);
-  } else {
-    drawPolygon(e.x, e.y, e.sides, r, e.rot, col, e.isBoss ? 14 : 6, fillCol, e.isBoss ? 3 : 2);
-  }
-  if(!e.isBoss && e.hp < e.maxHp){
-    const w = r*1.8, x = e.x - w/2, y = e.y + r + 5;
-    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x,y,w,2);
-    ctx.fillStyle = e.color; ctx.shadowBlur = 0;
-    ctx.fillRect(x,y, w*(e.hp/e.maxHp), 2);
-    ctx.shadowBlur = 0;
-  }
-}
-
-function drawProjectile(pr){
-  if(pr.subtype === 'shuriken'){
-    drawStar(pr.x, pr.y, 4, 14, 6, pr.spin, pr.color, 8, pr.color, 1.6);
-  } else if(pr.subtype === 'homing'){
-    drawDiamond(pr.x, pr.y, 8, Math.atan2(pr.vy,pr.vx), pr.color, 6, pr.color);
-  } else if(pr.subtype === 'prism'){
-    drawPolygon(pr.x, pr.y, 3, 8, Math.atan2(pr.vy,pr.vx)+Math.PI/2, pr.color, 6, pr.color, 1.6);
-  } else {
-    drawCircle(pr.x, pr.y, 4, pr.color, 6, pr.color, 1);
-  }
-}
-function drawEnemyBullet(b){
-  drawCircle(b.x, b.y, b.r, b.color, 6, b.color, 1.4);
-}
-
-function drawBeams(p){
-  for(const w of p.weapons){
-    if(w.key !== 'BEAM' || !w.beams) continue;
-    for(const b of w.beams){
-      if(!b) continue;
-      ctx.save();
-      const g = ctx.createLinearGradient(b.x1, b.y1, b.x2, b.y2);
-      g.addColorStop(0, 'rgba(255,212,0,.0)');
-      g.addColorStop(.5, 'rgba(255,212,0,.85)');
-      g.addColorStop(1, 'rgba(255,212,0,0)');
-      ctx.strokeStyle = g;
-      ctx.lineWidth = w.stats.width + 6;
-      ctx.lineCap = 'round';
-      ctx.shadowBlur = 12; ctx.shadowColor = C.gold;
-      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = w.stats.width;
-      ctx.shadowBlur = 6;
-      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
-      ctx.restore();
-    }
-  }
-}
-function drawOrbits(p){
-  for(const w of p.weapons){
-    if(w.key !== 'ORBIT' || !w.lastNodes) continue;
-    for(const n of w.lastNodes){
-      if(!n) continue;
-      drawCircle(n.x, n.y, w.stats.nodeR, C.violet, 8, hsl(280,80,15,.5), 2);
-      ctx.save();
-      ctx.strokeStyle = 'rgba(155,92,255,.25)';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(n.x, n.y); ctx.stroke();
-      ctx.restore();
-    }
-  }
-}
-function drawBlackhole(e){
-  ctx.save();
-  const t = e.t;
-  const rg = ctx.createRadialGradient(e.x,e.y, 0, e.x,e.y, e.r);
-  rg.addColorStop(0, 'rgba(0,0,0,.95)');
-  rg.addColorStop(.5, 'rgba(40,8,80,.9)');
-  rg.addColorStop(1, 'rgba(155,92,255,0)');
-  ctx.fillStyle = rg;
-  ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, TAU); ctx.fill();
-  for(let i=0;i<5;i++){
-    const a = t*4 + i*TAU/5;
-    const r1 = e.r * (.4 + i*.12);
-    ctx.strokeStyle = `hsla(280 80% 70% / ${.7 - i*.12})`;
-    ctx.lineWidth = 1.5;
-    ctx.shadowBlur = 6; ctx.shadowColor = C.violet;
-    ctx.beginPath();
-    for(let s=0;s<24;s++){
-      const aa = a + s*.18;
-      const rr = r1 - s*1.2;
-      const x = e.x + Math.cos(aa)*rr;
-      const y = e.y + Math.sin(aa)*rr;
-      if(s===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-function drawPickup(e){
-  if(e.type==='xp'){
-    drawDiamond(e.x, e.y, e.r, G.realT*3, e.color, 6, e.color);
-  } else if(e.type==='coin'){
-    ctx.save();
-    ctx.translate(e.x, e.y); ctx.rotate(G.realT*4);
-    drawDiamond(0,0,e.r, 0, C.gold, 8, C.gold);
-    ctx.restore();
-  } else if(e.type==='heart'){
-    ctx.save();
-    ctx.fillStyle = C.red; ctx.shadowColor = C.red; ctx.shadowBlur = 8;
-    const s = e.r;
-    ctx.beginPath();
-    ctx.moveTo(e.x, e.y - s*.2);
-    ctx.bezierCurveTo(e.x-s*1.5, e.y-s*1.5, e.x-s*2, e.y+s*.4, e.x, e.y+s*1.4);
-    ctx.bezierCurveTo(e.x+s*2, e.y+s*.4, e.x+s*1.5, e.y-s*1.5, e.x, e.y-s*.2);
-    ctx.fill();
-    ctx.restore();
-  } else if(e.type==='magnet'){
-    drawStar(e.x, e.y, 4, e.r, e.r*.4, G.realT*2, C.pink, 8, C.pink, 1.6);
-  } else if(e.type==='freeze'){
-    drawStar(e.x, e.y, 6, e.r, e.r*.5, G.realT, C.teal, 8, C.teal, 1.6);
-  } else if(e.type==='chest'){
-    drawStar(e.x, e.y, 5, e.r*1.4, e.r*.6, G.realT*1.2, C.gold, 10, hsl(50,90,20,.7), 2);
-  } else if(e.type==='item'){
-    const col = e.color || C.gold;
-    const glow = e.glow || 18;
-    const rot = G.realT * 1.8;
-    const pulseV = 1 + Math.sin(G.realT*4)*.12;
-    const r = e.r * pulseV;
-    // Outer breathing glow
-    ctx.save();
-    ctx.globalAlpha = .35 + Math.sin(G.realT*5)*.2;
-    ctx.strokeStyle = col; ctx.lineWidth = 1.5;
-    ctx.shadowColor = col; ctx.shadowBlur = glow;
-    ctx.beginPath(); ctx.arc(e.x, e.y, r*1.7, 0, TAU); ctx.stroke();
-    ctx.restore();
-    // Tier shell — hexagon (relic) or diamond (consumable). Identifies category at a glance.
-    const isRelic = e.item && e.item.kind === 'relic';
-    if(isRelic){
-      drawPolygon(e.x, e.y, 6, r*1.25, rot*.4, col, glow*.5, 'rgba(0,0,0,.35)', 1.6);
-    } else {
-      drawDiamond(e.x, e.y, r*1.2, rot*.4, col, glow*.5, 'rgba(0,0,0,.35)');
-    }
-    // Per-item glyph icon
-    if(e.item && e.item.icon){
-      e.item.icon(ctx, e.x, e.y, r * 2.0);
-    } else {
-      drawCircle(e.x, e.y, r*.4, '#fff', 8, col);
-    }
-  }
-}
-function drawFxParticle(e){
-  // shadowBlur removed — particles are tiny and brief, glow not perceptible
-  // and the per-particle blur cost dominates draw time in late-run frames.
-  const a = e.life / e.maxLife;
-  ctx.globalAlpha = a;
-  ctx.fillStyle = e.color;
-  ctx.beginPath(); ctx.arc(e.x, e.y, e.size * a, 0, TAU); ctx.fill();
-  ctx.globalAlpha = 1;
-}
-function drawFxRing(e){
-  const a = e.life / e.maxLife;
-  ctx.save();
-  ctx.globalAlpha = a * .8;
-  ctx.strokeStyle = e.color; ctx.lineWidth = 2 + (1-a)*4;
-  ctx.shadowBlur = 8; ctx.shadowColor = e.color;
-  ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, TAU); ctx.stroke();
-  ctx.restore();
-}
-function drawFxShock(e){
-  const k = 1 - e.life/e.maxLife;
-  ctx.save();
-  ctx.globalAlpha = (1 - k) * .9;
-  ctx.strokeStyle = e.color; ctx.lineWidth = 4 + k*10;
-  ctx.shadowBlur = 10; ctx.shadowColor = e.color;
-  ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, TAU); ctx.stroke();
-  ctx.restore();
-}
-function drawFxLine(e){
-  const a = e.life / e.maxLife;
-  ctx.save();
-  ctx.globalAlpha = a;
-  ctx.strokeStyle = e.color; ctx.lineWidth = e.width;
-  ctx.shadowBlur = 6; ctx.shadowColor = e.color;
-  ctx.beginPath(); ctx.moveTo(e.x1,e.y1);
-  const segs = 6;
-  for(let i=1;i<segs;i++){
-    const t = i/segs;
-    const mx = lerp(e.x1, e.x2, t) + (Math.random()-.5)*16;
-    const my = lerp(e.y1, e.y2, t) + (Math.random()-.5)*16;
-    ctx.lineTo(mx,my);
-  }
-  ctx.lineTo(e.x2,e.y2); ctx.stroke();
-  ctx.restore();
-}
-function drawFan(e){
-  const a = e.life / e.maxLife;
-  ctx.save();
-  ctx.globalAlpha = a * .7;
-  ctx.fillStyle = e.color;
-  ctx.shadowBlur = 10; ctx.shadowColor = e.color;
-  ctx.beginPath();
-  ctx.moveTo(e.x, e.y);
-  ctx.arc(e.x, e.y, e.r, e.angle - e.arc/2, e.angle + e.arc/2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-function drawText(e){
-  // shadowBlur removed for perf — damage numbers are short-lived and dense
-  // during boss fights / mass kills. Plain bright text reads fine on dark bg.
-  const a = e.life / e.maxLife;
-  ctx.globalAlpha = a;
-  ctx.font = (e.big ? '700 18px ' : '700 14px ') + "'JetBrains Mono', monospace";
-  ctx.fillStyle = e.color;
-  ctx.textAlign = 'center';
-  ctx.fillText(e.text, e.x, e.y);
-  ctx.globalAlpha = 1;
-}
