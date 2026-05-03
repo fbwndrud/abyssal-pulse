@@ -5,7 +5,9 @@
 import {
   G, keys, mouse, canvas, W, H, fmtTime, meta,
   flushMetaIfNeeded, flushMetaNow, initPixi,
+  app, world, bgC, entityLayer, fxLayer, beamLayer, hudC,
 } from './core.js';
+import { BG } from './render.js';
 import { AUDIO } from './audio.js';
 import { update, render, setLoopHandlers } from './gameloop.js';
 import {
@@ -114,6 +116,10 @@ addEventListener('keydown',     ()=>{ AUDIO.init().then(()=>{ if(G.mode==='menu'
 await initPixi();
 requestAnimationFrame(t=>{ lastT = t; requestAnimationFrame(loop); });
 showMenu();
+
+// Dev-mode handles for in-browser inspection (browser automation, REPL).
+// Same module instances the page uses; safe to read via window.__dev.
+window.__dev = { G, app, world, bgC, entityLayer, fxLayer, beamLayer, hudC, BG };
 document.getElementById('menu-coins').textContent = meta.coins;
 document.getElementById('menu-best').textContent = fmtTime(meta.bestTime);
 document.getElementById('menu-runs').textContent = meta.runs;
