@@ -482,11 +482,39 @@ function updateProjectile(pr){
 function updateEnemyBullets(){
   const p = G.player;
   const ents = G.ents;
+  // ORBIT defensive role: pre-collect active orbit-kind weapon nodes so ebullets
+  // can be blocked on contact. Covers base ORBIT, evolved variants (VOID_HALO /
+  // SOLAR_CORONA / LIFE_BLOOM) and fusions with kind:'ORBIT' (VOID_PULSAR,
+  // RESONANT_RING). All set w.lastNodes in their onUpdate.
+  const orbitNodes = [];
+  if(p && p.weapons){
+    for(const w of p.weapons){
+      if((w.def && w.def.kind === 'ORBIT') && w.lastNodes){
+        const nr = (w.stats && w.stats.nodeR) || 12;
+        for(const n of w.lastNodes){ if(n) orbitNodes.push(n.x, n.y, nr); }
+      }
+    }
+  }
+  const orbN = orbitNodes.length;
   for(let i = 0; i < ents.length; i++){
     const b = ents[i];
     if(b.type !== 'ebullet' || !b.alive) continue;
     b.life -= G.dt; if(b.life<=0){ b.alive=false; continue; }
     b.x += b.vx * G.dt; b.y += b.vy * G.dt;
+    // ORBIT shield: block + spark on contact. Triplet stride (x,y,r).
+    let blocked = false;
+    for(let k = 0; k < orbN; k += 3){
+      const ddx = b.x - orbitNodes[k], ddy = b.y - orbitNodes[k+1];
+      const rr = orbitNodes[k+2] + b.r;
+      if(ddx*ddx + ddy*ddy < rr*rr){
+        fxBurst(b.x, b.y, b.color, 6, 110, 2, .22);
+        fxRing(b.x, b.y, C.violet, 22, .22);
+        b.alive = false;
+        blocked = true;
+        break;
+      }
+    }
+    if(blocked) continue;
     if(p){
       const dxb = b.x - p.x, dyb = b.y - p.y;
       const rr = p.r + b.r;
