@@ -11,6 +11,7 @@ import {
   acquireParticle, releaseParticle,
   acquireGraphics, releaseGraphics,
   acquireText, releaseText,
+  getBossAuraTexture,
 } from './render.js';
 
 /* ───────── ENTITY BASE ───────── */
@@ -76,6 +77,12 @@ export function attachSpriteFromTexInfo(e, texInfo){
   entityLayer.addChild(e.sprite);
 }
 export function detachSprite(e){
+  // Boss aura is a separate sprite — destroy it (not pooled, bosses are rare).
+  if(e.auraSprite){
+    if(e.auraSprite.parent) e.auraSprite.parent.removeChild(e.auraSprite);
+    e.auraSprite.destroy({ children: false, texture: false });
+    e.auraSprite = null;
+  }
   if(!e.sprite) return;
   switch(e.__sprKind){
     case 'particle': releaseParticle(e.sprite); break;
@@ -110,6 +117,21 @@ function _attachEnemySprite(e){
   const lw = isBoss ? 3 : 2;
   const fillNorm = 'rgba(8,14,30,.55)';
   const fillFlash = 'rgba(255,255,255,.6)';
+  // Boss aura: large radial-gradient backdrop, added BEFORE body so body
+  // renders on top. Gives bosses a distinct visual "presence" beyond polygon
+  // sides (RING_LORD/SPIKE_KING/HYDRA/PRISMA all looked alike without it).
+  if(isBoss){
+    const auraSp = new PIXI.Sprite(getBossAuraTexture());
+    auraSp.anchor.set(0.5);
+    auraSp.tint = e.color;
+    const auraSize = e.r * 6;
+    auraSp.scale.set(auraSize / 256);
+    auraSp.alpha = 0.4;
+    auraSp.position.set(e.x, e.y);
+    entityLayer.addChild(auraSp);
+    e.auraSprite = auraSp;
+    e.auraSize = auraSize;
+  }
   let normTex, flashTex;
   if(e.isDiamond){
     normTex  = getDiamondTexture(e.r, e.color, glow, fillNorm);

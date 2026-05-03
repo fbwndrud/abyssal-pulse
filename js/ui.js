@@ -208,7 +208,10 @@ export function doLevelUp(forceNoXpReset=false){
   if(!forceNoXpReset && p.xp >= p.xpNext){
     p.xp -= p.xpNext;
     p.level++;
-    p.xpNext = Math.round(p.xpNext * 1.42 + 4);
+    // XP curve eased: 1.42→1.30 multiplier, +4→+3 base. Prior curve made
+    // weapon max-out (8 levels each) practically unreachable mid-run.
+    // L1→L15: was 5..1374, now 5..488 (≈3× faster late game).
+    p.xpNext = Math.round(p.xpNext * 1.30 + 3);
   }
   AUDIO.level();
   shake(.1); flash('#fff', .25);
@@ -702,7 +705,7 @@ export function updateHUD(){
 export function startRun(classKey){
   clearAllWorldSprites();
   G.ents = []; G.t = 0; G.spawnTimer = 0; G.combo=0; G.comboTimer=0;
-  G.killCount = 0; G.coinsRun = 0; G.bossActive=null; G.bossTimer = 0;
+  G.killCount = 0; G.coinsRun = 0; G.bossActive=null; G.bossTimer = 0; G.bossCount = 0;
   G.endReason = null; G.rerollCost = 3;
   G.classChosen = classKey;
   G.cam = {x:0, y:0, zoom:1, tx:0, ty:0};

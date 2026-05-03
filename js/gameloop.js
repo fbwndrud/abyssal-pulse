@@ -282,17 +282,23 @@ export function update(){
   G.flash = Math.max(0, G.flash - G.dt * .8);
   if(G.comboTimer > 0){ G.comboTimer -= G.dt; if(G.comboTimer <= 0) G.combo = 0; }
   spawnDirector();
-  G.bossTimer += G.dt;
-  // First boss at 110s, then every 90s after. Gives more build time before the wall.
-  const FIRST_BOSS_AT = 110, BOSS_INTERVAL = 90;
+  // Pause boss interval timer during a fight — otherwise a long boss kill
+  // burns the cooldown and the next boss spawns the instant the previous
+  // one dies, giving zero breather. (Player feedback: "back-to-back bosses".)
+  if(!G.bossActive) G.bossTimer += G.dt;
+  // First boss at 110s, then every 120s of NON-fight time. Was 90s but felt
+  // too dense at high levels — XP curve change pairs with longer breaks.
+  const FIRST_BOSS_AT = 110, BOSS_INTERVAL = 120;
   const firstReady = G.t >= FIRST_BOSS_AT;
   const intervalReady = G.bossTimer >= BOSS_INTERVAL && G.t >= FIRST_BOSS_AT;
   if(!G.bossActive && firstReady && intervalReady){
-    // Cycle through all 4 bosses, then loop. Variety > seeing PRISMA forever
-    // after 6:20. (Was: clamped to last index, so PRISMA repeated indefinitely.)
+    // Cycle by spawn count, not time, so each boss appears in order regardless
+    // of how long previous fights took. RING_LORD → SPIKE_KING → HYDRA →
+    // PRISMA → loop.
     const order = ['RING_LORD','SPIKE_KING','HYDRA','PRISMA'];
-    const cycleIdx = Math.max(0, Math.floor((G.t - FIRST_BOSS_AT) / BOSS_INTERVAL));
-    spawnBoss(order[cycleIdx % order.length]);
+    G.bossCount = (G.bossCount || 0);
+    spawnBoss(order[G.bossCount % order.length]);
+    G.bossCount++;
     G.bossTimer = 0;
   } else if(!G.bossActive && !firstReady){
     // pre-first-boss: keep timer pegged so post-FIRST_BOSS_AT triggers immediately on next interval

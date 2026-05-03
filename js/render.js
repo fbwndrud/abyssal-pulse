@@ -198,6 +198,22 @@ export function getDiamondTexture(r, color='#fff', glow=12, fill=null){
   return getPolygonTexture(4, r, color, glow, fill, 2);
 }
 
+/* ───────── BOSS AURA TEX (large white radial fade, tinted per-boss) ───────── */
+let _BOSS_AURA_TEX = null;
+export function getBossAuraTexture(){
+  if(_BOSS_AURA_TEX) return _BOSS_AURA_TEX;
+  const sz = 256;
+  const c = document.createElement('canvas'); c.width = sz; c.height = sz;
+  const cx = c.getContext('2d');
+  const g = cx.createRadialGradient(sz/2, sz/2, sz*.15, sz/2, sz/2, sz/2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(.5, 'rgba(255,255,255,.45)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  cx.fillStyle = g; cx.fillRect(0, 0, sz, sz);
+  _BOSS_AURA_TEX = PIXI.Texture.from(c);
+  return _BOSS_AURA_TEX;
+}
+
 /* ───────── PARTICLE TEX (white round dot for fxBurst, tinted at runtime) ─────── */
 let _PARTICLE_TEX = null;
 export function getParticleTexture(){
