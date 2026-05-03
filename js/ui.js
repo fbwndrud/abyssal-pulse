@@ -9,7 +9,7 @@ import {
 import { AUDIO } from './audio.js';
 import { withDrawCtx } from './render.js';
 import {
-  shake, flash,
+  shake, flash, clearAllWorldSprites,
 } from './entities.js';
 import {
   CLASSES, PASSIVES, ENEMIES, UPGRADE_TIERS, SHOP_ITEMS,
@@ -681,6 +681,7 @@ export function updateHUD(){
    RUN LIFECYCLE
    =================================================================== */
 export function startRun(classKey){
+  clearAllWorldSprites();
   G.ents = []; G.t = 0; G.spawnTimer = 0; G.combo=0; G.comboTimer=0;
   G.killCount = 0; G.coinsRun = 0; G.bossActive=null; G.bossTimer = 0;
   G.endReason = null; G.rerollCost = 3;

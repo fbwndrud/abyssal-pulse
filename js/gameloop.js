@@ -17,6 +17,7 @@ import {
   makeEnt, fxBurst, fxRing, fxText, fxShockwave, fxLine, shake, flash,
   spawnEnemy, spawnBoss, spawnCoin,
   fireProjectile, dealDamage, nearestEnemy,
+  detachSprite,
 } from './entities.js';
 import {
   damagePlayer, applyItem, dropItem,
@@ -215,11 +216,26 @@ export function update(){
       }
     }
     if(G.superMagnetTimer > 0) G.superMagnetTimer -= G.dt;
+    _syncEntitySprite(e);
   }
   updateEnemyBullets();
   updateCamera();
-  // cleanup — swap-and-pop
-  { const arr = G.ents; let wi = 0; for(let ri = 0; ri < arr.length; ri++){ if(arr[ri].alive) arr[wi++] = arr[ri]; } arr.length = wi; }
+  // player sprite sync (player is not in G.ents)
+  if(p && p.sprite){
+    p.sprite.position.set(p.x, p.y);
+    p.sprite.rotation = p.rot;
+    p.dotSprite.position.set(p.x, p.y);
+    if(p.invuln > 0 && (Math.floor(G.realT*16)%2===0)){
+      p.sprite.alpha = 0.35; p.dotSprite.alpha = 0.35;
+    } else {
+      p.sprite.alpha = 1; p.dotSprite.alpha = 1;
+    }
+  }
+  // cleanup — swap-and-pop, detach sprites for dying entities
+  { const arr = G.ents; let wi = 0; for(let ri = 0; ri < arr.length; ri++){
+      if(arr[ri].alive){ arr[wi++] = arr[ri]; }
+      else { detachSprite(arr[ri]); }
+    } arr.length = wi; }
   G.shake = Math.max(0, G.shake * Math.pow(.001, G.dt));
   G.flash = Math.max(0, G.flash - G.dt * .8);
   if(G.comboTimer > 0){ G.comboTimer -= G.dt; if(G.comboTimer <= 0) G.combo = 0; }
@@ -445,6 +461,36 @@ function updateEnemyBullets(){
         b.alive = false;
       }
     }
+    if(b.alive && b.sprite) b.sprite.position.set(b.x, b.y);
+  }
+}
+
+/* ───────── SPRITE SYNC ─────────
+   Called once per frame per alive entity at the end of the update loop.
+   Position mirrors e.x/e.y; rotation and texture-swap (hitFlash) are
+   type-specific. Types not yet migrated to sprites (fx/ring/shock/etc.)
+   have no e.sprite and fall through. */
+function _syncEntitySprite(e){
+  const sp = e.sprite;
+  if(!sp) return;
+  if(e.type === 'ebullet') return; // synced inside updateEnemyBullets after position update
+  sp.position.set(e.x, e.y);
+  if(e.type === 'enemy'){
+    sp.rotation = e.rot;
+    const wantFlash = e.hitFlash > 0;
+    if(wantFlash && e.__flashTex && sp.texture !== e.__flashTex.texture) sp.texture = e.__flashTex.texture;
+    else if(!wantFlash && e.__normTex && sp.texture !== e.__normTex.texture) sp.texture = e.__normTex.texture;
+  } else if(e.type === 'proj'){
+    sp.rotation = e.subtype === 'shuriken' ? e.spin : Math.atan2(e.vy, e.vx);
+  } else if(e.type === 'xp')     sp.rotation = G.realT * 3;
+  else   if(e.type === 'coin')   sp.rotation = G.realT * 4;
+  else   if(e.type === 'magnet') sp.rotation = G.realT * 2;
+  else   if(e.type === 'freeze') sp.rotation = G.realT;
+  else   if(e.type === 'chest')  sp.rotation = G.realT * 1.2;
+  else   if(e.type === 'item'){
+    sp.rotation = G.realT * 0.72;
+    const pulseV = 1 + Math.sin(G.realT*4)*.12;
+    sp.scale.set(pulseV);
   }
 }
 

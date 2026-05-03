@@ -4,13 +4,16 @@
    Installs the kill hook in entities.js so killEnemy can drop XP/items
    without entities.js having to import data.js.
    =================================================================== */
-import { G, W, H, C, TAU, rand, meta, saveMeta, saveMetaLater, announce } from './core.js';
+import { G, W, H, C, TAU, rand, meta, saveMeta, saveMetaLater, announce, entityLayer } from './core.js';
 import { AUDIO } from './audio.js';
 import {
   makeEnt, fxBurst, fxRing, fxText, shake, flash,
   spawnXP, spawnCoin, spawnHeart, spawnMagnet, spawnFreeze, spawnChest, spawnEnemy,
   setOnKillHook,
 } from './entities.js';
+import {
+  getCircleTexture, getPolygonTexture, acquireSprite, releaseSprite,
+} from './render.js';
 import {
   CLASSES, PASSIVES, ITEMS, ITEM_TIERS, SYNERGIES, itemsByTier,
 } from './data.js';
@@ -52,6 +55,24 @@ export function spawnPlayer(classKey){
   p.maxHp += meta.shop.hp * 20;
   p.hp = p.maxHp;
   G.player = p;
+  // PIXI sprites — body + center dot. Trail/halo are dynamic (Graphics, Step 5).
+  let bodyTex;
+  if(p.sides === 0){
+    bodyTex = getCircleTexture(p.r, p.color, 22, 'hsla(180 80% 8% / .6)', 2.6);
+  } else {
+    bodyTex = getPolygonTexture(p.sides, p.r, p.color, 20, 'rgba(0,0,0,.4)', 2.4);
+  }
+  const dotGlow = p.sides === 0 ? 18 : 12;
+  const dotLW   = p.sides === 0 ? 1.4 : 1.2;
+  const dotR    = p.sides === 0 ? p.r * .45 : p.r * .35;
+  const dotTex  = getCircleTexture(dotR, '#ffffff', dotGlow, p.color, dotLW);
+  p.__bodyKey = bodyTex.key; p.__dotKey = dotTex.key;
+  p.sprite = acquireSprite(bodyTex.key, bodyTex.texture);
+  p.dotSprite = acquireSprite(dotTex.key, dotTex.texture);
+  p.sprite.position.set(p.x, p.y);
+  p.dotSprite.position.set(p.x, p.y);
+  entityLayer.addChild(p.sprite);
+  entityLayer.addChild(p.dotSprite);
   // Snap camera to the player on spawn — without this the run starts with
   // the camera at (0,0) lerping toward the player, which leaves the player
   // visibly off-center for the first ~1 second.

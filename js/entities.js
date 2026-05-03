@@ -3,14 +3,128 @@
    This is the bottom of the game-logic stack: weapons.js calls into here
    (firePulse / fireProjectile / fxBurst / etc), and player.js calls dealDamage.
    =================================================================== */
-import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce } from './core.js';
+import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce, entityLayer } from './core.js';
 import { AUDIO } from './audio.js';
+import {
+  getCircleTexture, getPolygonTexture, getStarTexture, getDiamondTexture,
+  acquireSprite, releaseSprite,
+} from './render.js';
 
 /* ───────── ENTITY BASE ───────── */
 export function makeEnt(props){
   const e = Object.assign({alive:true, t:0}, props);
   G.ents.push(e);
+  _autoAttachSprite(e);
   return e;
+}
+
+function _autoAttachSprite(e){
+  switch(e.type){
+    case 'enemy':   _attachEnemySprite(e); break;
+    case 'proj':    _attachProjectileSprite(e); break;
+    case 'ebullet': _attachEnemyBulletSprite(e); break;
+    case 'xp': case 'coin': case 'heart': case 'magnet':
+    case 'freeze': case 'chest': case 'item':
+      _attachPickupSprite(e); break;
+    // fx / ring / shock / line / fan / text / blackhole — handled in Step 5 (PIXI.Graphics)
+  }
+}
+
+/* ───────── SPRITE ATTACHMENT ─────────
+   Each visual entity gets a PIXI.Sprite from the pool, added to entityLayer.
+   Position/rotation are synced each frame in gameloop.update(). On entity
+   death (alive=false), the cleanup pass calls detachSprite() to return it. */
+export function attachSpriteFromTexInfo(e, texInfo){
+  e.__texKey = texInfo.key;
+  e.sprite = acquireSprite(texInfo.key, texInfo.texture);
+  e.sprite.position.set(e.x, e.y);
+  entityLayer.addChild(e.sprite);
+}
+export function detachSprite(e){
+  if(!e.sprite) return;
+  releaseSprite(e.__texKey, e.sprite);
+  e.sprite = null;
+  e.__texKey = null;
+  e.__normTex = null;
+  e.__flashTex = null;
+}
+
+/* Detach all entity + player sprites. Called by startRun to avoid sprite leaks
+   when a run restarts (G.ents is cleared and a new player spawns). */
+export function clearAllWorldSprites(){
+  for(const e of G.ents) detachSprite(e);
+  const p = G.player;
+  if(p){
+    if(p.sprite){ releaseSprite(p.__bodyKey, p.sprite); p.sprite = null; }
+    if(p.dotSprite){ releaseSprite(p.__dotKey, p.dotSprite); p.dotSprite = null; }
+  }
+}
+
+function _attachEnemySprite(e){
+  const isBoss = !!e.isBoss;
+  const glow = isBoss ? 14 : 6;
+  const lw = isBoss ? 3 : 2;
+  const fillNorm = 'rgba(8,14,30,.55)';
+  const fillFlash = 'rgba(255,255,255,.6)';
+  let normTex, flashTex;
+  if(e.isDiamond){
+    normTex  = getDiamondTexture(e.r, e.color, glow, fillNorm);
+    flashTex = getDiamondTexture(e.r, '#ffffff', glow, fillFlash);
+  } else if(e.sides === 0){
+    normTex  = getCircleTexture(e.r, e.color, glow, fillNorm, lw);
+    flashTex = getCircleTexture(e.r, '#ffffff', glow, fillFlash, lw);
+  } else {
+    normTex  = getPolygonTexture(e.sides, e.r, e.color, glow, fillNorm, lw);
+    flashTex = getPolygonTexture(e.sides, e.r, '#ffffff', glow, fillFlash, lw);
+  }
+  e.__normTex = normTex;
+  e.__flashTex = flashTex;
+  attachSpriteFromTexInfo(e, normTex);
+}
+
+function _attachProjectileSprite(e){
+  let texInfo;
+  if(e.subtype === 'shuriken')     texInfo = getStarTexture(4, 14, 6, e.color, 8, e.color, 1.6);
+  else if(e.subtype === 'homing')  texInfo = getDiamondTexture(8, e.color, 6, e.color);
+  else if(e.subtype === 'prism')   texInfo = getPolygonTexture(3, 8, e.color, 6, e.color, 1.6);
+  else                             texInfo = getCircleTexture(4, e.color, 6, e.color, 1);
+  attachSpriteFromTexInfo(e, texInfo);
+}
+
+function _attachEnemyBulletSprite(e){
+  const tex = getCircleTexture(e.r, e.color, 6, e.color, 1.4);
+  attachSpriteFromTexInfo(e, tex);
+}
+
+function _attachPickupSprite(e){
+  let texInfo;
+  if(e.type === 'xp'){
+    texInfo = getDiamondTexture(e.r, e.color, 6, e.color);
+  } else if(e.type === 'coin'){
+    texInfo = getDiamondTexture(e.r, C.gold, 8, C.gold);
+  } else if(e.type === 'magnet'){
+    texInfo = getStarTexture(4, e.r, e.r*.4, C.pink, 8, C.pink, 1.6);
+  } else if(e.type === 'freeze'){
+    texInfo = getStarTexture(6, e.r, e.r*.5, C.teal, 8, C.teal, 1.6);
+  } else if(e.type === 'chest'){
+    texInfo = getStarTexture(5, e.r*1.4, e.r*.6, C.gold, 10, 'hsla(50 90% 20% / .7)', 2);
+  } else if(e.type === 'heart'){
+    // Heart bezier shape isn't a regular polygon; approximate with a small filled circle.
+    // (Visual regression: heart icon → red dot. Acceptable for a rare drop.)
+    texInfo = getCircleTexture(e.r * 1.1, C.red, 8, C.red, 1.4);
+  } else if(e.type === 'item'){
+    const col = e.color || C.gold;
+    const glow = e.glow || 18;
+    const isRelic = e.item && e.item.kind === 'relic';
+    if(isRelic){
+      texInfo = getPolygonTexture(6, e.r * 1.25, col, glow * .5, 'rgba(0,0,0,.35)', 1.6);
+    } else {
+      texInfo = getDiamondTexture(e.r * 1.2, col, glow * .5, 'rgba(0,0,0,.35)');
+    }
+  } else {
+    texInfo = getCircleTexture(e.r, '#ffffff', 6, '#ffffff', 1);
+  }
+  attachSpriteFromTexInfo(e, texInfo);
 }
 
 /* ───────── SPATIAL HASH GRID (enemies only) ───────── */
