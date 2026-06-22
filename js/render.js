@@ -416,12 +416,136 @@ function _makeGridTexture(){
   const cv = document.createElement('canvas');
   cv.width = g; cv.height = g;
   const cx2 = cv.getContext('2d');
-  cx2.strokeStyle = 'rgba(214,168,79,.08)';
+  cx2.strokeStyle = 'rgba(214,168,79,.035)';
   cx2.lineWidth = 1;
   cx2.beginPath();
   cx2.moveTo(0, 0); cx2.lineTo(g, 0);
   cx2.moveTo(0, 0); cx2.lineTo(0, g);
   cx2.stroke();
+  return PIXI.Texture.from(cv);
+}
+function _seededRand(seed){
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function _makeFloorTexture(biomeKey){
+  const sz = 256;
+  const cv = document.createElement('canvas');
+  cv.width = sz; cv.height = sz;
+  const c2 = cv.getContext('2d');
+  const style = {
+    nave: {
+      seed: 12031,
+      base:'#130b08', tile:'#20140f', seam:'rgba(216,199,161,.12)',
+      dust:'rgba(216,199,161,.18)', crack:'rgba(5,3,2,.78)', glow:'rgba(214,168,79,.16)',
+    },
+    crypt: {
+      seed: 41191,
+      base:'#080d10', tile:'#121820', seam:'rgba(73,199,255,.09)',
+      dust:'rgba(216,199,161,.16)', crack:'rgba(3,5,8,.84)', glow:'rgba(73,199,255,.18)',
+    },
+    hellforge: {
+      seed: 88661,
+      base:'#110504', tile:'#1e0a07', seam:'rgba(240,106,36,.10)',
+      dust:'rgba(240,106,36,.18)', crack:'rgba(0,0,0,.9)', glow:'rgba(240,106,36,.34)',
+    },
+  }[biomeKey] || null;
+  const s = style || {
+    seed: 12031, base:'#130b08', tile:'#20140f', seam:'rgba(216,199,161,.12)',
+    dust:'rgba(216,199,161,.18)', crack:'rgba(5,3,2,.78)', glow:'rgba(214,168,79,.16)',
+  };
+  const rnd = _seededRand(s.seed);
+  c2.fillStyle = s.base;
+  c2.fillRect(0, 0, sz, sz);
+
+  const tile = biomeKey === 'crypt' ? 48 : 64;
+  for(let y = -tile; y < sz + tile; y += tile){
+    for(let x = -tile; x < sz + tile; x += tile){
+      const ox = Math.round((rnd() - .5) * 8);
+      const oy = Math.round((rnd() - .5) * 8);
+      const w = tile + Math.round((rnd() - .5) * 10);
+      const h = tile + Math.round((rnd() - .5) * 10);
+      c2.fillStyle = s.tile;
+      c2.globalAlpha = .42 + rnd() * .18;
+      c2.fillRect(x + ox, y + oy, w, h);
+      c2.globalAlpha = 1;
+      c2.strokeStyle = s.seam;
+      c2.lineWidth = 1;
+      c2.strokeRect(x + ox + .5, y + oy + .5, w - 1, h - 1);
+    }
+  }
+
+  for(let i = 0; i < 180; i++){
+    const x = rnd() * sz, y = rnd() * sz;
+    const r = .4 + rnd() * 1.4;
+    c2.globalAlpha = .18 + rnd() * .24;
+    c2.fillStyle = rnd() > .7 ? s.dust : '#000';
+    c2.beginPath(); c2.arc(x, y, r, 0, TAU); c2.fill();
+  }
+  c2.globalAlpha = 1;
+
+  for(let i = 0; i < 16; i++){
+    let x = rnd() * sz, y = rnd() * sz;
+    c2.beginPath();
+    c2.moveTo(x, y);
+    const steps = 3 + Math.floor(rnd() * 5);
+    for(let j = 0; j < steps; j++){
+      x += (rnd() - .5) * 46;
+      y += (rnd() - .5) * 46;
+      c2.lineTo(x, y);
+    }
+    c2.strokeStyle = s.crack;
+    c2.lineWidth = .7 + rnd() * 1.2;
+    c2.stroke();
+    if(biomeKey === 'hellforge' && rnd() > .45){
+      c2.save();
+      c2.globalCompositeOperation = 'lighter';
+      c2.strokeStyle = s.glow;
+      c2.lineWidth = 3.5;
+      c2.stroke();
+      c2.restore();
+    }
+  }
+
+  if(biomeKey === 'nave'){
+    c2.strokeStyle = 'rgba(214,168,79,.16)';
+    c2.lineWidth = 2;
+    for(let x = 28; x < sz; x += 64){
+      c2.beginPath();
+      c2.moveTo(x, 0); c2.lineTo(x + 18, sz);
+      c2.stroke();
+    }
+    c2.fillStyle = 'rgba(184,24,47,.12)';
+    c2.fillRect(112, 0, 8, sz);
+    c2.fillRect(136, 0, 8, sz);
+  } else if(biomeKey === 'crypt'){
+    c2.strokeStyle = 'rgba(216,199,161,.16)';
+    c2.lineWidth = 1.4;
+    for(let i = 0; i < 18; i++){
+      const x = rnd() * sz, y = rnd() * sz, a = rnd() * TAU;
+      c2.save();
+      c2.translate(x, y); c2.rotate(a);
+      c2.beginPath(); c2.moveTo(-8, 0); c2.lineTo(8, 0); c2.stroke();
+      c2.beginPath(); c2.arc(-10, 0, 2.5, 0, TAU); c2.arc(10, 0, 2.5, 0, TAU); c2.stroke();
+      c2.restore();
+    }
+  } else if(biomeKey === 'hellforge'){
+    c2.save();
+    c2.globalCompositeOperation = 'lighter';
+    c2.fillStyle = 'rgba(184,24,47,.10)';
+    for(let i = 0; i < 12; i++){
+      c2.beginPath();
+      c2.arc(rnd() * sz, rnd() * sz, 8 + rnd() * 20, 0, TAU);
+      c2.fill();
+    }
+    c2.restore();
+  }
+
   return PIXI.Texture.from(cv);
 }
 function _makePlayerGlowTexture(){
@@ -466,6 +590,8 @@ export const BG = {
   gradSprite: null,
   starSprites: [],
   gridSprite: null,
+  floorSprite: null,
+  floorTextures: null,
   playerGlow: null,
   init(){
     this.stars = [];
@@ -484,6 +610,15 @@ export const BG = {
     this.bakeGradient('nave');
     this.gradSprite = new PIXI.Sprite(PIXI.Texture.from(gc));
     bgC.addChild(this.gradSprite);
+
+    this.floorTextures = {
+      nave: _makeFloorTexture('nave'),
+      crypt: _makeFloorTexture('crypt'),
+      hellforge: _makeFloorTexture('hellforge'),
+    };
+    this.floorSprite = new PIXI.TilingSprite({ texture: this.floorTextures.nave, width: W, height: H });
+    this.floorSprite.alpha = .82;
+    bgC.addChild(this.floorSprite);
 
     // 4-quad star parallax — tile to cover screen with positive offsets too
     for(let i = 0; i < 4; i++){
@@ -515,6 +650,9 @@ export const BG = {
       // Tell PIXI the source canvas changed
       this.gradSprite.texture.source.update();
     }
+    if(this.floorSprite && this.floorTextures){
+      this.floorSprite.texture = this.floorTextures[biomeKey] || this.floorTextures.nave;
+    }
   },
   tick(){
     const biomeKey = !G.player ? 'nave' : (G.t < 300 ? 'nave' : (G.t < 600 ? 'crypt' : 'hellforge'));
@@ -535,14 +673,20 @@ export const BG = {
     for(let i = 0; i < 4; i++){
       const sp = this.starSprites[i];
       sp.position.set(positions[i][0], positions[i][1]);
-      sp.alpha = a;
+      sp.alpha = biomeKey === 'nave' ? a * .42 : (biomeKey === 'crypt' ? a * .34 : a * .5);
+    }
+
+    if(this.floorSprite){
+      this.floorSprite.tilePosition.x = -G.cam.x * .88;
+      this.floorSprite.tilePosition.y = -G.cam.y * .88;
+      this.floorSprite.alpha = biomeKey === 'hellforge' ? .9 : .82;
     }
 
     // grid: tilePosition is the offset of the tile pattern
     if(this.gridSprite){
       this.gridSprite.tilePosition.x = -G.cam.x;
       this.gridSprite.tilePosition.y = -G.cam.y;
-      this.gridSprite.alpha = biomeKey === 'hellforge' ? .55 : .38;
+      this.gridSprite.alpha = biomeKey === 'hellforge' ? .18 : .10;
     }
 
     // player glow follows player in screen space (player is camera-centered)

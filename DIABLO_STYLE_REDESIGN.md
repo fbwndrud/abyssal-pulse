@@ -23,6 +23,8 @@
 - `RIFT WARDEN`, `HOLLOW IMP`, `GRAVE BRUTE`, `ASHEN BUTCHER`를 생성형 투명 PNG 스프라이트로 교체
 - `Bone Shards`, `Hellfire Cross`, `Spectral Blades` 투사체 PNG 적용
 - PixiJS 렌더러는 PNG 에셋 우선, 기존 도형 텍스처 폴백 구조 유지
+- `RUINED NAVE`, `BONE CRYPT`, `HELLFORGE RIFT` 전투 맵을 절차적 석재/납골/지옥 균열 바닥으로 교체
+- 레벨업 선택창을 `ALTAR OF BOONS` 제단 카드 UI로 리디자인하고, 클래스/상점/룬 소켓 오버레이 프레임 통일
 - 후속 P1: `BLOOD SEER`, `GRAVE BULWARK`, `IRON EXILE`, `HEX WITCH`, 나머지 일반 적과 보스 이미지 확장
 
 ---

@@ -27,6 +27,8 @@ The game keeps the original horde-survivor roguelite loop while shifting the fan
 
 - Exile classes with distinct starting skills
 - Generated gothic PNG sprites for Rift Warden, Hollow Imp, Grave Brute, Ashen Butcher, Bone Shards, Hellfire Cross, and Spectral Blades
+- Procedural dungeon floor maps for Ruined Nave, Bone Crypt, and Hellforge Rift
+- Gothic altar-style skill selection cards and matching dark sanctuary overlays
 - Rune awakenings and legendary skill awakenings
 - Relic, rune, and cursed altar progression
 - Elite affix monsters such as Molten, Frostbound, and Void-Touched

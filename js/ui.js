@@ -400,6 +400,7 @@ function renderLevelupCards(){
       desc = `${f.desc}<br><span style="color:#ffd96b">각성 재료: ${f.sourceA} + ${f.sourceB}</span><br><span style="color:#9eff5b">두 스킬 흡수 → Lv.1 전설 스킬</span>`;
     }
     el.className = 'card rarity-' + rarityClass + (card.type==='evolve'?' evo':'') + (card.type==='fuse'?' fuse':'') + (card.type==='glyph_pick'?' glyph':'') + (card.type==='shrine_pick'?' shrine':'');
+    el.style.setProperty('--accent', color);
     let tierLabel;
     if(card.type === 'evolve') tierLabel = `<div class="tier-label" style="color:#49c7ff;text-shadow:0 0 14px rgba(73,199,255,.9)">▲ RUNE · 각성</div>`;
     else if(card.type === 'fuse') tierLabel = `<div class="tier-label" style="color:#b8182f;text-shadow:0 0 14px rgba(184,24,47,.9)">★ AWAKEN · 전설</div>`;
