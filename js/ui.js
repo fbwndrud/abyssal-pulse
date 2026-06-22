@@ -184,7 +184,7 @@ function passivePreviewRows(passiveKey, mult, currentLv, p){
       rows.push({ key:'+', text:`...+${matches.length-2} 더` });
     }
   } else if(p) {
-    rows.push({ key:'EVO', text:'<span style="color:#7d96b4">관련 무기 미보유</span>' });
+    rows.push({ key:'RUNE', text:'<span style="color:#7d96b4">관련 스킬 미보유</span>' });
   }
   return rows;
 }
@@ -236,15 +236,15 @@ export function doLevelUp(forceNoXpReset=false){
 // keep growing past the content cap, but the +%/level is small (5-12% scaled by
 // rarity) so it doesn't trivialize the mid-game weapon/passive picks.
 const STAT_UPS = {
-  dmg:   { label:'+ POWER',   tag:'STAT', color:C.red,    desc:'전 무기 데미지 영구 +5%',
+  dmg:   { label:'+ WRATH',   tag:'STAT', color:C.red,    desc:'전 스킬 데미지 영구 +5%',
            apply:(p,m)=>{ p.dmgMul *= (1 + .05*m); } },
-  area:  { label:'+ REACH',   tag:'STAT', color:C.violet, desc:'효과 범위 영구 +5%',
+  area:  { label:'+ DOMINION',tag:'STAT', color:C.violet, desc:'효과 범위 영구 +5%',
            apply:(p,m)=>{ p.areaMul *= (1 + .05*m); } },
-  cd:    { label:'+ CADENCE', tag:'STAT', color:C.gold,   desc:'발사 속도 영구 +5%',
+  cd:    { label:'+ ZEAL',    tag:'STAT', color:C.gold,   desc:'발사 속도 영구 +5%',
            apply:(p,m)=>{ p.cdMul *= (1 + .05*m); } },
-  speed: { label:'+ HASTE',   tag:'STAT', color:C.cyan,   desc:'이동 속도 영구 +4%',
+  speed: { label:'+ FLEET',   tag:'STAT', color:C.cyan,   desc:'이동 속도 영구 +4%',
            apply:(p,m)=>{ p.speed *= (1 + .04*m); } },
-  hp:    { label:'+ SOUL',    tag:'STAT', color:C.lime,   desc:'최대 HP 영구 +15, 회복',
+  hp:    { label:'+ VITALITY',tag:'STAT', color:C.lime,   desc:'최대 HP 영구 +15, 회복',
            apply:(p,m)=>{ const inc = Math.round(15*m); p.maxHp += inc; p.hp = Math.min(p.maxHp, p.hp + inc); } },
 };
 function pickLevelupCards(p, n=3){
@@ -353,7 +353,7 @@ function renderLevelupCards(){
       statTable = renderStatTable(passivePreviewRows(card.key, mult, curLv, p));
     }
     else if(card.type === 'heal'){
-      title = 'REPAIR'; tag='HEAL'; color=C.red;
+      title = 'BLOOD REST'; tag='HEAL'; color=C.red;
       const heal = Math.round(p.maxHp * 0.5 * mult);
       desc = `HP +${heal} <span style="color:#7d96b4">(50%${mult!==1?` ×${mult.toFixed(2)}`:''})</span>`;
     }
@@ -363,49 +363,50 @@ function renderLevelupCards(){
       desc = `<span style="color:#cfeaff">${su.desc}${mult!==1?` <span style="color:#9eff5b">×${mult.toFixed(2)}</span>`:''}</span>`;
     }
     else if(card.type === 'gold'){
-      title = 'CORE CACHE'; tag='GOLD'; color=C.gold;
+      title = 'COFFER OF CORES'; tag='GOLD'; color=C.gold;
       const amt = Math.round(10 * mult);
       desc = `+${amt} ◆${mult!==1?` <span style="color:#7d96b4">(×${mult.toFixed(2)})</span>`:''}`;
     }
     else if(card.type === 'evolve'){
       const e = card.evo; const w = p.weapons.find(w=>w.key===card.key);
-      title = e.name; color = e.color; tag = '▲ EVO';
+      title = e.name; color = e.color; tag = '▲ RUNE';
       const reqs = e.req.map(r => PASSIVES[r].name).join(' + ');
-      desc = `${e.desc}<br><span style="color:#ffd96b">재료: ${reqs}</span><br><span style="color:#9eff5b">→ 무기 슬롯이 변형됩니다</span>`;
+      desc = `${e.desc}<br><span style="color:#ffd96b">룬 조건: ${reqs}</span><br><span style="color:#9eff5b">→ 스킬 슬롯이 각성됩니다</span>`;
       if(w) statTable = renderStatTable(evolutionRows(w, e));
     }
     else if(card.type === 'item_pick'){
       const it = card.item;
       title = it.name; color = ITEM_TIERS[it.tier].color;
-      tag = it.kind === 'relic' ? '◈ 유물' : '◇ 아이템';
+      tag = it.kind === 'relic' ? '◈ RELIC' : '◇ LOOT';
       desc = `<span style="color:#cfeaff">${it.desc}</span><br><span style="color:#7d96b4">${it.kind === 'relic' ? '영구 효과' : '일회성 사용'}</span>`;
     }
     else if(card.type === 'glyph_pick'){
       const g = card.glyph;
       const stackCount = (p.glyphs||[]).filter(id => id === g.id).length;
-      title = g.name; color = g.color; tag = '▽ 글리프';
-      const stackLabel = stackCount > 0 ? `<br><span style="color:#9eff5b">현재 ${stackCount}중첩 — 픽 시 누적</span>` : '<br><span style="color:#9eff5b">이번 런 영구 (보스 처치 보상)</span>';
+      title = g.name; color = g.color; tag = '▽ RUNE';
+      const stackLabel = stackCount > 0 ? `<br><span style="color:#9eff5b">현재 ${stackCount}중첩 — 픽 시 누적</span>` : '<br><span style="color:#9eff5b">이번 원정 영구 (심연 보스 보상)</span>';
       desc = `<span style="color:#cfeaff">${g.desc}</span>${stackLabel}`;
     }
     else if(card.type === 'shrine_pick'){
       const s = card.shrine;
       const affordable = meta.coins >= card.cost;
-      title = s.name; color = s.color; tag = '◈ 제단';
+      title = s.name; color = s.color; tag = '◈ ALTAR';
       const costLine = `<br><span style="color:${affordable?'#ffd400':'#ff6464'};font-weight:900">◆ ${card.cost} ${affordable?'':'(코인 부족)'}</span>`;
       desc = `<span style="color:#cfeaff">${s.desc}</span>${costLine}`;
     }
     else if(card.type === 'fuse'){
       const f = card.fuse;
-      title = f.name; color = f.color; tag = '★ FUSE';
-      desc = `${f.desc}<br><span style="color:#ffd96b">재료: ${f.sourceA} + ${f.sourceB}</span><br><span style="color:#9eff5b">두 무기 흡수 → Lv.1 새 무기</span>`;
+      title = f.name; color = f.color; tag = '★ AWAKEN';
+      desc = `${f.desc}<br><span style="color:#ffd96b">각성 재료: ${f.sourceA} + ${f.sourceB}</span><br><span style="color:#9eff5b">두 스킬 흡수 → Lv.1 전설 스킬</span>`;
     }
     el.className = 'card rarity-' + rarityClass + (card.type==='evolve'?' evo':'') + (card.type==='fuse'?' fuse':'') + (card.type==='glyph_pick'?' glyph':'') + (card.type==='shrine_pick'?' shrine':'');
     let tierLabel;
-    if(card.type === 'evolve') tierLabel = `<div class="tier-label" style="color:#00e5ff;text-shadow:0 0 14px rgba(0,229,255,.9)">▲ EVOLVE · 진화</div>`;
-    else if(card.type === 'fuse') tierLabel = `<div class="tier-label" style="color:#ff3dcb;text-shadow:0 0 14px rgba(255,61,203,.9)">★ FUSE · 융합</div>`;
-    else if(card.type === 'glyph_pick') tierLabel = `<div class="tier-label" style="color:${card.glyph.color};text-shadow:0 0 14px ${card.glyph.color}">▽ GLYPH · 보스 보상</div>`;
-    else if(card.type === 'shrine_pick') tierLabel = `<div class="tier-label" style="color:${card.shrine.color};text-shadow:0 0 14px ${card.shrine.color}">◈ SHRINE · 즉시 헌납</div>`;
-    else if(card.type === 'pas') tierLabel = `<div class="tier-label" style="color:${PASSIVES[card.key].color};text-shadow:0 0 10px ${PASSIVES[card.key].color}">◇ GATE · 진화 게이트</div>`;
+    if(card.type === 'evolve') tierLabel = `<div class="tier-label" style="color:#49c7ff;text-shadow:0 0 14px rgba(73,199,255,.9)">▲ RUNE · 각성</div>`;
+    else if(card.type === 'fuse') tierLabel = `<div class="tier-label" style="color:#b8182f;text-shadow:0 0 14px rgba(184,24,47,.9)">★ AWAKEN · 전설</div>`;
+    else if(card.type === 'glyph_pick') tierLabel = `<div class="tier-label" style="color:${card.glyph.color};text-shadow:0 0 14px ${card.glyph.color}">▽ BOSS RUNE · 심연 보상</div>`;
+    else if(card.type === 'shrine_pick') tierLabel = `<div class="tier-label" style="color:${card.shrine.color};text-shadow:0 0 14px ${card.shrine.color}">◈ CURSED ALTAR · 즉시 헌납</div>`;
+    else if(card.type === 'pas') tierLabel = `<div class="tier-label" style="color:${PASSIVES[card.key].color};text-shadow:0 0 10px ${PASSIVES[card.key].color}">◇ VIRTUE · 룬 조건</div>`;
+    else if(card.type === 'item_pick') tierLabel = `<div class="tier-label" style="color:${ITEM_TIERS[card.item.tier].color};text-shadow:0 0 12px ${ITEM_TIERS[card.item.tier].glow}">${card.item.tier.toUpperCase()} · ${card.item.kind.toUpperCase()}</div>`;
     else if(card.tier) tierLabel = `<div class="tier-label" style="color:${card.tier.color};text-shadow:0 0 10px ${card.tier.glow}">${card.tier.label}${(card.mult && card.mult !== 1)?' · ×'+card.mult.toFixed(2):''}</div>`;
     else tierLabel = '';
     el.innerHTML = `<div class="tag">${tag}</div>
@@ -600,7 +601,7 @@ export function openChestPick(){
   const seen = new Set();
   const cards = [];
   for(let attempts = 0; attempts < 40 && cards.length < 3; attempts++){
-    const it = pickRandomItem((p.luck||0) + .2, ['common','rare','legendary'], 'relic');
+    const it = pickRandomItem((p.luck||0) + .2, ['rare','epic','legendary'], 'relic');
     if(it && !seen.has(it.id)){
       seen.add(it.id);
       cards.push({type:'item_pick', item:it, rarity: it.tier === 'legendary' ? 'legend' : it.tier});
@@ -652,9 +653,9 @@ function updateProgressionGuide(p){
     if(w.isFusion) continue;  // fusions can't re-evolve
     if(w.evolved){
       evoRows.push({ sortKey: 3, html:
-        `<div class="pg-row evo locked" title="${w.def.name} — 이미 진화됨: ${w.evoName||''}">
+        `<div class="pg-row evo locked" title="${w.def.name} — 이미 각성됨: ${w.evoName||''}">
           <div class="pg-name" style="color:${w.color||w.def.color}">${w.def.name} ✓</div>
-          <div class="pg-meta">진화 완료: ${w.evoName||'(이름 없음)'}</div>
+          <div class="pg-meta">각성 완료: ${w.evoName||'(이름 없음)'}</div>
         </div>` });
       continue;
     }
@@ -678,7 +679,7 @@ function updateProgressionGuide(p){
     const lvStr = atMax ? `<span class="ok">Lv.${maxLv}✓</span>` : `<span class="lvl">Lv.${w.level}/${maxLv}</span>`;
     const cls = ready ? 'ready' : ((atMax || allReqsMet) ? 'partial' : 'locked');
     const sortKey = ready ? 0 : (atMax ? 1 : (allReqsMet ? 1 : 2));
-    const tip = `${w.def.name} → ${bestPath.name}\n조건: 무기 ${maxLv}렙 + ${bestPath.req.join('+')} 만렙`;
+    const tip = `${w.def.name} → ${bestPath.name}\n조건: 스킬 ${maxLv}렙 + ${bestPath.req.join('+')} 만렙`;
     evoRows.push({ sortKey, html:
       `<div class="pg-row evo ${cls}" title="${tip.replace(/"/g,'&quot;')}">
         <div class="pg-name" style="color:${w.def.color}">${w.def.name} → ${bestPath.name}</div>
@@ -703,10 +704,10 @@ function updateProgressionGuide(p){
     const stat = (key, has, evo, max, w) => {
       if(!has) return `<span class="miss">${key}없음</span>`;
       if(!max) return `<span class="lvl">${key}${w.level}/${w.def.maxLv}</span>`;
-      if(!evo) return `<span class="need">${key}진화필요</span>`;
+      if(!evo) return `<span class="need">${key}각성필요</span>`;
       return `<span class="ok">${key}✓</span>`;
     };
-    const tip = `${f.name} = ${f.sourceA} + ${f.sourceB}\n조건: 둘 다 만렙+진화 → 새 무기 Lv.1로 융합`;
+    const tip = `${f.name} = ${f.sourceA} + ${f.sourceB}\n조건: 둘 다 만렙+각성 → 새 전설 스킬 Lv.1`;
     fuseRows.push({ sortKey, html:
       `<div class="pg-row fuse ${cls}" title="${tip.replace(/"/g,'&quot;')}">
         <div class="pg-name" style="color:${f.color}">${f.name}</div>
@@ -717,8 +718,8 @@ function updateProgressionGuide(p){
   if(evoRows.length === 0 && fuseRows.length === 0){ root.style.display = 'none'; return; }
   evoRows.sort((x,y)=>x.sortKey - y.sortKey);
   fuseRows.sort((x,y)=>x.sortKey - y.sortKey);
-  evoList.innerHTML = evoRows.length ? evoRows.map(r=>r.html).join('') : '<div style="color:#5d7290;font-size:9px">무기 보유 시 표시</div>';
-  fuseList.innerHTML = fuseRows.length ? fuseRows.map(r=>r.html).join('') : '<div style="color:#5d7290;font-size:9px">2개 이상 무기 보유 시 표시</div>';
+  evoList.innerHTML = evoRows.length ? evoRows.map(r=>r.html).join('') : '<div style="color:#5d7290;font-size:9px">스킬 보유 시 표시</div>';
+  fuseList.innerHTML = fuseRows.length ? fuseRows.map(r=>r.html).join('') : '<div style="color:#5d7290;font-size:9px">2개 이상 스킬 보유 시 표시</div>';
   root.style.display = 'block';
 }
 
@@ -781,6 +782,8 @@ export function updateHUD(){
     ce.textContent = `×${G.combo} COMBO`;
     ce.classList.add('show');
   } else { ce.classList.remove('show'); }
+  const diff = document.getElementById('diff-chip');
+  if(diff) diff.textContent = 'RIFT · ' + (G.biomeName || 'RUINED NAVE');
   // Progression guide panel — right-side, always-visible during play. Throttled
   // since state only changes on level-up / evolve, not per frame.
   if(!_fgT || G.realT - _fgT > 0.4){
@@ -835,22 +838,22 @@ export function startRun(classKey){
   saveMeta();
   closeOverlay('menu-overlay'); closeOverlay('class-overlay');
   document.getElementById('menu-runs').textContent = meta.runs;
-  announce('SURVIVE 15:00', 1.6);
+  announce('SURVIVE THE RIFT 15:00', 1.6);
 }
 export function endRun(victory){
   if(G.mode === 'end') return;
   G.mode = 'end';
   G.endReason = victory ? 'victory' : 'death';
   document.getElementById('end-overlay').classList.remove('hidden');
-  document.getElementById('end-title').textContent = victory ? 'YOU SURVIVED' : 'CORE OFFLINE';
-  document.getElementById('end-text').textContent = victory ? '시스템 안정화. 금고에 코어 적립.' : '벡터가 붕괴되었습니다.';
+  document.getElementById('end-title').textContent = victory ? 'RIFT SEALED' : 'EXILE FALLEN';
+  document.getElementById('end-text').textContent = victory ? '심연이 봉인되었습니다. 전리품이 금고에 적립됩니다.' : '추방자가 균열 속에서 쓰러졌습니다.';
   const stats = document.getElementById('end-stats');
   stats.innerHTML = `
     <span>TIME</span><b>${fmtTime(G.t)}</b>
     <span>KILLS</span><b>${G.killCount}</b>
     <span>LEVEL</span><b>${G.player ? G.player.level : 1}</b>
     <span>CORES</span><b>◆ ${G.coinsRun}</b>
-    <span>VECTOR</span><b>${G.classChosen}</b>
+    <span>EXILE</span><b>${CLASSES[G.classChosen]?.name || G.classChosen}</b>
   `;
   if(G.t > meta.bestTime){ meta.bestTime = G.t|0; }
   meta.kills += G.killCount;
@@ -867,7 +870,7 @@ function unlockMilestones(){
     const need = CLASSES[k].unlock;
     if(meta.coins >= need && !meta.unlocked.includes(k)){
       meta.unlocked.push(k);
-      announce('UNLOCKED ' + k, 2);
+      announce('EXILE UNLOCKED · ' + CLASSES[k].name, 2);
     }
   }
 }
@@ -893,13 +896,13 @@ export function togglePause(){
     G.mode = 'pause';
     document.getElementById('pause-overlay').classList.remove('hidden');
     const p = G.player; if(!p) return;
-    let html = `<div><b>VECTOR:</b> ${G.classChosen} · LV ${p.level} · ${fmtTime(G.t)}</div>`;
-    html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">WEAPONS</div>';
+    let html = `<div><b>EXILE:</b> ${CLASSES[G.classChosen]?.name || G.classChosen} · LV ${p.level} · ${fmtTime(G.t)}</div>`;
+    html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">SKILLS</div>';
     for(const w of p.weapons){
       const tag = w.evolved ? ` <span style="color:#ff2bd6">▲ ${w.evoName||''}</span>` : '';
       html += `<div>· ${w.def.name} <span style="color:${w.color||w.def.color}">Lv.${w.level}</span>${tag}</div>`;
     }
-    html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">PASSIVES</div>';
+    html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">VIRTUES</div>';
     for(const k in p.passives) html += `<div>· ${PASSIVES[k].name} <span style="color:${PASSIVES[k].color}">Lv.${p.passives[k]}</span></div>`;
     if(Object.keys(p.passives).length===0) html += '<div style="color:#5d7290">(없음)</div>';
     // Relics — permanent pickups
@@ -937,7 +940,7 @@ export function toggleMute(){
   document.getElementById('mute-btn').textContent = AUDIO.isMuted() ? '×' : '♪';
 }
 export function confirmAbandon(){
-  if(confirm('이 런을 포기합니다.')){
+  if(confirm('이 균열 원정을 포기합니다.')){
     closeOverlay('pause-overlay');
     endRun(false);
   }
@@ -962,7 +965,7 @@ function buildClassPicker(){
     el.innerHTML = `<canvas width="80" height="80"></canvas>
       <div class="cname">${cl.name}</div>
       <div class="cdesc">${cl.desc}</div>
-      <div class="cstart">${locked ? '◆ ' + cl.unlock + ' 필요' : 'START: ' + WEAPONS[cl.startWeap].name}</div>`;
+      <div class="cstart">${locked ? '◆ ' + cl.unlock + ' 필요' : 'RIFT SKILL: ' + WEAPONS[cl.startWeap].name}</div>`;
     grid.appendChild(el);
     const cv = el.querySelector('canvas'); const cx = cv.getContext('2d');
     cx.translate(40,40);
@@ -1023,7 +1026,7 @@ function _chipCardHtml(chip, opts={}){
   const equippedTag = opts.equippedSlot != null ? `<div class="cequip">▣ ${opts.equippedSlot+1}</div>` : '';
   const stackTag = stack > 1 ? `<div class="cstack">×${stack}</div>` : '';
   const cls = 'chip tier-' + chip.tier + (opts.equipped ? ' equipped' : '') + (opts.fuseReady ? ' fuse-ready' : '') + (opts.empty ? ' empty' : '');
-  const fuseBtn = opts.fuseReady ? `<div class="cfuse" data-fuse="${chip.id}">★ FUSE → ${_CHIP_TIER_NEXT[chip.tier] ? CHIP_TIERS[_CHIP_TIER_NEXT[chip.tier]].label : '?'}</div>` : '';
+  const fuseBtn = opts.fuseReady ? `<div class="cfuse" data-fuse="${chip.id}">★ FORGE → ${_CHIP_TIER_NEXT[chip.tier] ? CHIP_TIERS[_CHIP_TIER_NEXT[chip.tier]].label : '?'}</div>` : '';
   // Effective-strength hint when stack > 1 — players can read "+5%/Lv" but a
   // ×4 stack means +20%, which is non-obvious without math. We surface a
   // small "현재" line that scales linear-equivalent values out of the desc.
@@ -1039,8 +1042,8 @@ function _chipCardHtml(chip, opts={}){
 }
 function _emptySlotHtml(slotIdx){
   return `<div class="chip empty" data-action="empty-slot" data-slot="${slotIdx}" style="width:160px">
-    <div class="cn" style="color:#5d7290">EMPTY SLOT ${slotIdx+1}</div>
-    <div class="cd" style="color:#5d7290">인벤토리에서 칩을 클릭해 장착</div>
+    <div class="cn" style="color:#5d7290">EMPTY SOCKET ${slotIdx+1}</div>
+    <div class="cd" style="color:#5d7290">룬 금고에서 룬을 클릭해 장착</div>
   </div>`;
 }
 function _chipFlash(name, tierKey){
@@ -1091,13 +1094,13 @@ function chipsetEquip(chipId){
   // shouldn't re-equip into another slot. Player must explicitly unequip first.
   const eq = meta.chips.equipped;
   if(eq.includes(chipId)){
-    _chipsetToast('이미 장착된 칩', '#9ab5d0');
+    _chipsetToast('이미 장착된 룬', '#9ab5d0');
     return;
   }
   const empty = eq.indexOf(null);
   if(empty < 0){
     // Slots full — refuse and tell the player. No silent overwrite.
-    _chipsetToast('슬롯이 가득 참 — 장착된 칩을 먼저 클릭해 빼세요', '#ff6464');
+    _chipsetToast('소켓이 가득 참 — 장착된 룬을 먼저 클릭해 빼세요', '#ff6464');
     return;
   }
   eq[empty] = chipId;
@@ -1123,10 +1126,10 @@ function _pickRandomChipOfTier(tier){
   return pool[Math.floor(Math.random() * pool.length)];
 }
 function chipsetFuse(chipId){
-  // Real fusion: 3 chips of same id → 1 random chip of next tier.
-  // Consumes the source chip stacks entirely (owned[id] -= 3) and adds 1 to
-  // the new chip's owned count. Auto-unequips the source if its owned hits 0
-  // and it was equipped (so a stale equipped slot doesn't reference a chip
+  // Real forging: 3 runes of same id → 1 random rune of next tier.
+  // Consumes the source rune stacks entirely (owned[id] -= 3) and adds 1 to
+  // the new rune's owned count. Auto-unequips the source if its owned hits 0
+  // and it was equipped (so a stale equipped socket doesn't reference a rune
   // the player no longer owns).
   const src = CHIPS[chipId]; if(!src) return;
   if((meta.chips.owned[chipId] || 0) < 3) return;
@@ -1153,7 +1156,7 @@ function chipsetFuse(chipId){
   const tier = CHIP_TIERS[newChip.tier];
   document.getElementById('chipset-pull-result').innerHTML =
     `<div class="chip tier-${newChip.tier}" style="pointer-events:none;outline:3px solid ${tier.color};box-shadow:0 0 24px ${tier.color}">
-      <div class="cn" style="color:${tier.color}">★ FUSE → ${newChip.name}</div>
+      <div class="cn" style="color:${tier.color}">★ FORGE → ${newChip.name}</div>
       <div class="cd" style="font-size:10px">${newChip.desc}</div>
       <div style="font-size:9px;color:${tier.color};letter-spacing:.12em;font-weight:700">${tier.label}</div>
     </div>`;
@@ -1174,7 +1177,7 @@ function buildChipset(){
     slotBtn.textContent = `+ 슬롯 → ${slots+1} (◆ ${cost})`;
     slotBtn.disabled = meta.coins < cost;
   }
-  document.getElementById('chipset-slot-info').textContent = `${slots} slots`;
+  document.getElementById('chipset-slot-info').textContent = `${slots} sockets`;
   // Equipped grid
   const eqRoot = document.getElementById('chipset-equipped');
   let html = '';
@@ -1195,7 +1198,7 @@ function buildChipset(){
   const invRoot = document.getElementById('chipset-inventory');
   const ownedIds = Object.keys(meta.chips.owned).filter(id => meta.chips.owned[id] > 0);
   if(ownedIds.length === 0){
-    invRoot.innerHTML = `<div style="color:#5d7290;padding:20px;font-size:12px">아직 칩이 없습니다. 위에서 가챠를 돌리세요.</div>`;
+    invRoot.innerHTML = `<div style="color:#5d7290;padding:20px;font-size:12px">아직 룬이 없습니다. 위에서 제련하세요.</div>`;
   } else {
     const tierRank = { legendary:0, epic:1, rare:2, common:3 };
     ownedIds.sort((a, b) => {
@@ -1240,7 +1243,7 @@ export function openChipset(){
   // like dead space when the player first arrives.
   document.getElementById('chipset-pull-result').innerHTML =
     `<div style="padding:18px 22px;border:1px dashed rgba(255,61,203,.4);border-radius:8px;color:#9ab5d0;font-size:11px;letter-spacing:.16em;font-weight:700;text-align:center">
-      ◇ 가챠로 칩을 뽑은 후 인벤에서 슬롯에 장착하세요 · 같은 칩 ×3 → ★ FUSE 로 다음 등급 변환
+      ◇ 코어로 룬을 제련한 후 금고에서 소켓에 장착하세요 · 같은 룬 ×3 → ★ FORGE 로 다음 등급 변환
     </div>`;
   buildChipset();
 }
@@ -1251,33 +1254,33 @@ export function openChipset(){
 function buildCodex(){
   const root = document.getElementById('codex-content');
   let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
-  html += '<div><div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">WEAPONS</div>';
+  html += '<div><div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">SKILLS</div>';
   for(const k in WEAPONS){
     const seen = meta.seenCodex.weapons.includes(k);
     const d = WEAPONS[k];
     html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${seen?d.color:'#5d7290'}"><b>${seen?d.name:'???'}</b> · <span style="color:#9ab5d0">${seen?d.desc:'미해금'}</span></div>`;
   }
-  html += '</div><div><div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">PASSIVES</div>';
+  html += '</div><div><div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">VIRTUES</div>';
   for(const k in PASSIVES){
     const seen = meta.seenCodex.passives.includes(k);
     const d = PASSIVES[k];
     html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${seen?d.color:'#5d7290'}"><b>${seen?d.name:'???'}</b> · <span style="color:#9ab5d0">${seen?d.desc:'미해금'}</span></div>`;
   }
   html += '</div></div>';
-  html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">★ FUSIONS — 두 무기를 모두 진화 + 만렙 시 융합 가능</div>';
+  html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">★ AWAKENINGS — 두 스킬을 모두 각성 + 만렙 시 전설 각성</div>';
   for(const fk in FUSIONS){
     const f = FUSIONS[fk];
     html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${f.color}">· <b>${f.name}</b> <span style="color:#9ab5d0">= ${f.sourceA} + ${f.sourceB} — ${f.desc}</span></div>`;
   }
-  html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">▽ GLYPHS — 보스 처치 시 1장 픽 (스택 가능, 한 런 영구)</div>';
+  html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">▽ BOSS RUNES — 보스 처치 시 1장 선택 (스택 가능, 한 원정 영구)</div>';
   for(const gk in GLYPHS){
     const g = GLYPHS[gk];
     html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${g.color}">· <b>${g.name}</b> <span style="color:#9ab5d0">${g.desc}</span></div>`;
   }
-  html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">ENEMIES</div>';
+  html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">ABYSS BESTIARY</div>';
   for(const k in ENEMIES){
     const d = ENEMIES[k];
-    html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${d.color}">· ${k} <span style="color:#9ab5d0">${d.brain} · HP ${d.hp} · DMG ${d.dmg}</span></div>`;
+    html += `<div style="padding:6px;border-bottom:1px solid #322018;color:${d.color}">· ${d.name || k} <span style="color:#9ab5d0">${d.brain} · HP ${d.hp} · DMG ${d.dmg}</span></div>`;
   }
   root.innerHTML = html;
 }

@@ -355,7 +355,22 @@ export function killEnemy(e){
   }
   fxBurst(e.x, e.y, e.color, e.isBoss?42:14, e.isBoss?340:200, e.isBoss?5:3, .6);
   fxRing(e.x, e.y, e.color, e.isBoss?160:e.r*3.5, e.isBoss?.7:.45);
-  if(e.isBoss){ shake(.6); flash(e.color, .35); AUDIO.explode(e.x, e.y); announce('CORE SHATTERED', 1.6); }
+  if(e.eliteAffix === 'molten'){
+    const r = 150;
+    fxShockwave(e.x, e.y, C.red, r, .55);
+    fxBurst(e.x, e.y, C.red, 32, 320, 4, .55);
+    const list = EGRID.query(e.x, e.y, r + 40, _EQ1);
+    for(let i = 0; i < list.length; i++){
+      const o = list[i];
+      if(!o.alive || o === e) continue;
+      const dx = o.x - e.x, dy = o.y - e.y;
+      if(dx*dx + dy*dy <= r*r) dealDamage(o, Math.max(20, o.maxHp * .18), C.red);
+    }
+  } else if(e.eliteAffix === 'voidTouched'){
+    spawnBlackhole(e.x, e.y, 120, 1.8, 360, 32);
+    fxRing(e.x, e.y, C.violet, 150, .6);
+  }
+  if(e.isBoss){ shake(.6); flash(e.color, .35); AUDIO.explode(e.x, e.y); announce('ABYSS LORD SLAIN', 1.6); }
   else { shake(.04); AUDIO.hit(e.x); }
   // drops are handled by player.js (it imports the items table) via _onKill hook
   if(_onKillHook) _onKillHook(e);
@@ -483,28 +498,52 @@ export function spawnBlackhole(x,y,r,life,pull,dmgPerSec){
 // ENEMIES + BOSSES tables live in data.js; we need them here for spawn.
 // To keep entities.js below data.js in the dep order, data.js installs the
 // definitions via setEnemyTables.
-let ENEMIES_REF = null, BOSSES_REF = null;
-export function setEnemyTables(enemies, bosses){ ENEMIES_REF = enemies; BOSSES_REF = bosses; }
+let ENEMIES_REF = null, BOSSES_REF = null, ELITE_AFFIXES_REF = null;
+export function setEnemyTables(enemies, bosses, eliteAffixes){
+  ENEMIES_REF = enemies; BOSSES_REF = bosses; ELITE_AFFIXES_REF = eliteAffixes || null;
+}
+
+function _rollEliteAffix(typeKey){
+  if(!ELITE_AFFIXES_REF || G.t < 120 || typeKey === 'SWARM') return null;
+  const min = G.t / 60;
+  const chance = Math.min(.08, .025 + Math.max(0, min - 2) * .006);
+  if(Math.random() > chance) return null;
+  const pool = Object.values(ELITE_AFFIXES_REF);
+  return pool[Math.floor(Math.random() * pool.length)] || null;
+}
 
 export function spawnEnemy(typeKey, x, y){
   const def = ENEMIES_REF[typeKey];
   const tier = 1 + G.t/180;
+  const affix = _rollEliteAffix(typeKey);
+  const hpMul = affix ? affix.hpMul : 1;
+  const dmgMul = affix ? affix.dmgMul : 1;
+  const speedMul = affix ? affix.speedMul : 1;
+  const rewardMul = affix ? affix.xpMul : 1;
+  const goldMul = affix ? affix.goldMul : 1;
   const e = makeEnt({
     type:'enemy', kind:typeKey, def,
     x, y, vx:0, vy:0,
-    sides:def.sides, color:def.color, r:def.r,
-    hp: def.hp * tier, maxHp: def.hp * tier,
-    speed: def.speed,
-    dmg: def.dmg * Math.sqrt(tier),
-    xp: def.xp,
-    gold: def.gold,
+    sides:def.sides, color:affix ? affix.color : def.color, baseColor:def.color, r: affix ? def.r * 1.18 : def.r,
+    hp: def.hp * tier * hpMul, maxHp: def.hp * tier * hpMul,
+    speed: def.speed * speedMul,
+    dmg: def.dmg * Math.sqrt(tier) * dmgMul,
+    xp: Math.round(def.xp * rewardMul),
+    gold: def.gold * goldMul,
     brain: def.brain,
     rot: Math.random()*TAU, rotSpeed:rand(-1,1),
     hitFlash:0,
     hitOrbit:{},
     isDiamond: def.isDiamond,
     state:0, timer:0,
+    eliteAffix: affix ? affix.id : null,
+    eliteName: affix ? `${affix.name} ${def.name || typeKey}` : (def.name || typeKey),
+    eliteColor: affix ? affix.color : null,
   });
+  if(affix){
+    e.__elitePulse = rand(0, TAU);
+    fxRing(e.x, e.y, affix.color, e.r * 3.2, .5);
+  }
   return e;
 }
 export function spawnBoss(typeKey){

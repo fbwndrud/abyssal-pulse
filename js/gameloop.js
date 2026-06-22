@@ -68,7 +68,9 @@ export function update(){
   // stack of buffs can't punt the player off-screen faster than camera can follow.
   // (Original code applied boost AFTER movement and immediately restored — so
   // speed boosts didn't actually affect player position. Fix: compute inline.)
-  const moveSpeed = Math.min(p.speed * (p._boostSpdMul || 1), 720);
+  if(p._eliteSlowTimer > 0) p._eliteSlowTimer -= G.dt;
+  const eliteSlowMul = p._eliteSlowTimer > 0 ? 0.72 : 1;
+  const moveSpeed = Math.min(p.speed * (p._boostSpdMul || 1) * eliteSlowMul, 720);
   p.vx = dx * moveSpeed;
   p.vy = dy * moveSpeed;
   p.x += p.vx * G.dt;
@@ -464,6 +466,20 @@ function updateEnemy(e, freezeMul){
       AUDIO.boss();
     }
   }
+  if(e.eliteAffix){
+    e._eliteFxT = (e._eliteFxT || 0) - G.dt;
+    if(e._eliteFxT <= 0){
+      e._eliteFxT = e.eliteAffix === 'frostbound' ? .45 : .75;
+      fxRing(e.x, e.y, e.eliteColor || e.color, e.r * (e.eliteAffix === 'frostbound' ? 5.2 : 3.4), .28);
+    }
+    if(e.eliteAffix === 'frostbound'){
+      const dxs = e.x - p.x, dys = e.y - p.y;
+      const slowR = 170;
+      if(dxs*dxs + dys*dys < slowR*slowR){
+        p._eliteSlowTimer = Math.max(p._eliteSlowTimer || 0, .22);
+      }
+    }
+  }
   e.vx *= .985; e.vy *= .985;
   // slow effect from evolved weapons (e.g. GLACIAL RING). Decays via slowTime.
   let mul = freezeMul;
@@ -750,7 +766,7 @@ function shrineDirector(){
         const minStr = Math.floor(t/60) + '분';
         // announce already imported elsewhere — use direct DOM if not.
         const el = document.getElementById('announce');
-        if(el){ el.textContent = '◈ NEON SHRINE 등장 (' + minStr + ') ◈'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), 2500); }
+        if(el){ el.textContent = '◈ CURSED ALTAR 등장 (' + minStr + ') ◈'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), 2500); }
       } catch(e){}
     }
   }
@@ -830,4 +846,3 @@ export function render(){
   }
   if(app.renderer) app.renderer.render(app.stage);
 }
-

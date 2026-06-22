@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "start": "python3 -m http.server 8000"
+  },
   "dependencies": {
     "jsdom": "^29.0.2"
   }

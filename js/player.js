@@ -7,7 +7,7 @@
 import { G, W, H, C, TAU, rand, meta, saveMeta, saveMetaLater, announce, entityLayer, beamLayer } from './core.js';
 import { AUDIO } from './audio.js';
 import {
-  makeEnt, fxBurst, fxRing, fxText, shake, flash,
+  makeEnt, fxBurst, fxRing, fxText, fxLine, shake, flash,
   spawnXP, spawnCoin, spawnHeart, spawnMagnet, spawnFreeze, spawnChest, spawnEnemy,
   setOnKillHook, dealDamage,
 } from './entities.js';
@@ -163,7 +163,7 @@ export function addPassive(p, key, mult){
     fxBurst(p.x, p.y, def.color, 30, 240, 3.5, .7);
     fxRing(p.x, p.y, def.color, 110, .6);
     AUDIO.level();
-    announce('▲ ' + def.name + ' MAX — 진화 게이트 해금', 2.0);
+    announce('▲ ' + def.name + ' MAX — 룬 각성 해금', 2.0);
   }
   if(!meta.seenCodex.passives.includes(key)){ meta.seenCodex.passives.push(key); saveMeta(); }
   return true;
@@ -234,7 +234,7 @@ export function applyEvo(p, weaponKey, evoId){
   fxBurst(p.x, p.y, e.color, 60, 360, 5, .8);
   shake(.4); flash(e.color, .4);
   AUDIO.explode();
-  announce('▲ 진화 · ' + e.name, 2.2);
+  announce('▲ 룬 각성 · ' + e.name, 2.2);
   updateSynergies(p);
 }
 
@@ -321,7 +321,7 @@ export function applyFusion(p, fuseKey){
   fxBurst(p.x, p.y, fuse.color, 80, 400, 6, .9);
   shake(.5); flash(fuse.color, .5);
   AUDIO.explode();
-  announce('★ 융합 · ' + fuse.name, 2.5);
+  announce('★ 전설 각성 · ' + fuse.name, 2.5);
   updateSynergies(p);
 }
 
@@ -337,7 +337,7 @@ export function updateSynergies(p){
       fxRing(p.x, p.y, C.gold, 140, .7);
       shake(.2); flash(C.gold, .25);
       AUDIO.level();
-      announce('◈ 시너지 · ' + s.name, 2.0);
+      announce('◈ 계약 시너지 · ' + s.name, 2.0);
     }
   }
 }
@@ -351,13 +351,15 @@ export function pickRandomItem(luck, tierBias, kindFilter){
   const weights = {
     common: tiers.includes('common') ? Math.max(0, 5 - L*2) : 0,
     rare: tiers.includes('rare') ? 2 + L*1.2 : 0,
+    epic: tiers.includes('epic') ? .9 + L*.8 : 0,
     legendary: tiers.includes('legendary') ? .5 + L*.9 : 0
   };
-  const total = weights.common + weights.rare + weights.legendary;
+  const total = weights.common + weights.rare + weights.epic + weights.legendary;
   if(total <= 0) return null;
   let r = Math.random()*total; let pickTier = 'common';
   if((r -= weights.common) <= 0) pickTier = 'common';
   else if((r -= weights.rare) <= 0) pickTier = 'rare';
+  else if((r -= weights.epic) <= 0) pickTier = 'epic';
   else pickTier = 'legendary';
   const tieredPool = itemsByTier(pickTier);
   const pool = kindFilter ? tieredPool.filter(it => it.kind === kindFilter) : tieredPool;
@@ -367,7 +369,19 @@ export function pickRandomItem(luck, tierBias, kindFilter){
 export function dropItem(x, y, luck, tierBias, kindFilter){
   const it = pickRandomItem(luck, tierBias, kindFilter);
   if(!it) return null;
-  return makeEnt({type:'item', x, y, vx:rand(-60,60), vy:rand(-60,60), r:11, color:ITEM_TIERS[it.tier].color, glow:ITEM_TIERS[it.tier].glow, item:it, life:30, maxLife:30});
+  const tier = ITEM_TIERS[it.tier];
+  if(it.tier === 'rare' || it.tier === 'epic' || it.tier === 'legendary'){
+    fxLine(x, y - 170, x, y + 14, tier.color, it.tier === 'legendary' ? 2.4 : 1.8, it.tier === 'legendary' ? 8 : 5);
+    fxRing(x, y, tier.color, it.tier === 'legendary' ? 92 : 66, .65);
+    fxText(x, y - 38, it.tier.toUpperCase(), tier.color, it.tier === 'legendary');
+  }
+  if(it.tier === 'legendary'){
+    shake(.3); flash(tier.color, .22);
+    announce('LEGENDARY RELIC · ' + it.name, 2.0);
+  } else if(it.tier === 'epic'){
+    announce('EPIC LOOT · ' + it.name, 1.4);
+  }
+  return makeEnt({type:'item', x, y, vx:rand(-60,60), vy:rand(-60,60), r:11, color:tier.color, glow:tier.glow, item:it, life:30, maxLife:30});
 }
 export function applyGlyph(p, glyphId){
   const g = GLYPHS[glyphId]; if(!g) return;
@@ -378,7 +392,7 @@ export function applyGlyph(p, glyphId){
   fxRing(p.x, p.y, g.color, 110, .6);
   shake(.25); flash(g.color, .25);
   AUDIO.level();
-  announce('▽ 글리프 · ' + g.name, 1.8);
+  announce('▽ 보스 룬 · ' + g.name, 1.8);
 }
 export function applyItem(p, itemId){
   const it = ITEMS[itemId]; if(!it) return;
@@ -393,7 +407,7 @@ export function applyItem(p, itemId){
   fxBurst(p.x, p.y, col, 24, 200, 3, .5);
   fxRing(p.x, p.y, col, 80, .5);
   AUDIO.pickup();
-  announce((it.kind==='relic'?'◈ 유물 · ':'◇ 아이템 · ') + it.name, 1.6);
+  announce((it.kind==='relic'?'◈ 유물 · ':'◇ 전리품 · ') + it.name, 1.6);
   if(p._forcedLevelup){ p._forcedLevelup = false; p.xp = p.xpNext; if(_doLevelUp) _doLevelUp(false); }
   updateSynergies(p);
 }
@@ -418,6 +432,12 @@ setOnKillHook(function onKill(e){
     // overwrite G.weaponPickPool while a chest pick is open.
     spawnChest(e.x, e.y);
     if(_openGlyphPick) _openGlyphPick();
+  } else if(e.eliteAffix){
+    announce('ELITE SLAIN · ' + (e.eliteName || e.kind), 1.4);
+    if(Math.random() < Math.min(.55, .25 + pLuck*.18)){
+      const kind = Math.random() < .25 ? 'relic' : 'consumable';
+      dropItem(e.x, e.y, pLuck + .35, ['rare','epic','legendary'], kind);
+    }
   } else if(Math.random() < Math.min(HEART_CAP, .003 + pLuck*.01)){
     spawnHeart(e.x, e.y);
   } else if(Math.random() < .002){
@@ -426,13 +446,13 @@ setOnKillHook(function onKill(e){
     spawnFreeze(e.x, e.y);
   } else if(Math.random() < Math.min(ITEM_MOB_CAP, .00075 + pLuck*.0015)){
     // Regular mobs: small chance of a consumable item. Relics never drop here.
-    dropItem(e.x, e.y, pLuck, ['common','rare'], 'consumable');
+    dropItem(e.x, e.y, pLuck, ['common','rare','epic'], 'consumable');
   }
   // Elite (HEX/OCT) drop chance — bumped slightly back to 3% since passives no
   // longer give stat boosts; consumable items now carry the stat scaling load.
   if(!e.isBoss && (e.kind === 'HEX' || e.kind === 'OCT')){
     if(Math.random() < Math.min(ITEM_ELITE_CAP, .015 + pLuck*.0125)){
-      dropItem(e.x, e.y, pLuck, ['common','rare'], 'consumable');
+      dropItem(e.x, e.y, pLuck, ['common','rare','epic'], 'consumable');
     }
   }
   if(e.def && e.def.onDeath === 'split'){

@@ -358,7 +358,7 @@ function _makeGridTexture(){
   const cv = document.createElement('canvas');
   cv.width = g; cv.height = g;
   const cx2 = cv.getContext('2d');
-  cx2.strokeStyle = 'rgba(60,120,220,.08)';
+  cx2.strokeStyle = 'rgba(214,168,79,.08)';
   cx2.lineWidth = 1;
   cx2.beginPath();
   cx2.moveTo(0, 0); cx2.lineTo(g, 0);
@@ -372,12 +372,31 @@ function _makePlayerGlowTexture(){
   cv.width = sz; cv.height = sz;
   const c2 = cv.getContext('2d');
   const g = c2.createRadialGradient(sz/2, sz/2, 30, sz/2, sz/2, 380);
-  g.addColorStop(0, 'rgba(0,240,255,.18)');
-  g.addColorStop(1, 'rgba(0,240,255,0)');
+  g.addColorStop(0, 'rgba(73,199,255,.16)');
+  g.addColorStop(.45, 'rgba(127,77,216,.07)');
+  g.addColorStop(1, 'rgba(73,199,255,0)');
   c2.fillStyle = g;
   c2.fillRect(0, 0, sz, sz);
   return PIXI.Texture.from(cv);
 }
+
+const BIOMES = {
+  nave: {
+    name:'RUINED NAVE',
+    center:['rgba(54,22,17,1)', 'rgba(17,10,9,1)', '#050302'],
+    stars:[C.gold, C.red, C.cyan, C.violet],
+  },
+  crypt: {
+    name:'BONE CRYPT',
+    center:['rgba(16,34,40,1)', 'rgba(10,12,18,1)', '#040506'],
+    stars:[C.cyan, C.teal, C.violet, C.white],
+  },
+  hellforge: {
+    name:'HELLFORGE RIFT',
+    center:['rgba(70,18,12,1)', 'rgba(26,8,7,1)', '#050201'],
+    stars:[C.red, C.gold, C.magenta, C.violet],
+  },
+};
 
 export const BG = {
   stars: [],
@@ -385,6 +404,7 @@ export const BG = {
   starLayerH: 0,
   gradCanvas: null,
   gradHue: -999,
+  biomeKey: null,
   gradSprite: null,
   starSprites: [],
   gridSprite: null,
@@ -392,7 +412,7 @@ export const BG = {
   init(){
     this.stars = [];
     for(let i=0;i<140;i++){
-      this.stars.push({x:Math.random()*W*3-W, y:Math.random()*H*3-H, r:Math.random()*1.5+.3, p:Math.random()*.6+.4, c:choice([C.cyan,C.magenta,C.violet,C.lime,C.gold])});
+      this.stars.push({x:Math.random()*W*3-W, y:Math.random()*H*3-H, r:Math.random()*1.5+.3, p:Math.random()*.6+.4, c:choice([C.cyan,C.red,C.violet,C.gold,C.white])});
     }
     const sw = Math.floor(W*1.5), sh = Math.floor(H*1.5);
     this.starLayerW = sw; this.starLayerH = sh;
@@ -403,7 +423,7 @@ export const BG = {
     const gc = document.createElement('canvas');
     gc.width = W; gc.height = H;
     this.gradCanvas = gc;
-    this.bakeGradient(0);
+    this.bakeGradient('nave');
     this.gradSprite = new PIXI.Sprite(PIXI.Texture.from(gc));
     bgC.addChild(this.gradSprite);
 
@@ -424,24 +444,24 @@ export const BG = {
     this.playerGlow.visible = false;
     bgC.addChild(this.playerGlow);
   },
-  bakeGradient(hue){
+  bakeGradient(biomeKey){
+    const biome = BIOMES[biomeKey] || BIOMES.nave;
     const gc = this.gradCanvas, gx = gc.getContext('2d');
     const g = gx.createRadialGradient(W/2, H/2+100, 0, W/2, H/2, 800);
-    g.addColorStop(0, `hsla(${hue} 55% 12% / 1)`);
-    g.addColorStop(.5, `hsla(${(hue+50)%360} 35% 6% / 1)`);
-    g.addColorStop(1, '#04050b');
+    g.addColorStop(0, biome.center[0]);
+    g.addColorStop(.52, biome.center[1]);
+    g.addColorStop(1, biome.center[2]);
     gx.fillStyle = g; gx.fillRect(0,0,W,H);
-    this.gradHue = hue;
+    this.biomeKey = biomeKey;
     if(this.gradSprite && this.gradSprite.texture){
       // Tell PIXI the source canvas changed
       this.gradSprite.texture.source.update();
     }
   },
   tick(){
-    const hue = (G.bgT*8) % 360;
-    let dh = Math.abs(hue - this.gradHue);
-    if(dh > 180) dh = 360 - dh;
-    if(dh > 8) this.bakeGradient(hue);
+    const biomeKey = !G.player ? 'nave' : (G.t < 300 ? 'nave' : (G.t < 600 ? 'crypt' : 'hellforge'));
+    if(biomeKey !== this.biomeKey) this.bakeGradient(biomeKey);
+    G.biomeName = BIOMES[biomeKey].name;
 
     // star parallax: 4-quad wrap so stars are continuous in any direction
     const sw = this.starLayerW, sh = this.starLayerH;
@@ -464,6 +484,7 @@ export const BG = {
     if(this.gridSprite){
       this.gridSprite.tilePosition.x = -G.cam.x;
       this.gridSprite.tilePosition.y = -G.cam.y;
+      this.gridSprite.alpha = biomeKey === 'hellforge' ? .55 : .38;
     }
 
     // player glow follows player in screen space (player is camera-centered)

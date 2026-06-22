@@ -14,8 +14,8 @@ import {
 
 export const WEAPONS = {
   PULSE: {
-    name:'PULSE WAVE', color:C.cyan, kind:'AOE',
-    desc:'주기적 충격파로 주변 적 타격.',
+    name:'SANCTIFIED NOVA', color:C.cyan, kind:'AOE',
+    desc:'주기적 신성 파동으로 주변 적을 정화.',
     maxLv:6,
     baseStats:{ cd:1.6, dmg:24, radius:130, kb:120 },
     icon(ctx,x,y,s){ for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(x,y, s*.18 + i*s*.18, 0, TAU); ctx.strokeStyle=C.cyan; ctx.lineWidth=1.6; ctx.shadowBlur=8; ctx.shadowColor=C.cyan; ctx.globalAlpha=1-i*.25; ctx.stroke(); ctx.globalAlpha=1; } },
@@ -49,8 +49,8 @@ export const WEAPONS = {
     levelUp(w,lv){ w.stats.cd *= .92; w.stats.dmg += 8; w.stats.radius += 16; },
   },
   BEAM: {
-    name:'BEAM', color:C.gold, kind:'BEAM',
-    desc:'회전하는 레이저 빔.',
+    name:'SERAPH LANCE', color:C.gold, kind:'BEAM',
+    desc:'몸 주위를 도는 천상의 창.',
     maxLv:6,
     baseStats:{ rotSpeed:1.4, dmg:42, length:520, width:6, count:1, tick:.12 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.gold; ctx.shadowBlur=10; ctx.shadowColor=C.gold; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x-s*.4,y-s*.4); ctx.lineTo(x+s*.4,y+s*.4); ctx.stroke(); ctx.restore(); },
@@ -103,8 +103,8 @@ export const WEAPONS = {
     },
   },
   ORBIT: {
-    name:'ORBIT NODES', color:C.violet, kind:'ORBIT',
-    desc:'주변을 도는 발광 노드.',
+    name:'RUNIC AEGIS', color:C.violet, kind:'ORBIT',
+    desc:'주변을 도는 수호 룬.',
     maxLv:6,
     baseStats:{ count:2, radius:90, rotSpeed:2.2, dmg:18, nodeR:12 },
     icon(ctx,x,y,s){ drawCircle(x,y,s*.2,C.violet,8); for(let i=0;i<3;i++){ const a=(i/3)*TAU; drawCircle(x+Math.cos(a)*s*.3, y+Math.sin(a)*s*.3, s*.08, C.violet, 6, C.violet); } },
@@ -145,8 +145,8 @@ export const WEAPONS = {
     },
   },
   HOMING: {
-    name:'HOMING SHARDS', color:C.teal, kind:'HOMING',
-    desc:'추적하는 다이아몬드 파편.',
+    name:'BONE SHARDS', color:C.teal, kind:'HOMING',
+    desc:'적을 추적하는 뼈 파편.',
     maxLv:6,
     baseStats:{ cd:1.0, dmg:28, count:1, speed:340, life:1.6 },
     icon(ctx,x,y,s){ drawDiamond(x,y,s*.25,0,C.teal,10,C.teal); },
@@ -169,8 +169,8 @@ export const WEAPONS = {
     },
   },
   CROSS: {
-    name:'CROSS FIRE', color:C.pink, kind:'BULLET',
-    desc:'4방향 십자 발사.',
+    name:'HELLFIRE CROSS', color:C.pink, kind:'BULLET',
+    desc:'4방향으로 갈라지는 지옥불.',
     maxLv:6,
     baseStats:{ cd:.7, dmg:18, speed:420, life:1.0, count:4 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.pink; ctx.shadowBlur=8; ctx.shadowColor=C.pink; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x-s*.35,y); ctx.lineTo(x+s*.35,y); ctx.moveTo(x,y-s*.35); ctx.lineTo(x,y+s*.35); ctx.stroke(); ctx.restore(); },
@@ -192,8 +192,8 @@ export const WEAPONS = {
     },
   },
   SHOCK: {
-    name:'SHOCKWAVE', color:C.magenta, kind:'AOE',
-    desc:'전방 부채꼴 충격파.',
+    name:'GRAVE CLEAVE', color:C.magenta, kind:'AOE',
+    desc:'전방을 베는 묘지의 충격파.',
     maxLv:6,
     baseStats:{ cd:1.4, dmg:38, radius:200, arc:Math.PI*.7 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.magenta; ctx.shadowBlur=10; ctx.shadowColor=C.magenta; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x-s*.15,y, s*.4, -1.0, 1.0); ctx.stroke(); ctx.restore(); },
@@ -211,8 +211,8 @@ export const WEAPONS = {
     levelUp(w,lv){ w.stats.dmg += 14; w.stats.radius += 30; if(lv===4||lv===6) w.stats.arc += .4; },
   },
   CHAIN: {
-    name:'CHAIN BOLT', color:C.lime, kind:'CHAIN',
-    desc:'적을 잇는 번개 사슬.',
+    name:'HEX LIGHTNING', color:C.lime, kind:'CHAIN',
+    desc:'적을 잇는 저주 번개.',
     maxLv:6,
     baseStats:{ cd:1.0, dmg:32, jumps:3, range:280 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.lime; ctx.shadowBlur=10; ctx.shadowColor=C.lime; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x-s*.35,y-s*.3); ctx.lineTo(x-s*.05,y); ctx.lineTo(x+s*.1,y-s*.1); ctx.lineTo(x+s*.35,y+s*.3); ctx.stroke(); ctx.restore(); },
@@ -254,8 +254,8 @@ export const WEAPONS = {
     levelUp(w,lv){ if(lv===3||lv===5) w.stats.jumps++; w.stats.dmg += 12; w.stats.range += 36; },
   },
   BLADE: {
-    name:'SHURIKEN', color:C.cyan, kind:'BULLET',
-    desc:'관통하는 회전 칼날.',
+    name:'SPECTRAL BLADES', color:C.cyan, kind:'BULLET',
+    desc:'관통하는 망령 칼날.',
     maxLv:6,
     baseStats:{ cd:1.0, dmg:30, speed:330, life:1.2, count:1, pierce:3 },
     icon(ctx,x,y,s){ drawStar(x,y,4,s*.4,s*.18,Math.PI/4,C.cyan,10,C.cyan,1.6); },
@@ -277,8 +277,8 @@ export const WEAPONS = {
     levelUp(w,lv){ if(lv===3||lv===5) w.stats.count++; if(lv===4||lv===6) w.stats.pierce++; w.stats.dmg += 10; },
   },
   BLACKHOLE: {
-    name:'SINGULARITY', color:C.violet, kind:'BLACKHOLE',
-    desc:'블랙홀로 적을 빨아들임.',
+    name:'ABYSS WELL', color:C.violet, kind:'BLACKHOLE',
+    desc:'심연의 구멍으로 적을 빨아들임.',
     maxLv:6,
     baseStats:{ cd:7, dmg:8, radius:180, life:3, pull:160 },
     icon(ctx,x,y,s){ ctx.save(); for(let i=0;i<3;i++){ ctx.strokeStyle=C.violet; ctx.shadowBlur=10; ctx.shadowColor=C.violet; ctx.lineWidth=1.4; ctx.globalAlpha=1-i*.3; ctx.beginPath(); ctx.arc(x,y, s*.1+i*s*.13, 0, TAU); ctx.stroke(); } ctx.restore(); },
@@ -308,8 +308,8 @@ export const WEAPONS = {
     levelUp(w,lv){ w.stats.radius += 22; w.stats.dmg += 4; w.stats.life += .5; },
   },
   PRISM: {
-    name:'PRISM SPLIT', color:C.gold, kind:'BULLET',
-    desc:'명중 시 분열하는 빛 화살.',
+    name:'SOUL PRISM', color:C.gold, kind:'BULLET',
+    desc:'명중 시 분열하는 영혼 결정.',
     maxLv:6,
     baseStats:{ cd:1.4, dmg:26, speed:380, life:1.2, splits:3 },
     icon(ctx,x,y,s){ drawPolygon(x,y,3,s*.3,Math.PI,C.gold,10); drawCircle(x,y,s*.08,'#fff',6,'#fff'); },
@@ -349,17 +349,17 @@ export const WEAPONS = {
 export const EVOLUTIONS = {
   PULSE: [
     {
-      id:'EVO_PULSE_SUN', name:'SUN PULSE', color:C.gold, req:['POWER'],
+      id:'EVO_PULSE_SUN', name:'SAINT NOVA', color:C.gold, req:['POWER'],
       desc:'2중 폭발 거대 광파 — 쿨감 + 초대형 반경',
       apply: w => { w.stats.cd*=.55; w.stats.dmg*=1.9; w.stats.radius*=1.7; w.stats.kb*=1.6; w.evolved=true; w.color=C.gold; w.extra={double:true}; }
     },
     {
-      id:'EVO_PULSE_STORM', name:'STORM PULSE', color:C.violet, req:['CADENCE'],
+      id:'EVO_PULSE_STORM', name:'RIFT PEAL', color:C.violet, req:['CADENCE'],
       desc:'초고속 연쇄 폭발 — 작지만 끊임없이 터진다',
       apply: w => { w.stats.cd*=.32; w.stats.dmg*=.85; w.stats.radius*=.9; w.stats.kb*=.7; w.evolved=true; w.color=C.violet; w.extra={triple:true, ringDelay:.12}; }
     },
     {
-      id:'EVO_PULSE_GLACIAL', name:'GLACIAL RING', color:C.teal, req:['REACH'],
+      id:'EVO_PULSE_GLACIAL', name:'FROSTBOUND RING', color:C.teal, req:['REACH'],
       desc:'거대 빙결 파동 — 적 둔화 + 강력한 넉백',
       apply: w => { w.stats.cd*=.9; w.stats.dmg*=1.3; w.stats.radius*=2.1; w.stats.kb*=2.4; w.evolved=true; w.color=C.teal; w.extra={slow:.45, slowDur:1.2}; }
     },
@@ -367,7 +367,7 @@ export const EVOLUTIONS = {
 
   BEAM: [
     {
-      id:'EVO_BEAM_SOLAR', name:'SOLAR CROWN', color:C.gold, req:['REACH'],
+      id:'EVO_BEAM_SOLAR', name:'SERAPH CROWN', color:C.gold, req:['REACH'],
       desc:'6갈래 회전 태양관 — 사거리 폭증',
       apply: w => { w.stats.count=6; w.stats.length*=1.5; w.stats.dmg*=1.8; w.stats.width+=3; w.stats.tick*=.6; w.stats.rotSpeed*=1.2; w.evolved=true; w.color=C.gold; }
     },
@@ -377,7 +377,7 @@ export const EVOLUTIONS = {
       apply: w => { w.stats.count=1; w.stats.length*=1.8; w.stats.dmg*=2.6; w.stats.width+=8; w.stats.rotSpeed*=.55; w.stats.tick*=.5; w.evolved=true; w.color=C.magenta; w.extra={pierceAll:true}; }
     },
     {
-      id:'EVO_BEAM_PRISM', name:'PRISM RAY', color:C.pink, req:['LUCK'],
+      id:'EVO_BEAM_PRISM', name:'FATE RAY', color:C.pink, req:['LUCK'],
       desc:'무작위 분기 광선 — 3갈래 굴절 조준',
       apply: w => { w.stats.count=3; w.stats.length*=1.3; w.stats.dmg*=1.5; w.stats.width+=2; w.stats.rotSpeed*=1.6; w.stats.tick*=.7; w.evolved=true; w.color=C.pink; w.extra={randomAim:true, dropBoost:.25}; }
     },
@@ -390,7 +390,7 @@ export const EVOLUTIONS = {
       apply: w => { w.stats.count=8; w.stats.dmg*=1.7; w.stats.radius*=1.35; w.stats.rotSpeed*=1.4; w.stats.nodeR*=1.25; w.evolved=true; w.color=C.violet; }
     },
     {
-      id:'EVO_ORBIT_SOLAR', name:'SOLAR CORONA', color:C.gold, req:['POWER'],
+      id:'EVO_ORBIT_SOLAR', name:'MARTYR CORONA', color:C.gold, req:['POWER'],
       desc:'거대 3노드 — 접촉 시 폭발하는 태양',
       apply: w => { w.stats.count=3; w.stats.dmg*=2.2; w.stats.radius*=1.9; w.stats.rotSpeed*=.75; w.stats.nodeR*=2.4; w.evolved=true; w.color=C.gold; w.extra={burst:true, burstR:90, burstDmg:.6}; }
     },
@@ -403,7 +403,7 @@ export const EVOLUTIONS = {
 
   HOMING: [
     {
-      id:'EVO_HOMING_MISSILE', name:'MISSILE SWARM', color:C.teal, req:['POWER'],
+      id:'EVO_HOMING_MISSILE', name:'BONE SWARM', color:C.teal, req:['POWER'],
       desc:'8발 연속 추적 — 끈질긴 추격',
       apply: w => { w.stats.count=8; w.stats.dmg*=1.6; w.stats.cd*=.45; w.stats.speed*=1.35; w.stats.life*=1.3; w.evolved=true; w.color=C.teal; }
     },
@@ -413,7 +413,7 @@ export const EVOLUTIONS = {
       apply: w => { w.stats.count=1; w.stats.dmg*=2.6; w.stats.cd*=1.15; w.stats.speed*=1.5; w.stats.life*=1.6; w.stats.pierce=6; w.evolved=true; w.color=C.violet; w.extra={blast:80}; }
     },
     {
-      id:'EVO_HOMING_SOLAR', name:'SOLAR FLARE', color:C.gold, req:['CADENCE'],
+      id:'EVO_HOMING_SOLAR', name:'CINDER FLARE', color:C.gold, req:['CADENCE'],
       desc:'쾌속 연사 — 적중 시 화염 잔류',
       apply: w => { w.stats.count=3; w.stats.dmg*=1.25; w.stats.cd*=.3; w.stats.speed*=1.2; w.stats.life*=.9; w.evolved=true; w.color=C.gold; w.extra={burn:true, burnDmg:6, burnDur:1.2}; }
     },
@@ -421,17 +421,17 @@ export const EVOLUTIONS = {
 
   CROSS: [
     {
-      id:'EVO_CROSS_STAR', name:'STAR CROSS', color:C.pink, req:['CADENCE'],
+      id:'EVO_CROSS_STAR', name:'HELLSTAR CROSS', color:C.pink, req:['CADENCE'],
       desc:'12방향 별빛 난사 — 빈틈없는 포위',
       apply: w => { w.stats.count=12; w.stats.dmg*=1.5; w.stats.cd*=.55; w.stats.life*=1.2; w.evolved=true; w.color=C.pink; }
     },
     {
-      id:'EVO_CROSS_TEMPEST', name:'TEMPEST SPIRAL', color:C.cyan, req:['HASTE'],
+      id:'EVO_CROSS_TEMPEST', name:'PILGRIM SPIRAL', color:C.cyan, req:['HASTE'],
       desc:'8갈래 나선 회전탄 — 휘몰아치는 폭풍',
       apply: w => { w.stats.count=8; w.stats.dmg*=1.4; w.stats.cd*=.7; w.stats.speed*=1.15; w.stats.life*=1.5; w.evolved=true; w.color=C.cyan; w.extra={spiral:true, curl:1.8}; }
     },
     {
-      id:'EVO_CROSS_GLACIAL', name:'GLACIAL WAVE', color:C.teal, req:['POWER'],
+      id:'EVO_CROSS_GLACIAL', name:'FROSTFIRE WAVE', color:C.teal, req:['POWER'],
       desc:'4방향 빙결 파동 — 적중 시 둔화',
       apply: w => { w.stats.count=4; w.stats.dmg*=2.0; w.stats.cd*=.85; w.stats.speed*=.85; w.stats.life*=1.8; w.evolved=true; w.color=C.teal; w.extra={slow:.5, slowDur:1.5, wide:2.2}; }
     },
@@ -439,17 +439,17 @@ export const EVOLUTIONS = {
 
   BLADE: [
     {
-      id:'EVO_BLADE_GHOST', name:'GHOST BLADES', color:C.white, req:['POWER'],
+      id:'EVO_BLADE_GHOST', name:'PHANTOM BLADES', color:C.white, req:['POWER'],
       desc:'6장 유령 칼날 — 무한 관통의 잔상',
       apply: w => { w.stats.count=6; w.stats.pierce=9; w.stats.dmg*=1.55; w.stats.speed*=1.25; w.stats.life*=1.2; w.evolved=true; w.color=C.white; }
     },
     {
-      id:'EVO_BLADE_BOOMERANG', name:'BOOMERANG FANG', color:C.lime, req:['MAGNET'],
+      id:'EVO_BLADE_BOOMERANG', name:'GRAVE FANG', color:C.lime, req:['MAGNET'],
       desc:'2장 회귀 칼날 — 두 번 베고 돌아온다',
       apply: w => { w.stats.count=2; w.stats.pierce=6; w.stats.dmg*=1.7; w.stats.cd*=.9; w.stats.life*=1.6; w.evolved=true; w.color=C.lime; w.extra={returns:true, magnetPull:true}; }
     },
     {
-      id:'EVO_BLADE_CHAOS', name:'CHAOS RIPPER', color:C.magenta, req:['POWER'],
+      id:'EVO_BLADE_CHAOS', name:'ABYSS RIPPER', color:C.magenta, req:['POWER'],
       desc:'관통 시 폭발 — 카오스 파편 비산',
       apply: w => { w.stats.count=3; w.stats.pierce=4; w.stats.dmg*=1.6; w.stats.cd*=.85; w.stats.speed*=1.1; w.evolved=true; w.color=C.magenta; w.extra={blastOnPierce:true, blastR:70, blastDmg:14}; }
     },
@@ -457,7 +457,7 @@ export const EVOLUTIONS = {
 
   PRISM: [
     {
-      id:'EVO_PRISM_RAINBOW', name:'RAINBOW LANCE', color:C.gold, req:['LUCK'],
+      id:'EVO_PRISM_RAINBOW', name:'FATE LANCE', color:C.gold, req:['LUCK'],
       desc:'분열의 분열 — 무지개로 흩어지는 빛',
       apply: w => { w.stats.splits=6; w.stats.dmg*=1.8; w.stats.cd*=.7; w.stats.speed*=1.2; w.evolved=true; w.color=C.gold; w.extra={subSplit:2}; }
     },
@@ -467,7 +467,7 @@ export const EVOLUTIONS = {
       apply: w => { w.stats.splits=4; w.stats.count=2; w.stats.dmg*=1.5; w.stats.cd*=.6; w.stats.life*=1.4; w.evolved=true; w.color=C.violet; w.extra={homingSplit:true, turn:3.5}; }
     },
     {
-      id:'EVO_PRISM_LIFE', name:'AURORA BLOOM', color:C.lime, req:['SOUL'],
+      id:'EVO_PRISM_LIFE', name:'SOUL BLOOM', color:C.lime, req:['SOUL'],
       desc:'분열 시 광역 폭발 — 생명의 개화',
       apply: w => { w.stats.splits=3; w.stats.dmg*=2.0; w.stats.cd*=.9; w.evolved=true; w.color=C.lime; w.extra={bloomBlast:true, bloomR:90, bloomDmg:20}; }
     },
@@ -475,12 +475,12 @@ export const EVOLUTIONS = {
 
   SHOCK: [
     {
-      id:'EVO_SHOCK_CATACLYSM', name:'CATACLYSM', color:C.magenta, req:['REACH'],
+      id:'EVO_SHOCK_CATACLYSM', name:'CRYPT CATACLYSM', color:C.magenta, req:['REACH'],
       desc:'360° 대격변 — 전방위 충격파',
       apply: w => { w.stats.arc=TAU; w.stats.radius*=1.6; w.stats.dmg*=1.9; w.stats.cd*=.75; w.evolved=true; w.color=C.magenta; }
     },
     {
-      id:'EVO_SHOCK_RAIL', name:'RAILGUN', color:C.cyan, req:['POWER'],
+      id:'EVO_SHOCK_RAIL', name:'SAINTSPLITTER', color:C.cyan, req:['POWER'],
       desc:'초장거리 관통 저격 — 좁고 깊게',
       apply: w => { w.stats.arc=Math.PI*.12; w.stats.radius*=2.6; w.stats.dmg*=2.4; w.stats.cd*=.9; w.evolved=true; w.color=C.cyan; w.extra={pierceAll:true}; }
     },
@@ -493,12 +493,12 @@ export const EVOLUTIONS = {
 
   CHAIN: [
     {
-      id:'EVO_CHAIN_THUNDER', name:'THUNDER GOD', color:C.gold, req:['POWER'],
+      id:'EVO_CHAIN_THUNDER', name:'STORM SAINT', color:C.gold, req:['POWER'],
       desc:'뇌신 — 점프 +5, 사거리 +30%',
       apply: w => { w.stats.jumps+=5; w.stats.dmg*=1.7; w.stats.range*=1.3; w.stats.cd*=.65; w.evolved=true; w.color=C.gold; }
     },
     {
-      id:'EVO_CHAIN_TEMPEST', name:'TEMPEST COIL', color:C.violet, req:['CADENCE'],
+      id:'EVO_CHAIN_TEMPEST', name:'HEX COIL', color:C.violet, req:['CADENCE'],
       desc:'근거리 폭풍 — 짧지만 끊임없이 난타',
       apply: w => { w.stats.cd*=.3; w.stats.range*=.55; w.stats.jumps+=2; w.stats.dmg*=.85; w.evolved=true; w.color=C.violet; w.extra={storm:true}; }
     },
@@ -511,12 +511,12 @@ export const EVOLUTIONS = {
 
   BLACKHOLE: [
     {
-      id:'EVO_BH_GRAVITY', name:'GRAVITY KING', color:C.violet, req:['REACH'],
+      id:'EVO_BH_GRAVITY', name:'ABYSS KING', color:C.violet, req:['REACH'],
       desc:'중력왕 — 거대 블랙홀, 강한 흡인',
       apply: w => { w.stats.radius*=1.7; w.stats.dmg*=2.1; w.stats.pull*=1.4; w.stats.cd*=.55; w.stats.life*=1.5; w.evolved=true; w.color=C.violet; }
     },
     {
-      id:'EVO_BH_SUPERNOVA', name:'SUPERNOVA', color:C.gold, req:['POWER'],
+      id:'EVO_BH_SUPERNOVA', name:'HELLSTAR', color:C.gold, req:['POWER'],
       desc:'초신성 — 소멸 시 거대 폭발',
       apply: w => { w.stats.life*=.7; w.stats.dmg*=1.5; w.stats.radius*=1.2; w.stats.cd*=.7; w.evolved=true; w.color=C.gold; w.extra={implode:true, burstMul:3.2}; }
     },
@@ -541,7 +541,7 @@ export const EVOLUTIONS = {
    =================================================================== */
 export const FUSIONS = {
   'BEAM+PRISM': {
-    id:'FUSE_PRISM_HALO', name:'PRISM HALO', color:C.gold, kind:'BEAM',
+    id:'FUSE_PRISM_HALO', name:'SERAPH HALO', color:C.gold, kind:'BEAM',
     desc:'무지개 회전 빔 — 적중 시 분열탄 비산',
     sourceA:'BEAM', sourceB:'PRISM',
     baseStats:{ rotSpeed:2.0, dmg:60, length:600, width:9, count:4, tick:.10, splits:2 },
@@ -587,7 +587,7 @@ export const FUSIONS = {
     },
   },
   'BLACKHOLE+ORBIT': {
-    id:'FUSE_VOID_PULSAR', name:'VOID PULSAR', color:C.violet, kind:'ORBIT',
+    id:'FUSE_VOID_PULSAR', name:'ABYSSAL HALO', color:C.violet, kind:'ORBIT',
     desc:'궤도 노드 각각이 중력장을 끌며 회전',
     sourceA:'BLACKHOLE', sourceB:'ORBIT',
     baseStats:{ count:3, radius:120, rotSpeed:2.0, dmg:30, nodeR:18, pull:90, pullR:90 },
@@ -638,7 +638,7 @@ export const FUSIONS = {
     },
   },
   'PULSE+SHOCK': {
-    id:'FUSE_SEISMIC_BLOOM', name:'SEISMIC BLOOM', color:C.red, kind:'AOE',
+    id:'FUSE_SEISMIC_BLOOM', name:'CRYPT BLOOM', color:C.red, kind:'AOE',
     desc:'전방위 충격 + 후속 잔진의 연쇄',
     sourceA:'PULSE', sourceB:'SHOCK',
     baseStats:{ cd:1.4, dmg:60, radius:230, kb:200, aftershockR:140, aftershockDmg:30, aftershockDelay:.35 },
@@ -678,7 +678,7 @@ export const FUSIONS = {
     },
   },
   'CHAIN+HOMING': {
-    id:'FUSE_TESLA_SWARM', name:'TESLA SWARM', color:C.cyan, kind:'HOMING',
+    id:'FUSE_TESLA_SWARM', name:'HEX SWARM', color:C.cyan, kind:'HOMING',
     desc:'추적 전구체 — 발사 직후 연쇄 방전',
     sourceA:'CHAIN', sourceB:'HOMING',
     baseStats:{ cd:.85, dmg:42, count:2, speed:360, life:1.8, jumps:3, jumpRange:200, jumpDmg:.7 },
@@ -714,7 +714,7 @@ export const FUSIONS = {
     },
   },
   'BEAM+BLACKHOLE': {
-    id:'FUSE_EVENT_LANCE', name:'EVENT LANCE', color:C.magenta, kind:'BEAM',
+    id:'FUSE_EVENT_LANCE', name:'RIFT LANCE', color:C.magenta, kind:'BEAM',
     desc:'특이점 빔 — 끝점에서 적을 흡인하며 폭발',
     sourceA:'BEAM', sourceB:'BLACKHOLE',
     baseStats:{ rotSpeed:1.0, dmg:70, length:560, width:10, count:1, tick:.10, tipPull:200, tipR:80, tipDmg:14 },
@@ -789,7 +789,7 @@ export const FUSIONS = {
     },
   },
   'BLADE+CROSS': {
-    id:'FUSE_SHURIKEN_CROSS', name:'SHURIKEN CROSS', color:C.lime, kind:'BULLET',
+    id:'FUSE_SHURIKEN_CROSS', name:'SPECTRAL CROSS', color:C.lime, kind:'BULLET',
     desc:'십자 패턴 관통 수리검 — 회전하며 적을 가른다',
     sourceA:'BLADE', sourceB:'CROSS',
     baseStats:{ cd:.65, dmg:38, count:4, speed:380, life:1.4, pierce:4 },
@@ -838,7 +838,7 @@ export const FUSIONS = {
     },
   },
   'ORBIT+PULSE': {
-    id:'FUSE_RESONANT_RING', name:'RESONANT RING', color:C.teal, kind:'ORBIT',
+    id:'FUSE_RESONANT_RING', name:'BELL RING', color:C.teal, kind:'ORBIT',
     desc:'궤도 노드 주기적 펄스 방출',
     sourceA:'ORBIT', sourceB:'PULSE',
     baseStats:{ count:2, radius:100, rotSpeed:2.4, dmg:28, nodeR:14, pulseCd:1.6, pulseR:90, pulseDmg:30 },
@@ -887,7 +887,7 @@ export const FUSIONS = {
     },
   },
   'CHAIN+SHOCK': {
-    id:'FUSE_THUNDER_ARC', name:'THUNDER ARC', color:C.cyan, kind:'SHOCK',
+    id:'FUSE_THUNDER_ARC', name:'STORM ARC', color:C.cyan, kind:'SHOCK',
     desc:'전방 부채꼴 낙뢰 — 적중 적에서 연쇄',
     sourceA:'CHAIN', sourceB:'SHOCK',
     baseStats:{ cd:1.2, dmg:60, radius:230, arc:Math.PI*.8, jumps:3, jumpRange:220, jumpDmg:.6 },
@@ -958,7 +958,7 @@ export const FUSIONS = {
     },
   },
   'BEAM+CROSS': {
-    id:'FUSE_STAR_FORGE', name:'STAR FORGE', color:C.gold, kind:'BEAM',
+    id:'FUSE_STAR_FORGE', name:'SAINT FORGE', color:C.gold, kind:'BEAM',
     desc:'십자 고정 빔 — 4방향 영구 광선',
     sourceA:'BEAM', sourceB:'CROSS',
     baseStats:{ rotSpeed:0.6, dmg:48, length:480, width:7, count:4, tick:.12 },
@@ -1045,7 +1045,7 @@ export const FUSIONS = {
     },
   },
   'CROSS+SHOCK': {
-    id:'FUSE_QUAD_BLAST', name:'QUAD BLAST', color:C.red, kind:'SHOCK',
+    id:'FUSE_QUAD_BLAST', name:'FOURFOLD RUIN', color:C.red, kind:'SHOCK',
     desc:'사방향 부채꼴 충격파 동시 발사',
     sourceA:'CROSS', sourceB:'SHOCK',
     baseStats:{ cd:1.5, dmg:42, radius:180, arc:Math.PI*.5, dirs:4 },
@@ -1068,7 +1068,7 @@ export const FUSIONS = {
     },
   },
   'CHAIN+ORBIT': {
-    id:'FUSE_COIL_HALO', name:'COIL HALO', color:C.teal, kind:'ORBIT',
+    id:'FUSE_COIL_HALO', name:'COVENANT HALO', color:C.teal, kind:'ORBIT',
     desc:'궤도 노드 사이 항시 전류 — 노드에서 체인 방전',
     sourceA:'CHAIN', sourceB:'ORBIT',
     baseStats:{ count:3, radius:110, rotSpeed:2.2, dmg:22, nodeR:12, arcDmg:18, arcTick:.18, jumps:2, jumpRange:180 },

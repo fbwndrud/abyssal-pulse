@@ -11,9 +11,9 @@ export const RUN_LENGTH_SEC = 15 * 60;
 export const SAVE_KEY = 'neonpulse.save.v1';
 
 export const C = {
-  cyan:'#00f0ff', magenta:'#ff2bd6', violet:'#9b5cff', lime:'#9eff5b',
-  gold:'#ffd400', pink:'#ff71b8', red:'#ff3a5e', teal:'#1de9b6',
-  white:'#e9faff', dim:'#5d7290'
+  cyan:'#49c7ff', magenta:'#b8185f', violet:'#7f4dd8', lime:'#8bdc53',
+  gold:'#d6a84f', pink:'#d94778', red:'#b8182f', teal:'#46d6b0',
+  white:'#f4ead2', dim:'#8b7962'
 };
 
 export const rand   = (a,b)=> a + Math.random()*(b-a);

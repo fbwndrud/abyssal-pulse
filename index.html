@@ -3,50 +3,53 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>네온 펄스 · NEON PULSE</title>
+<title>Abyssal Pulse · Neon Pulse</title>
 <style>
 /* ───────── RESET ───────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;height:100%;overflow:hidden;background:#05060d;color:#cfeaff;font-family:'JetBrains Mono','Consolas','Menlo',monospace;letter-spacing:.02em;-webkit-font-smoothing:antialiased;user-select:none;touch-action:none}
+html,body{width:100%;height:100%;overflow:hidden;background:#070504;color:#eadfca;font-family:'JetBrains Mono','Consolas','Menlo',monospace;letter-spacing:.02em;-webkit-font-smoothing:antialiased;user-select:none;touch-action:none}
 button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
 :root{
-  --bg:#05060d;
-  --bg2:#0a0d1c;
-  --grid:#10204a;
-  --cyan:#00f0ff;
-  --magenta:#ff2bd6;
-  --violet:#9b5cff;
-  --lime:#9eff5b;
-  --gold:#ffd400;
-  --pink:#ff71b8;
-  --red:#ff3a5e;
-  --teal:#1de9b6;
-  --white:#e9faff;
-  --dim:#5d7290;
+  --bg:#070504;
+  --bg2:#120b0a;
+  --grid:#2a1f1b;
+  --cyan:#49c7ff;
+  --magenta:#b8185f;
+  --violet:#7f4dd8;
+  --lime:#8bdc53;
+  --gold:#d6a84f;
+  --pink:#d94778;
+  --red:#b8182f;
+  --teal:#46d6b0;
+  --white:#f4ead2;
+  --dim:#8b7962;
+  --bone:#d8c7a1;
+  --ember:#f06a24;
+  --iron:#4b4a46;
 }
 
 /* ───────── LAYOUT ───────── */
-#app{position:relative;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(circle at 50% 60%, #0b1230 0%, #05060d 70%)}
+#app{position:relative;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(circle at 50% 60%, #27100d 0%, #070504 70%)}
 #shake{position:relative}
-#canvas{display:block;background:#04050b;border-radius:6px;box-shadow:0 0 0 2px #14264a, 0 0 60px rgba(0,240,255,.18), 0 0 120px rgba(255,43,214,.10)}
+#canvas{display:block;background:#050302;border-radius:6px;box-shadow:0 0 0 2px #3b271e, 0 0 60px rgba(184,24,47,.24), 0 0 120px rgba(73,199,255,.10)}
 #pixi-canvas{display:block;position:absolute;top:0;left:0;background:transparent;border-radius:6px;pointer-events:none}
-.scanlines{pointer-events:none;position:absolute;inset:0;border-radius:6px;background:repeating-linear-gradient(to bottom, rgba(255,255,255,.025) 0 1px, transparent 1px 3px);mix-blend-mode:overlay;opacity:.6}
-.vignette{pointer-events:none;position:absolute;inset:0;border-radius:6px;background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.85) 100%)}
+.scanlines{pointer-events:none;position:absolute;inset:0;border-radius:6px;background:repeating-linear-gradient(to bottom, rgba(255,222,180,.025) 0 1px, transparent 1px 3px);mix-blend-mode:overlay;opacity:.45}
+.vignette{pointer-events:none;position:absolute;inset:0;border-radius:6px;background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.9) 100%)}
 
 /* ───────── HUD ───────── */
 #hud{position:absolute;inset:0;pointer-events:none;font-size:12px}
 .bar-wrap{position:absolute;height:14px;border-radius:7px;background:rgba(255,255,255,.06);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
 .bar-wrap .bar{height:100%;border-radius:7px;transition:width .15s ease-out}
 #hp-wrap{top:14px;left:14px;width:260px}
-#hp-bar{background:linear-gradient(90deg,#ff3a5e,#ff7aa1);box-shadow:0 0 14px rgba(255,58,94,.7)}
+#hp-bar{background:linear-gradient(90deg,#8e1024,#d33b3b,#f06a24);box-shadow:0 0 14px rgba(184,24,47,.72)}
 #hp-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;text-shadow:0 0 4px #000}
 #xp-wrap{top:34px;left:14px;width:260px;height:8px}
-#xp-bar{background:linear-gradient(90deg,#00f0ff,#9eff5b);box-shadow:0 0 12px rgba(0,240,255,.7)}
+#xp-bar{background:linear-gradient(90deg,#49c7ff,#7f4dd8,#d6a84f);box-shadow:0 0 12px rgba(73,199,255,.6)}
 #hud-top{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:14px;align-items:center}
-.chip{background:rgba(8,14,30,.7);border:1px solid rgba(0,240,255,.35);padding:6px 12px;border-radius:8px;color:#cfeaff;font-weight:700;letter-spacing:.08em;font-size:11px;backdrop-filter:blur(4px);box-shadow:0 0 10px rgba(0,240,255,.15)}
-.chip.gold{border-color:rgba(255,212,0,.5);color:#ffe45e;box-shadow:0 0 10px rgba(255,212,0,.18)}
-.chip.kill{border-color:rgba(255,43,214,.4);color:#ffb1ec;box-shadow:0 0 10px rgba(255,43,214,.18)}
-#timer{font-size:18px;font-weight:800;letter-spacing:.16em;color:#fff;text-shadow:0 0 12px rgba(0,240,255,.7)}
+.chip{background:rgba(24,12,9,.72);border:1px solid rgba(214,168,79,.35);padding:6px 12px;border-radius:8px;color:#eadfca;font-weight:700;letter-spacing:.08em;font-size:11px;backdrop-filter:blur(4px);box-shadow:0 0 12px rgba(184,24,47,.16)}
+.chip.gold{border-color:rgba(214,168,79,.6);color:#ffe0a0;box-shadow:0 0 10px rgba(214,168,79,.2)}
+.chip.kill{border-color:rgba(184,24,47,.48);color:#ff9aa2;box-shadow:0 0 10px rgba(184,24,47,.18)}
+#timer{font-size:18px;font-weight:800;letter-spacing:.16em;color:#fff8e5;text-shadow:0 0 12px rgba(240,106,36,.65)}
 
 /* corner stats */
 #hud-tr{position:absolute;top:14px;right:14px;text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
@@ -54,81 +57,83 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 /* weapons / passives */
 #hud-bottom{position:absolute;bottom:14px;left:14px;display:flex;flex-direction:column;gap:8px}
 .slot-row{display:flex;gap:6px}
-.slot{width:32px;height:32px;border-radius:8px;background:rgba(8,14,30,.7);border:1.5px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;position:relative;backdrop-filter:blur(3px)}
-.slot.passive{border-color:rgba(255,212,0,.35)}
-.slot.relic{border-color:rgba(155,92,255,.45);background:rgba(20,12,40,.7);pointer-events:auto}
-.slot.relic .ttip{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:6px;background:#0c163a;border:1px solid rgba(155,92,255,.5);border-radius:4px;padding:4px 7px;font-size:10px;color:#cfeaff;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s;z-index:5;letter-spacing:.04em}
+.slot{width:32px;height:32px;border-radius:8px;background:rgba(24,12,9,.72);border:1.5px solid rgba(216,199,161,.16);display:flex;align-items:center;justify-content:center;position:relative;backdrop-filter:blur(3px)}
+.slot.passive{border-color:rgba(214,168,79,.42)}
+.slot.relic{border-color:rgba(127,77,216,.48);background:rgba(22,12,28,.72);pointer-events:auto}
+.slot.relic .ttip{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:6px;background:#160d12;border:1px solid rgba(127,77,216,.58);border-radius:4px;padding:4px 7px;font-size:10px;color:#eadfca;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s;z-index:5;letter-spacing:.04em}
 .slot.relic:hover .ttip{opacity:1}
-.slot .lvl{position:absolute;bottom:-5px;right:-5px;font-size:10px;background:#0b1230;padding:1px 5px;border-radius:6px;border:1px solid rgba(255,255,255,.25);color:#fff;font-weight:700}
+.slot .lvl{position:absolute;bottom:-5px;right:-5px;font-size:10px;background:#1a0d0a;padding:1px 5px;border-radius:6px;border:1px solid rgba(216,199,161,.28);color:#fff;font-weight:700}
 .slot canvas{width:24px;height:24px}
 
 /* combo */
-#combo{position:absolute;bottom:80px;right:18px;color:#fff;font-weight:800;font-size:18px;text-shadow:0 0 12px rgba(255,43,214,.8);opacity:0;transition:opacity .25s;letter-spacing:.1em}
+#combo{position:absolute;bottom:80px;right:18px;color:#fff;font-weight:800;font-size:18px;text-shadow:0 0 12px rgba(184,24,47,.85);opacity:0;transition:opacity .25s;letter-spacing:.1em}
 #combo.show{opacity:1}
 
 /* hint */
 #hint{position:absolute;bottom:14px;right:14px;font-size:11px;color:var(--dim)}
-.kbd{display:inline-block;padding:1px 6px;border:1px solid #2a3a5a;border-radius:4px;background:#0b1430;color:#cfeaff;margin:0 2px;font-size:10px}
+.kbd{display:inline-block;padding:1px 6px;border:1px solid #4b3426;border-radius:4px;background:#160c09;color:#eadfca;margin:0 2px;font-size:10px}
 
 /* damage text container */
 #damage-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 
 /* ───────── OVERLAYS ───────── */
-.overlay{position:absolute;inset:0;background:rgba(4,5,11,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:50;pointer-events:auto;backdrop-filter:blur(6px)}
+.overlay{position:absolute;inset:0;background:rgba(7,5,4,.93);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:50;pointer-events:auto;backdrop-filter:blur(6px)}
 .overlay.hidden{display:none}
-.overlay h1{font-size:54px;font-weight:900;letter-spacing:.18em;color:#fff;text-shadow:0 0 18px var(--cyan), 0 0 36px rgba(0,240,255,.5);margin-bottom:6px}
-.overlay h2{font-size:22px;letter-spacing:.18em;color:#fff;text-shadow:0 0 10px var(--magenta)}
-.overlay p{color:#9ab5d0;max-width:560px;text-align:center;line-height:1.7;font-size:13px}
-.btn{padding:11px 28px;background:linear-gradient(180deg,#0c1a3a,#070d22);border:1.5px solid rgba(0,240,255,.55);border-radius:8px;color:#cfeaff;font-weight:800;letter-spacing:.12em;font-size:13px;cursor:pointer;transition:all .15s;text-shadow:0 0 6px rgba(0,240,255,.6);box-shadow:0 0 14px rgba(0,240,255,.18), inset 0 0 14px rgba(0,240,255,.05)}
-.btn:hover{transform:translateY(-1px);box-shadow:0 0 22px rgba(0,240,255,.4), inset 0 0 18px rgba(0,240,255,.12);border-color:#00f0ff}
-.btn.magenta{border-color:rgba(255,43,214,.6);color:#ffd1f0;text-shadow:0 0 6px rgba(255,43,214,.7);box-shadow:0 0 14px rgba(255,43,214,.18)}
-.btn.magenta:hover{box-shadow:0 0 22px rgba(255,43,214,.5)}
-.btn.gold{border-color:rgba(255,212,0,.7);color:#fff5b5;text-shadow:0 0 6px rgba(255,212,0,.7);box-shadow:0 0 14px rgba(255,212,0,.18)}
-.btn.ghost{border-color:rgba(255,255,255,.2);background:transparent;text-shadow:none;box-shadow:none;color:#9ab5d0}
+.overlay h1{font-size:54px;font-weight:900;letter-spacing:.18em;color:#fff8e5;text-shadow:0 0 18px var(--ember), 0 0 36px rgba(184,24,47,.5);margin-bottom:6px}
+.overlay h2{font-size:22px;letter-spacing:.18em;color:#fff8e5;text-shadow:0 0 10px var(--red)}
+.overlay p{color:#b9a98a;max-width:560px;text-align:center;line-height:1.7;font-size:13px}
+.btn{padding:11px 28px;background:linear-gradient(180deg,#2b1710,#120907);border:1.5px solid rgba(214,168,79,.56);border-radius:8px;color:#eadfca;font-weight:800;letter-spacing:.12em;font-size:13px;cursor:pointer;transition:all .15s;text-shadow:0 0 6px rgba(240,106,36,.45);box-shadow:0 0 14px rgba(184,24,47,.22), inset 0 0 14px rgba(214,168,79,.06)}
+.btn:hover{transform:translateY(-1px);box-shadow:0 0 22px rgba(240,106,36,.38), inset 0 0 18px rgba(214,168,79,.12);border-color:#d6a84f}
+.btn.magenta{border-color:rgba(127,77,216,.65);color:#e9dcff;text-shadow:0 0 6px rgba(127,77,216,.7);box-shadow:0 0 14px rgba(127,77,216,.18)}
+.btn.magenta:hover{box-shadow:0 0 22px rgba(127,77,216,.5)}
+.btn.gold{border-color:rgba(214,168,79,.75);color:#fff1bc;text-shadow:0 0 6px rgba(214,168,79,.7);box-shadow:0 0 14px rgba(214,168,79,.2)}
+.btn.ghost{border-color:rgba(216,199,161,.24);background:transparent;text-shadow:none;box-shadow:none;color:#b9a98a}
 .btn.ghost:hover{border-color:#fff;color:#fff;box-shadow:0 0 10px rgba(255,255,255,.2)}
 .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 
 /* main menu */
-#menu-title{font-size:84px;font-weight:900;letter-spacing:.2em;background:linear-gradient(180deg,#fff,#00f0ff 40%,#9b5cff 80%,#ff2bd6);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 24px rgba(0,240,255,.5));margin-bottom:0}
-#menu-sub{color:#9ab5d0;letter-spacing:.4em;font-size:12px;margin-bottom:16px}
+#menu-overlay{background:linear-gradient(180deg,rgba(7,5,4,.28),rgba(7,5,4,.92)),url("assets/concept/abyssal-rift-keyart.png") center/cover no-repeat}
+#menu-overlay::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 62%, transparent 0 34%, rgba(7,5,4,.58) 72%, rgba(0,0,0,.86) 100%);pointer-events:none;z-index:-1}
+#menu-title{font-size:84px;font-weight:900;letter-spacing:.16em;background:linear-gradient(180deg,#fff8e5,#d6a84f 38%,#f06a24 68%,#b8182f);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 24px rgba(184,24,47,.62));margin-bottom:0;text-align:center}
+#menu-sub{color:#d8c7a1;letter-spacing:.36em;font-size:12px;margin-bottom:16px;text-shadow:0 0 8px rgba(0,0,0,.8)}
 
 /* class picker */
 .class-grid{display:grid;grid-template-columns:repeat(5,160px);gap:14px}
-.class-card{background:linear-gradient(180deg,#0a1230,#060a1f);border:1.5px solid rgba(255,255,255,.12);border-radius:12px;padding:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:all .15s;position:relative;overflow:hidden}
+.class-card{background:linear-gradient(180deg,#22110d,#0c0706);border:1.5px solid rgba(216,199,161,.14);border-radius:12px;padding:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:all .15s;position:relative;overflow:hidden}
 .class-card::before{content:"";position:absolute;inset:-2px;border-radius:14px;padding:1.5px;background:linear-gradient(135deg,transparent,transparent);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;opacity:0;transition:opacity .2s}
 .class-card:hover{transform:translateY(-3px)}
-.class-card:hover::before{opacity:1;background:linear-gradient(135deg,#00f0ff,#ff2bd6)}
+.class-card:hover::before{opacity:1;background:linear-gradient(135deg,#d6a84f,#b8182f,#49c7ff)}
 .class-card.locked{opacity:.45;cursor:not-allowed}
 .class-card.locked:hover{transform:none}
 .class-card canvas{width:80px;height:80px}
 .class-card .cname{font-weight:900;letter-spacing:.18em;font-size:13px;color:#fff}
-.class-card .cdesc{font-size:10.5px;color:#7d96b4;text-align:center;line-height:1.5;min-height:42px}
-.class-card .cstart{font-size:10px;color:#ffd400;letter-spacing:.1em}
+.class-card .cdesc{font-size:10.5px;color:#a8987b;text-align:center;line-height:1.5;min-height:42px}
+.class-card .cstart{font-size:10px;color:#d6a84f;letter-spacing:.1em}
 
 /* level up */
 #levelup-overlay h2{margin-bottom:4px}
 .cards{display:flex;gap:14px;justify-content:center;align-items:stretch;flex-wrap:wrap;max-width:880px}
-.card{width:220px;min-height:260px;background:linear-gradient(180deg,#0c163a,#070d22);border:2px solid rgba(255,255,255,.12);border-radius:14px;padding:16px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:10px;transition:all .15s;position:relative;overflow:hidden}
+.card{width:220px;min-height:260px;background:linear-gradient(180deg,#21100d,#0c0706);border:2px solid rgba(216,199,161,.14);border-radius:14px;padding:16px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:10px;transition:all .15s;position:relative;overflow:hidden}
 .card .glow{position:absolute;inset:0;border-radius:12px;pointer-events:none;opacity:.8}
 .card:hover{transform:translateY(-4px)}
 .card .ico{width:64px;height:64px;display:flex;align-items:center;justify-content:center}
 .card .name{font-weight:900;letter-spacing:.14em;font-size:14px;color:#fff;text-align:center}
-.card .lv{font-size:10.5px;color:#9ab5d0;letter-spacing:.2em}
-.card .desc{font-size:11.5px;color:#cfeaff;text-align:center;line-height:1.6;flex:1}
+.card .lv{font-size:10.5px;color:#b9a98a;letter-spacing:.2em}
+.card .desc{font-size:11.5px;color:#eadfca;text-align:center;line-height:1.6;flex:1}
 .card.rarity-common{border-color:rgba(255,255,255,.25)}
-.card.rarity-rare{border-color:#00f0ff;box-shadow:0 0 22px rgba(0,240,255,.25)}
-.card.rarity-epic{border-color:#9b5cff;box-shadow:0 0 24px rgba(155,92,255,.35)}
-.card.rarity-legend{border-color:#ffd400;box-shadow:0 0 28px rgba(255,212,0,.4)}
-.card.evo{border-color:#00e5ff;box-shadow:0 0 30px rgba(0,229,255,.55),inset 0 0 16px rgba(0,229,255,.1);background:linear-gradient(180deg,#082030,#040810)}
+.card.rarity-rare{border-color:#49c7ff;box-shadow:0 0 22px rgba(73,199,255,.25)}
+.card.rarity-epic{border-color:#7f4dd8;box-shadow:0 0 24px rgba(127,77,216,.35)}
+.card.rarity-legend{border-color:#d6a84f;box-shadow:0 0 28px rgba(214,168,79,.4)}
+.card.evo{border-color:#49c7ff;box-shadow:0 0 30px rgba(73,199,255,.55),inset 0 0 16px rgba(73,199,255,.1);background:linear-gradient(180deg,#12262b,#050a0a)}
 .card .tag{position:absolute;top:8px;right:8px;font-size:9px;letter-spacing:.16em;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.08);color:#fff}
-.card.rarity-rare .tag{background:#00f0ff;color:#000}
-.card.rarity-epic .tag{background:#9b5cff;color:#fff}
-.card.rarity-legend .tag{background:#ffd400;color:#000}
-.card.evo .tag{background:#00e5ff;color:#000}
-.card.evo:hover{box-shadow:0 0 44px rgba(0,229,255,.85),inset 0 0 22px rgba(0,229,255,.18)}
-.card.fuse{border-color:#ff3dcb;box-shadow:0 0 32px rgba(255,61,203,.6),inset 0 0 18px rgba(255,61,203,.13);background:linear-gradient(180deg,#1a0820,#0a0510)}
-.card.fuse .tag{background:#ff3dcb;color:#000}
-.card.fuse:hover{box-shadow:0 0 44px rgba(255,61,203,.85),inset 0 0 22px rgba(255,61,203,.22)}
+.card.rarity-rare .tag{background:#49c7ff;color:#000}
+.card.rarity-epic .tag{background:#7f4dd8;color:#fff}
+.card.rarity-legend .tag{background:#d6a84f;color:#000}
+.card.evo .tag{background:#49c7ff;color:#000}
+.card.evo:hover{box-shadow:0 0 44px rgba(73,199,255,.75),inset 0 0 22px rgba(73,199,255,.18)}
+.card.fuse{border-color:#b8182f;box-shadow:0 0 32px rgba(184,24,47,.58),inset 0 0 18px rgba(184,24,47,.13);background:linear-gradient(180deg,#240b0d,#0a0404)}
+.card.fuse .tag{background:#b8182f;color:#fff8e5}
+.card.fuse:hover{box-shadow:0 0 44px rgba(184,24,47,.82),inset 0 0 22px rgba(184,24,47,.22)}
 .card .stat-table{font-family:'JetBrains Mono','Consolas',monospace;font-size:10.5px;line-height:1.55;color:#9ab5d0;text-align:left;width:100%;margin-top:2px;border-top:1px dashed rgba(255,255,255,.08);padding-top:6px}
 .card .stat-table .row{display:flex;justify-content:space-between;gap:6px}
 .card .stat-table .key{color:#7d96b4;letter-spacing:.06em}
@@ -143,68 +148,68 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 /* end overlay */
 #end-overlay h1{font-size:64px}
-#end-stats{display:grid;grid-template-columns:auto auto;gap:6px 28px;color:#cfeaff;font-size:13px;background:rgba(8,14,30,.5);padding:14px 24px;border-radius:10px;border:1px solid rgba(255,255,255,.1)}
+#end-stats{display:grid;grid-template-columns:auto auto;gap:6px 28px;color:#eadfca;font-size:13px;background:rgba(24,12,9,.56);padding:14px 24px;border-radius:10px;border:1px solid rgba(216,199,161,.12)}
 #end-stats b{color:#fff;font-weight:700;text-align:right}
 
 /* shop */
 .shop-grid{display:grid;grid-template-columns:repeat(3,240px);gap:14px;margin-top:8px}
-.shop-card{background:linear-gradient(180deg,#0a1230,#060a1f);border:2px solid rgba(255,212,0,.3);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;cursor:pointer;position:relative;transition:all .15s;color:#fff}
-.shop-card:hover{transform:translateY(-2px);border-color:#ffd400;box-shadow:0 0 16px rgba(255,212,0,.3)}
+.shop-card{background:linear-gradient(180deg,#22110d,#0c0706);border:2px solid rgba(214,168,79,.34);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;cursor:pointer;position:relative;transition:all .15s;color:#fff}
+.shop-card:hover{transform:translateY(-2px);border-color:#d6a84f;box-shadow:0 0 16px rgba(214,168,79,.3)}
 .shop-card.maxed{opacity:.55;cursor:default}
-.shop-card .sn{font-weight:900;letter-spacing:.12em;font-size:12px;color:#ffd400}
-.shop-card .sd{font-size:11px;color:#9ab5d0;line-height:1.5;min-height:40px}
+.shop-card .sn{font-weight:900;letter-spacing:.12em;font-size:12px;color:#d6a84f}
+.shop-card .sd{font-size:11px;color:#b9a98a;line-height:1.5;min-height:40px}
 .shop-card .sp{font-weight:700;font-size:12px;color:#fff}
 .shop-card .pip{display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.15);margin-right:3px}
-.shop-card .pip.on{background:#ffd400;box-shadow:0 0 4px #ffd400}
-/* CHIPSET */
-.chip{background:linear-gradient(180deg,#0a1230,#060a1f);border:2px solid rgba(255,61,203,.3);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;cursor:pointer;position:relative;width:160px;color:#fff;transition:all .12s}
-.chip:hover{transform:translateY(-2px)}
-.chip.tier-common{border-color:rgba(176,188,204,.45)}
-.chip.tier-rare{border-color:rgba(0,240,255,.6)}
-.chip.tier-epic{border-color:rgba(155,92,255,.7)}
-.chip.tier-legendary{border-color:rgba(255,212,0,.9);box-shadow:0 0 14px rgba(255,212,0,.25)}
-.chip .cn{font-weight:900;letter-spacing:.10em;font-size:11px}
-.chip .cd{font-size:10px;color:#9ab5d0;line-height:1.4;min-height:32px}
-.chip .cstack{position:absolute;top:4px;right:6px;font-size:10px;font-weight:900;color:#9eff5b;text-shadow:0 0 4px #000}
-.chip .cequip{position:absolute;top:4px;left:6px;font-size:9px;font-weight:900;color:#ffd400;text-shadow:0 0 4px #000}
-.chip .cfuse{margin-top:4px;text-align:center;font-size:10px;font-weight:900;letter-spacing:.18em;color:#ff3dcb;border:1px solid #ff3dcb;border-radius:4px;padding:3px 0;cursor:pointer;transition:all .12s}
-.chip .cfuse:hover{background:#ff3dcb;color:#000;box-shadow:0 0 12px rgba(255,61,203,.6)}
-.chip.empty{border-style:dashed;border-color:rgba(255,255,255,.2);opacity:.5;cursor:pointer}
-.chip.equipped{outline:2px solid #ffd400;outline-offset:2px}
-.chip.fuse-ready{box-shadow:0 0 12px rgba(255,61,203,.7)}
+.shop-card .pip.on{background:#d6a84f;box-shadow:0 0 4px #d6a84f}
+/* RUNE SOCKETS */
+#chipset-overlay .chip{background:linear-gradient(180deg,#22110d,#0c0706);border:2px solid rgba(127,77,216,.34);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;cursor:pointer;position:relative;width:160px;color:#fff;transition:all .12s}
+#chipset-overlay .chip:hover{transform:translateY(-2px)}
+#chipset-overlay .chip.tier-common{border-color:rgba(176,188,204,.45)}
+#chipset-overlay .chip.tier-rare{border-color:rgba(73,199,255,.6)}
+#chipset-overlay .chip.tier-epic{border-color:rgba(127,77,216,.7)}
+#chipset-overlay .chip.tier-legendary{border-color:rgba(214,168,79,.9);box-shadow:0 0 14px rgba(214,168,79,.25)}
+#chipset-overlay .chip .cn{font-weight:900;letter-spacing:.10em;font-size:11px}
+#chipset-overlay .chip .cd{font-size:10px;color:#b9a98a;line-height:1.4;min-height:32px}
+#chipset-overlay .chip .cstack{position:absolute;top:4px;right:6px;font-size:10px;font-weight:900;color:#9eff5b;text-shadow:0 0 4px #000}
+#chipset-overlay .chip .cequip{position:absolute;top:4px;left:6px;font-size:9px;font-weight:900;color:#ffd400;text-shadow:0 0 4px #000}
+#chipset-overlay .chip .cfuse{margin-top:4px;text-align:center;font-size:10px;font-weight:900;letter-spacing:.18em;color:#b8182f;border:1px solid #b8182f;border-radius:4px;padding:3px 0;cursor:pointer;transition:all .12s}
+#chipset-overlay .chip .cfuse:hover{background:#b8182f;color:#fff8e5;box-shadow:0 0 12px rgba(184,24,47,.6)}
+#chipset-overlay .chip.empty{border-style:dashed;border-color:rgba(255,255,255,.2);opacity:.5;cursor:pointer}
+#chipset-overlay .chip.equipped{outline:2px solid #d6a84f;outline-offset:2px}
+#chipset-overlay .chip.fuse-ready{box-shadow:0 0 12px rgba(184,24,47,.7)}
 
 /* pause inspector list */
-#pause-info{color:#cfeaff;font-size:12px;background:rgba(8,14,30,.5);padding:14px 22px;border-radius:10px;border:1px solid rgba(255,255,255,.1);max-width:680px;width:80%;max-height:60vh;overflow-y:auto;line-height:1.8}
+#pause-info{color:#eadfca;font-size:12px;background:rgba(24,12,9,.56);padding:14px 22px;border-radius:10px;border:1px solid rgba(216,199,161,.12);max-width:680px;width:80%;max-height:60vh;overflow-y:auto;line-height:1.8}
 
 /* boss banner */
-#boss-banner{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%) scale(.5);opacity:0;font-size:42px;font-weight:900;letter-spacing:.32em;color:#fff;text-shadow:0 0 22px var(--magenta), 0 0 44px var(--magenta);pointer-events:none;transition:all .35s cubic-bezier(.2,1.6,.4,1)}
+#boss-banner{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%) scale(.5);opacity:0;font-size:42px;font-weight:900;letter-spacing:.32em;color:#fff8e5;text-shadow:0 0 22px var(--red), 0 0 44px var(--ember);pointer-events:none;transition:all .35s cubic-bezier(.2,1.6,.4,1)}
 #boss-banner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
-#boss-hp-wrap{position:absolute;top:54px;left:50%;transform:translateX(-50%);width:60%;max-width:520px;height:10px;border-radius:5px;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,43,214,.4);overflow:hidden;display:none}
-#boss-hp-bar{height:100%;background:linear-gradient(90deg,#ff2bd6,#ff7aa1,#ffd400);box-shadow:0 0 14px rgba(255,43,214,.7)}
-#boss-name{position:absolute;top:36px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:.32em;color:#ffb1ec;text-shadow:0 0 8px var(--magenta);display:none;font-weight:700}
+#boss-hp-wrap{position:absolute;top:54px;left:50%;transform:translateX(-50%);width:60%;max-width:520px;height:10px;border-radius:5px;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(184,24,47,.48);overflow:hidden;display:none}
+#boss-hp-bar{height:100%;background:linear-gradient(90deg,#b8182f,#f06a24,#d6a84f);box-shadow:0 0 14px rgba(184,24,47,.72)}
+#boss-name{position:absolute;top:36px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:.32em;color:#ffb7a1;text-shadow:0 0 8px var(--red);display:none;font-weight:700}
 
 /* announcement */
-#announce{position:absolute;top:32%;left:50%;transform:translateX(-50%);font-weight:900;letter-spacing:.2em;font-size:28px;color:#fff;text-shadow:0 0 18px var(--cyan);opacity:0;pointer-events:none;transition:opacity .3s}
+#announce{position:absolute;top:32%;left:50%;transform:translateX(-50%);font-weight:900;letter-spacing:.2em;font-size:28px;color:#fff8e5;text-shadow:0 0 18px var(--ember);opacity:0;pointer-events:none;transition:opacity .3s}
 #announce.show{opacity:1}
 
 /* progression guide panel — always-visible right-side compact list. Two
    sections: ▲ EVOLVE (cyan) and ★ FUSE (magenta). Cursor:help indicates
    info-only — hover rows for tooltip. */
-#progression-guide{position:absolute;top:74px;right:14px;width:240px;max-height:62vh;overflow-y:auto;overflow-x:hidden;background:rgba(8,14,30,.6);border:1px solid rgba(0,229,255,.22);border-radius:8px;padding:8px 10px;font-size:10px;color:#9ab5d0;line-height:1.45;backdrop-filter:blur(3px);pointer-events:auto;cursor:help;letter-spacing:.02em;font-family:'JetBrains Mono','Consolas',monospace}
+#progression-guide{position:absolute;top:74px;right:14px;width:240px;max-height:62vh;overflow-y:auto;overflow-x:hidden;background:rgba(24,12,9,.64);border:1px solid rgba(214,168,79,.26);border-radius:8px;padding:8px 10px;font-size:10px;color:#b9a98a;line-height:1.45;backdrop-filter:blur(3px);pointer-events:auto;cursor:help;letter-spacing:.02em;font-family:'JetBrains Mono','Consolas',monospace}
 #progression-guide .pg-help{position:absolute;top:6px;right:8px;font-size:9px;color:#7d96b4;cursor:help;letter-spacing:.1em}
 #progression-guide .pg-help:hover{color:#cfeaff}
 #progression-guide .pg-section{margin-top:4px}
 #progression-guide .pg-section + .pg-section{margin-top:9px;padding-top:7px;border-top:1px solid rgba(255,255,255,.06)}
 #progression-guide .pg-head{font-weight:800;letter-spacing:.18em;margin-bottom:5px;font-size:10px}
-#progression-guide .pg-head.evo{color:#00e5ff;text-shadow:0 0 6px rgba(0,229,255,.5)}
-#progression-guide .pg-head.fuse{color:#ff3dcb;text-shadow:0 0 6px rgba(255,61,203,.5)}
+#progression-guide .pg-head.evo{color:#49c7ff;text-shadow:0 0 6px rgba(73,199,255,.5)}
+#progression-guide .pg-head.fuse{color:#b8182f;text-shadow:0 0 6px rgba(184,24,47,.5)}
 #progression-guide .pg-row{margin:2px 0;padding:2px 0;border-top:1px solid rgba(255,255,255,.04);cursor:help}
 #progression-guide .pg-row:first-child{border-top:none}
 #progression-guide .pg-name{font-weight:700;font-size:10px}
 #progression-guide .pg-meta{font-size:9px;color:#7d96b4;margin-top:1px}
 #progression-guide .pg-row.ready .pg-name{text-shadow:0 0 5px currentColor;animation:pgPulse 1.4s ease-in-out infinite}
-#progression-guide .pg-row.evo.ready::before{content:"▲ ";color:#00e5ff;font-weight:900}
-#progression-guide .pg-row.fuse.ready::before{content:"★ ";color:#ff3dcb;font-weight:900}
+#progression-guide .pg-row.evo.ready::before{content:"▲ ";color:#49c7ff;font-weight:900}
+#progression-guide .pg-row.fuse.ready::before{content:"★ ";color:#b8182f;font-weight:900}
 #progression-guide .pg-row.partial::before{content:"· ";color:#ffd400}
 #progression-guide .pg-row.locked{opacity:.45}
 #progression-guide .pg-row.locked::before{content:"· ";color:#5d7290}
@@ -252,18 +257,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     </div>
 
     <div id="hud-tr">
-      <div class="chip" id="diff-chip">VECTOR · NORMAL</div>
+      <div class="chip" id="diff-chip">RIFT · NORMAL</div>
       <div class="chip" id="fps-chip" title="실시간 FPS · 60 목표">FPS --</div>
     </div>
 
     <div id="progression-guide" style="display:none">
-      <div class="pg-help" title="진화: 무기 만렙 + 패시브 만렙 → 무기 변형. 융합: 진화된 두 무기 만렙 → 새 무기 Lv.1로 합쳐짐. 정보 패널 (클릭 불가)">[?] 도움말</div>
+      <div class="pg-help" title="룬 각성: 무기 만렙 + 덕목 만렙 → 스킬 변형. 전설 각성: 각성된 두 무기 만렙 → 새 무기 Lv.1로 합쳐짐. 정보 패널 (클릭 불가)">[?]</div>
       <div class="pg-section evo-section">
-        <div class="pg-head evo">▲ EVOLVE · 진화</div>
+        <div class="pg-head evo">▲ RUNE · 각성</div>
         <div id="evo-list"></div>
       </div>
       <div class="pg-section fuse-section">
-        <div class="pg-head fuse">★ FUSE · 융합</div>
+        <div class="pg-head fuse">★ AWAKEN · 전설</div>
         <div id="fuse-list"></div>
       </div>
     </div>
@@ -275,7 +280,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     </div>
 
     <div id="combo">×0 COMBO</div>
-    <div id="boss-name">▼ BOSS ▼</div>
+    <div id="boss-name">▼ ABYSS LORD ▼</div>
     <div id="boss-hp-wrap"><div id="boss-hp-bar" style="width:100%"></div></div>
     <div id="boss-banner">WARNING</div>
     <div id="announce"></div>
@@ -288,51 +293,51 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   <!-- MAIN MENU -->
   <div class="overlay" id="menu-overlay">
-    <div id="menu-title">NEON PULSE</div>
-    <div id="menu-sub">VECTOR ROGUELIKE · 0.1.0</div>
+    <div id="menu-title">ABYSSAL PULSE</div>
+    <div id="menu-sub">DARK LOOT ROGUELITE · 0.2.0</div>
     <div class="row">
-      <button class="btn" onclick="openClassPicker()">▶ START RUN</button>
-      <button class="btn gold" onclick="openShop()">◆ ARSENAL SHOP</button>
-      <button class="btn magenta" onclick="openChipset()">◈ CHIPSET LAB</button>
-      <button class="btn ghost" onclick="openCodex()">≣ CODEX</button>
+      <button class="btn" onclick="openClassPicker()">▶ ENTER RIFT</button>
+      <button class="btn gold" onclick="openShop()">◆ BLACKSMITH</button>
+      <button class="btn magenta" onclick="openChipset()">◈ RUNE SOCKETS</button>
+      <button class="btn ghost" onclick="openCodex()">≣ BESTIARY</button>
     </div>
     <div id="legend">
-      <div><span class="k">CYAN</span> 빠른 잡몹</div><div><span class="k">VIOLET</span> 두꺼운 적</div><div><span class="k">YELLOW</span> 사격형</div>
-      <div><span class="k">LIME</span> 분열형</div><div><span class="k">PINK</span> 돌진형</div><div><span class="k">GOLD</span> 보스</div>
+      <div><span class="k">SOUL</span> 빠른 망령</div><div><span class="k">VOID</span> 두꺼운 적</div><div><span class="k">EMBER</span> 사격형</div>
+      <div><span class="k">PLAGUE</span> 분열형</div><div><span class="k">BLOOD</span> 돌진형</div><div><span class="k">GOLD</span> 보스</div>
     </div>
     <div style="font-size:11px;color:#5d7290;margin-top:14px;letter-spacing:.2em">
-      금고 ◆ <span id="menu-coins">0</span> · 베스트 <span id="menu-best">0:00</span> · 런 <span id="menu-runs">0</span>
+      금고 ◆ <span id="menu-coins">0</span> · 최고 생존 <span id="menu-best">0:00</span> · 원정 <span id="menu-runs">0</span>
     </div>
   </div>
 
   <!-- CLASS PICKER -->
   <div class="overlay hidden" id="class-overlay">
-    <h1>SELECT VECTOR</h1>
-    <p>각 벡터는 시작 무기와 패시브가 다릅니다.</p>
+    <h1>CHOOSE EXILE</h1>
+    <p>각 추방자는 시작 스킬과 생존 성향이 다릅니다.</p>
     <div class="class-grid" id="class-grid"></div>
     <div class="row">
-      <button class="btn ghost" onclick="closeOverlay('class-overlay');showMenu()">← 돌아가기</button>
+      <button class="btn ghost" onclick="closeOverlay('class-overlay');showMenu()">← 성역으로</button>
     </div>
   </div>
 
   <!-- LEVEL UP -->
   <div class="overlay hidden" id="levelup-overlay">
-    <h2>LEVEL UP</h2>
-    <p style="margin-top:-4px">하나를 선택하세요</p>
+    <h2>RIFT BOON</h2>
+    <p style="margin-top:-4px">심연의 축복 하나를 선택하세요</p>
     <div class="cards" id="cards"></div>
     <div class="row" style="margin-top:6px">
-      <button class="btn ghost" id="reroll-btn" onclick="rerollLevelup()">⟳ REROLL (◆ <span id="reroll-cost">3</span>)</button>
-      <button class="btn ghost" id="skip-btn" onclick="skipLevelup()">⨯ SKIP (+10HP)</button>
+      <button class="btn ghost" id="reroll-btn" onclick="rerollLevelup()">⟳ DIVINE AGAIN (◆ <span id="reroll-cost">3</span>)</button>
+      <button class="btn ghost" id="skip-btn" onclick="skipLevelup()">⨯ BLOOD REST (+10HP)</button>
     </div>
   </div>
 
   <!-- PAUSE -->
   <div class="overlay hidden" id="pause-overlay">
-    <h1>PAUSED</h1>
+    <h1>RIFT PAUSED</h1>
     <div id="pause-info"></div>
     <div class="row">
-      <button class="btn" onclick="togglePause()">▶ RESUME</button>
-      <button class="btn ghost" onclick="confirmAbandon()">✕ ABANDON RUN</button>
+      <button class="btn" onclick="togglePause()">▶ RETURN</button>
+      <button class="btn ghost" onclick="confirmAbandon()">✕ ABANDON RIFT</button>
     </div>
   </div>
 
@@ -342,53 +347,53 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     <p id="end-text" style="margin-top:-8px"></p>
     <div id="end-stats"></div>
     <div class="row">
-      <button class="btn" onclick="returnToMenu()">▶ CONTINUE</button>
-      <button class="btn magenta" onclick="restartRun()">↻ RETRY</button>
+      <button class="btn" onclick="returnToMenu()">▶ CLAIM SPOILS</button>
+      <button class="btn magenta" onclick="restartRun()">↻ DELVE AGAIN</button>
     </div>
   </div>
 
   <!-- SHOP -->
   <div class="overlay hidden" id="shop-overlay">
-    <h1>ARSENAL</h1>
-    <p>금고의 코어를 소비해 영구 강화. 보유 ◆ <span id="shop-coins">0</span></p>
+    <h1>BLACKSMITH</h1>
+    <p>금고의 코어를 바쳐 영구 강화를 벼립니다. 보유 ◆ <span id="shop-coins">0</span></p>
     <div class="shop-grid" id="shop-grid"></div>
     <div class="row" style="margin-top:8px">
-      <button class="btn ghost" onclick="closeOverlay('shop-overlay');showMenu()">← 돌아가기</button>
+      <button class="btn ghost" onclick="closeOverlay('shop-overlay');showMenu()">← 성역으로</button>
     </div>
   </div>
 
   <!-- CHIPSET -->
   <div class="overlay hidden" id="chipset-overlay">
-    <h1>CHIPSET LAB</h1>
-    <p>코인을 칩으로 변환. 장착한 칩만 런에 적용. 보유 ◆ <span id="chipset-coins">0</span></p>
+    <h1>RUNE SOCKETS</h1>
+    <p>코어를 룬으로 벼려 장착합니다. 장착한 룬만 원정에 적용. 보유 ◆ <span id="chipset-coins">0</span></p>
     <div class="row" style="margin-top:4px;gap:10px">
-      <button class="btn magenta" id="pull1-btn" onclick="chipsetPull(1)">◇ 단판 (◆ 100)</button>
-      <button class="btn magenta" id="pull10-btn" onclick="chipsetPull(10)">◈ 10연 (◆ 900)</button>
-      <button class="btn ghost" id="slot-btn" onclick="chipsetBuySlot()">+ 슬롯</button>
+      <button class="btn magenta" id="pull1-btn" onclick="chipsetPull(1)">◇ 룬 조각 (◆ 100)</button>
+      <button class="btn magenta" id="pull10-btn" onclick="chipsetPull(10)">◈ 룬 제련 x10 (◆ 900)</button>
+      <button class="btn ghost" id="slot-btn" onclick="chipsetBuySlot()">+ 소켓</button>
     </div>
     <div id="chipset-pull-result" style="min-height:90px;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:920px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:920px;margin-top:10px;width:90%">
       <div>
-        <div style="color:#fff;font-weight:900;letter-spacing:.18em;margin-bottom:6px;font-size:12px">▣ EQUIPPED — <span id="chipset-slot-info">3 slots</span></div>
+        <div style="color:#fff;font-weight:900;letter-spacing:.18em;margin-bottom:6px;font-size:12px">▣ SOCKETED — <span id="chipset-slot-info">3 sockets</span></div>
         <div id="chipset-equipped" style="display:flex;gap:6px;flex-wrap:wrap"></div>
       </div>
       <div>
-        <div style="color:#fff;font-weight:900;letter-spacing:.18em;margin-bottom:6px;font-size:12px">◇ INVENTORY (클릭=장착, 같은 칩 3=합성)</div>
+        <div style="color:#fff;font-weight:900;letter-spacing:.18em;margin-bottom:6px;font-size:12px">◇ RUNE VAULT (클릭=장착, 같은 룬 3=합성)</div>
         <div id="chipset-inventory" style="display:flex;gap:6px;flex-wrap:wrap;max-height:240px;overflow-y:auto"></div>
       </div>
     </div>
     <div class="row" style="margin-top:8px">
-      <button class="btn ghost" onclick="closeOverlay('chipset-overlay');showMenu()">← 돌아가기</button>
+      <button class="btn ghost" onclick="closeOverlay('chipset-overlay');showMenu()">← 성역으로</button>
     </div>
   </div>
 
   <!-- CODEX -->
   <div class="overlay hidden" id="codex-overlay">
-    <h1>CODEX</h1>
-    <p>해금된 무기/패시브/시너지/적 정보.</p>
+    <h1>BESTIARY</h1>
+    <p>해금된 스킬, 덕목, 각성, 심연의 적 정보.</p>
     <div id="codex-content" style="max-width:880px;width:90%;max-height:60vh;overflow-y:auto;padding:8px"></div>
     <div class="row" style="margin-top:8px">
-      <button class="btn ghost" onclick="closeOverlay('codex-overlay');showMenu()">← 돌아가기</button>
+      <button class="btn ghost" onclick="closeOverlay('codex-overlay');showMenu()">← 성역으로</button>
     </div>
   </div>
 </div>
