@@ -255,13 +255,16 @@ export function update(){
   // player sprite sync (player is not in G.ents)
   if(p && p.sprite){
     p.sprite.position.set(p.x, p.y);
-    p.sprite.rotation = p.rot;
-    p.dotSprite.position.set(p.x, p.y);
+    p.sprite.rotation = p.spriteAsset ? Math.sin(G.realT * 4) * 0.035 : p.rot;
+    if(p.dotSprite) p.dotSprite.position.set(p.x, p.y);
     if(p.invuln > 0 && (Math.floor(G.realT*16)%2===0)){
-      p.sprite.alpha = 0.35; p.dotSprite.alpha = 0.35;
+      p.sprite.alpha = 0.35;
+      if(p.dotSprite) p.dotSprite.alpha = p.spriteAsset ? 0 : 0.35;
     } else {
-      p.sprite.alpha = 1; p.dotSprite.alpha = 1;
+      p.sprite.alpha = 1;
+      if(p.dotSprite) p.dotSprite.alpha = p.spriteAsset ? 0 : 1;
     }
+    if(p.dotSprite) p.dotSprite.visible = !p.spriteAsset;
     // Trail — fading line through trail points (each segment has its own alpha).
     if(p.trailGfx){
       p.trailGfx.clear();
@@ -636,16 +639,31 @@ function _syncEntitySprite(e){
   if(!gfxType) sp.position.set(e.x, e.y);
 
   if(e.type === 'enemy'){
-    sp.rotation = e.rot;
-    const wantFlash = e.hitFlash > 0;
-    if(wantFlash && e.__flashTex && sp.texture !== e.__flashTex.texture) sp.texture = e.__flashTex.texture;
-    else if(!wantFlash && e.__normTex && sp.texture !== e.__normTex.texture) sp.texture = e.__normTex.texture;
+    const visualPulse = e.__spriteAsset && e.eliteAffix
+      ? 1 + Math.sin(G.realT * 5 + (e.__elitePulse || 0)) * .04
+      : 1;
+    if(e.__spriteAsset){
+      sp.rotation = (e.rot || 0) * 0.12;
+      sp.tint = e.hitFlash > 0 ? 0xffefe0 : 0xffffff;
+      if(sp.__assetScaleX && sp.__assetScaleY) sp.scale.set(sp.__assetScaleX * visualPulse, sp.__assetScaleY * visualPulse);
+    } else {
+      sp.rotation = e.rot;
+      const wantFlash = e.hitFlash > 0;
+      if(wantFlash && e.__flashTex && sp.texture !== e.__flashTex.texture) sp.texture = e.__flashTex.texture;
+      else if(!wantFlash && e.__normTex && sp.texture !== e.__normTex.texture) sp.texture = e.__normTex.texture;
+    }
     if(e.auraSprite){
       e.auraSprite.position.set(e.x, e.y);
       e.auraSprite.alpha = .35 + Math.sin(G.realT*3) * .12;  // breathing pulse
     }
   } else if(e.type === 'proj'){
-    sp.rotation = e.subtype === 'shuriken' ? e.spin : Math.atan2(e.vy, e.vx);
+    if(e.__spriteAsset){
+      const baseRot = e.subtype === 'shuriken' ? e.spin : Math.atan2(e.vy, e.vx);
+      const drift = (e.__spriteAsset.spinRate || 0) * G.realT;
+      sp.rotation = baseRot + (e.__spriteAsset.rotationOffset || 0) + drift;
+    } else {
+      sp.rotation = e.subtype === 'shuriken' ? e.spin : Math.atan2(e.vy, e.vx);
+    }
   } else if(e.type === 'xp')     sp.rotation = G.realT * 3;
   else   if(e.type === 'coin')   sp.rotation = G.realT * 4;
   else   if(e.type === 'magnet') sp.rotation = G.realT * 2;

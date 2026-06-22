@@ -26,6 +26,7 @@ Then open `http://localhost:8000/`.
 The game keeps the original horde-survivor roguelite loop while shifting the fantasy to a dark gothic looter ARPG:
 
 - Exile classes with distinct starting skills
+- Generated gothic PNG sprites for Rift Warden, Hollow Imp, Grave Brute, Ashen Butcher, Bone Shards, Hellfire Cross, and Spectral Blades
 - Rune awakenings and legendary skill awakenings
 - Relic, rune, and cursed altar progression
 - Elite affix monsters such as Molten, Frostbound, and Void-Touched

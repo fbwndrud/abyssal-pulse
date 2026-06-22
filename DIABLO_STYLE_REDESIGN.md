@@ -18,6 +18,13 @@
 - 성당, 지하묘지, 지옥 대장간 같은 어두운 던전 분위기
 - 엘리트 몬스터와 보스가 짧고 강한 위협을 만드는 템포
 
+### 2026-06-23 아트 적용 상태
+
+- `RIFT WARDEN`, `HOLLOW IMP`, `GRAVE BRUTE`, `ASHEN BUTCHER`를 생성형 투명 PNG 스프라이트로 교체
+- `Bone Shards`, `Hellfire Cross`, `Spectral Blades` 투사체 PNG 적용
+- PixiJS 렌더러는 PNG 에셋 우선, 기존 도형 텍스처 폴백 구조 유지
+- 후속 P1: `BLOOD SEER`, `GRAVE BULWARK`, `IRON EXILE`, `HEX WITCH`, 나머지 일반 적과 보스 이미지 확장
+
 ---
 
 ## 2. 유지할 뼈대

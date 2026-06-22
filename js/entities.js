@@ -7,6 +7,7 @@ import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce, entityLayer
 import { AUDIO } from './audio.js';
 import {
   getCircleTexture, getPolygonTexture, getStarTexture, getDiamondTexture,
+  SPRITE_ASSETS, getImageTextureAsset, configureSpriteForAsset,
   acquireSprite, releaseSprite,
   acquireParticle, releaseParticle,
   acquireGraphics, releaseGraphics,
@@ -72,8 +73,10 @@ function _attachFxText(e){
    death (alive=false), the cleanup pass calls detachSprite() to return it. */
 export function attachSpriteFromTexInfo(e, texInfo){
   e.__texKey = texInfo.key;
+  e.__spriteAsset = texInfo.asset || null;
   e.sprite = acquireSprite(texInfo.key, texInfo.texture);
   e.sprite.position.set(e.x, e.y);
+  if(texInfo.asset) configureSpriteForAsset(e.sprite, texInfo.asset);
   entityLayer.addChild(e.sprite);
 }
 export function detachSprite(e){
@@ -96,6 +99,7 @@ export function detachSprite(e){
   e.__texKey = null;
   e.__normTex = null;
   e.__flashTex = null;
+  e.__spriteAsset = null;
 }
 
 /* Detach all entity + player sprites. Called by startRun to avoid sprite leaks
@@ -132,6 +136,14 @@ function _attachEnemySprite(e){
     e.auraSprite = auraSp;
     e.auraSize = auraSize;
   }
+  const imageAsset = isBoss ? SPRITE_ASSETS.bosses[e.kind] : SPRITE_ASSETS.enemies[e.kind];
+  const imageTex = getImageTextureAsset(imageAsset);
+  if(imageTex){
+    e.__normTex = imageTex;
+    e.__flashTex = null;
+    attachSpriteFromTexInfo(e, imageTex);
+    return;
+  }
   let normTex, flashTex;
   if(e.isDiamond){
     normTex  = getDiamondTexture(e.r, e.color, glow, fillNorm);
@@ -149,6 +161,12 @@ function _attachEnemySprite(e){
 }
 
 function _attachProjectileSprite(e){
+  const imageAsset = SPRITE_ASSETS.projectiles[e.subtype];
+  const imageTex = getImageTextureAsset(imageAsset);
+  if(imageTex){
+    attachSpriteFromTexInfo(e, imageTex);
+    return;
+  }
   let texInfo;
   if(e.subtype === 'shuriken')     texInfo = getStarTexture(4, 14, 6, e.color, 8, e.color, 1.6);
   else if(e.subtype === 'homing')  texInfo = getDiamondTexture(8, e.color, 6, e.color);

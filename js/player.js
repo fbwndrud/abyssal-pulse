@@ -13,6 +13,7 @@ import {
 } from './entities.js';
 import {
   getCircleTexture, getPolygonTexture, acquireSprite, releaseSprite,
+  SPRITE_ASSETS, getImageTextureAsset, configureSpriteForAsset,
   acquireGraphics, releaseGraphics,
 } from './render.js';
 import {
@@ -58,8 +59,11 @@ export function spawnPlayer(classKey){
   p.hp = p.maxHp;
   G.player = p;
   // PIXI sprites — body + center dot. Trail/halo are dynamic (Graphics, Step 5).
-  let bodyTex;
-  if(p.sides === 0){
+  const playerAsset = SPRITE_ASSETS.players[classKey];
+  let bodyTex = getImageTextureAsset(playerAsset);
+  if(bodyTex){
+    p.spriteAsset = playerAsset;
+  } else if(p.sides === 0){
     bodyTex = getCircleTexture(p.r, p.color, 22, 'hsla(180 80% 8% / .6)', 2.6);
   } else {
     bodyTex = getPolygonTexture(p.sides, p.r, p.color, 20, 'rgba(0,0,0,.4)', 2.4);
@@ -70,9 +74,14 @@ export function spawnPlayer(classKey){
   const dotTex  = getCircleTexture(dotR, '#ffffff', dotGlow, p.color, dotLW);
   p.__bodyKey = bodyTex.key; p.__dotKey = dotTex.key;
   p.sprite = acquireSprite(bodyTex.key, bodyTex.texture);
+  if(p.spriteAsset) configureSpriteForAsset(p.sprite, p.spriteAsset);
   p.dotSprite = acquireSprite(dotTex.key, dotTex.texture);
   p.sprite.position.set(p.x, p.y);
   p.dotSprite.position.set(p.x, p.y);
+  if(p.spriteAsset){
+    p.dotSprite.visible = false;
+    p.dotSprite.alpha = 0;
+  }
   // Player trail (fading line behind player) + beam graphics (BEAM/EVENT LANCE per-frame redraw).
   p.trailGfx = acquireGraphics();
   p.beamGfx  = acquireGraphics();

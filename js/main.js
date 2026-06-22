@@ -7,7 +7,7 @@ import {
   flushMetaIfNeeded, flushMetaNow, initPixi,
   app, world, bgC, entityLayer, fxLayer, beamLayer, hudC,
 } from './core.js';
-import { BG } from './render.js';
+import { BG, preloadSpriteAssets } from './render.js';
 import { AUDIO } from './audio.js';
 import { update, render, setLoopHandlers } from './gameloop.js';
 import {
@@ -116,6 +116,7 @@ addEventListener('pointerdown', ()=>{ AUDIO.init().then(()=>{ if(G.mode==='menu'
 addEventListener('keydown',     ()=>{ AUDIO.init().then(()=>{ if(G.mode==='menu') AUDIO.setMode('menu'); }); }, { once:true });
 
 await initPixi();
+await preloadSpriteAssets();
 requestAnimationFrame(t=>{ lastT = t; requestAnimationFrame(loop); });
 showMenu();
 

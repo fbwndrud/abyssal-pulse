@@ -198,6 +198,61 @@ export function getDiamondTexture(r, color='#fff', glow=12, fill=null){
   return getPolygonTexture(4, r, color, glow, fill, 2);
 }
 
+/* ───────── GENERATED GOTHIC SPRITE ASSETS ─────────
+   These PNGs sit on top of the original geometry-based renderer. Unmapped
+   actors still use procedural textures, so the art rollout can stay incremental. */
+export const SPRITE_ASSETS = Object.freeze({
+  players: Object.freeze({
+    CIRCLE: { id:'player.riftWarden', url:'assets/sprites/player/rift-warden.png', width:48, height:64 },
+  }),
+  enemies: Object.freeze({
+    TRI: { id:'enemy.hollowImp', url:'assets/sprites/enemies/hollow-imp.png', width:46, height:54 },
+    SQR: { id:'enemy.graveBrute', url:'assets/sprites/enemies/grave-brute.png', width:62, height:62 },
+  }),
+  bosses: Object.freeze({
+    SPIKE_KING: { id:'boss.ashenButcher', url:'assets/sprites/bosses/ashen-butcher.png', width:128, height:142 },
+  }),
+  projectiles: Object.freeze({
+    bullet: { id:'projectile.hellfireCross', url:'assets/sprites/projectiles/hellfire-cross.png', width:34, height:34, spinRate:2.2 },
+    homing: { id:'projectile.boneShard', url:'assets/sprites/projectiles/bone-shard.png', width:32, height:36, rotationOffset:-Math.PI/4 },
+    shuriken: { id:'projectile.spectralBlade', url:'assets/sprites/projectiles/spectral-blade.png', width:30, height:42, rotationOffset:-Math.PI/4 },
+  }),
+});
+export const SPRITE_ASSET_LIST = Object.freeze([
+  ...Object.values(SPRITE_ASSETS.players),
+  ...Object.values(SPRITE_ASSETS.enemies),
+  ...Object.values(SPRITE_ASSETS.bosses),
+  ...Object.values(SPRITE_ASSETS.projectiles),
+]);
+
+const IMAGE_TEX_CACHE = new Map();
+export async function preloadSpriteAssets(){
+  if(!globalThis.PIXI?.Assets) return;
+  await Promise.all(SPRITE_ASSET_LIST.map(asset =>
+    PIXI.Assets.load(asset.url).catch(err => {
+      console.warn('[sprite asset preload failed]', asset.url, err);
+      return null;
+    })
+  ));
+}
+export function getImageTextureAsset(asset){
+  if(!asset) return null;
+  let texture = IMAGE_TEX_CACHE.get(asset.id);
+  if(!texture){
+    texture = PIXI.Texture.from(asset.url);
+    IMAGE_TEX_CACHE.set(asset.id, texture);
+  }
+  return { texture, key:`IMG|${asset.id}`, asset, w:asset.width, h:asset.height };
+}
+export function configureSpriteForAsset(sprite, asset){
+  if(!sprite || !asset) return;
+  sprite.width = asset.width;
+  sprite.height = asset.height;
+  sprite.__assetScaleX = sprite.scale.x;
+  sprite.__assetScaleY = sprite.scale.y;
+  sprite.tint = 0xffffff;
+}
+
 /* ───────── BOSS AURA TEX (large white radial fade, tinted per-boss) ───────── */
 let _BOSS_AURA_TEX = null;
 export function getBossAuraTexture(){
@@ -313,6 +368,9 @@ export function acquireSprite(key, texture){
     s.alpha = 1;
     s.scale.set(1);
     s.rotation = 0;
+    s.tint = 0xffffff;
+    s.__assetScaleX = null;
+    s.__assetScaleY = null;
     return s;
   }
   const s = new PIXI.Sprite(texture);
