@@ -3,11 +3,10 @@
    pause/end overlays) and run lifecycle (startRun/endRun).
    =================================================================== */
 import {
-  G, C, TAU, fmtTime, meta, saveMeta,
+  G, C, fmtTime, meta, saveMeta,
   setBar, announce,
 } from './core.js';
 import { AUDIO } from './audio.js';
-import { withDrawCtx } from './render.js';
 import {
   shake, flash, clearAllWorldSprites, fxBurst, fxRing,
 } from './entities.js';
@@ -25,6 +24,65 @@ import {
   updateSynergies, applyItem, applyGlyph, pickRandomItem,
   fusionsAvailable, applyFusion, setUiHandlers,
 } from './player.js';
+
+const CLASS_ART = {
+  CIRCLE:'assets/sprites/classes/rift-warden.png',
+  TRIANGLE:'assets/sprites/classes/blood-seer.png',
+  HEXAGON:'assets/sprites/classes/grave-bulwark.png',
+  SQUARE:'assets/sprites/classes/iron-exile.png',
+  STAR:'assets/sprites/classes/hex-witch.png',
+};
+const SKILL_ART = {
+  PULSE:'assets/icons/skills/sanctified-nova.png',
+  BEAM:'assets/icons/skills/seraph-lance.png',
+  ORBIT:'assets/icons/skills/runic-aegis.png',
+  HOMING:'assets/icons/skills/bone-shards.png',
+  CROSS:'assets/icons/skills/hellfire-cross.png',
+  SHOCK:'assets/icons/skills/grave-cleave.png',
+  CHAIN:'assets/icons/skills/hex-lightning.png',
+  BLADE:'assets/icons/skills/spectral-blades.png',
+  BLACKHOLE:'assets/icons/skills/abyss-well.png',
+  PRISM:'assets/icons/skills/soul-prism.png',
+};
+const STAT_ICON_CLASS = { dmg:'wrath', area:'dominion', cd:'zeal', speed:'fleet', hp:'vitality' };
+function _escAttr(s){ return String(s || '').replace(/"/g, '&quot;'); }
+function imgIcon(src, alt='', cls='ui-art-img'){
+  return `<img class="${cls}" src="${src}" alt="${_escAttr(alt)}" draggable="false">`;
+}
+function runeIcon(kind, color, label=''){
+  return `<div class="rune-icon rune-${kind || 'generic'}" style="--accent:${color || '#d8c7a1'}" aria-label="${_escAttr(label)}"><span></span></div>`;
+}
+function skillIconSrc(key){ return SKILL_ART[key] || null; }
+function weaponIconHtml(key, label=''){
+  const src = skillIconSrc(key);
+  return src ? imgIcon(src, label, 'ui-art-img skill-art-img') : runeIcon('skill', '#d8c7a1', label);
+}
+function cardIconHtml(card, p, color, title){
+  if(card.type === 'weap_new' || card.type === 'weap_up' || card.type === 'evolve'){
+    return weaponIconHtml(card.key, title);
+  }
+  if(card.type === 'pas') return runeIcon('virtue-' + card.key.toLowerCase(), color, title);
+  if(card.type === 'item_pick'){
+    const kind = card.item.kind === 'relic' ? 'relic' : 'loot';
+    return runeIcon(kind + '-' + card.item.tier, color, title);
+  }
+  if(card.type === 'glyph_pick') return runeIcon('glyph', color, title);
+  if(card.type === 'shrine_pick') return runeIcon('altar', color, title);
+  if(card.type === 'fuse') return runeIcon('awaken', color, title);
+  if(card.type === 'heal') return runeIcon('blood', C.red, title);
+  if(card.type === 'gold') return runeIcon('coffer', C.gold, title);
+  if(card.type === 'stat_up') return runeIcon('stat-' + (STAT_ICON_CLASS[card.stat] || 'generic'), color, title);
+  return runeIcon('generic', color, title);
+}
+function slotWeaponIcon(w){ return weaponIconHtml(w.key, w.def.name); }
+function slotPassiveIcon(key){
+  const d = PASSIVES[key];
+  return runeIcon('virtue-' + key.toLowerCase(), d?.color || C.gold, d?.name || key);
+}
+function slotRelicIcon(item){
+  const tier = ITEM_TIERS[item.tier];
+  return runeIcon('relic-' + item.tier, tier?.color || C.gold, item.name);
+}
 
 /* ===================================================================
    STAT PREVIEW HELPERS
@@ -410,93 +468,15 @@ function renderLevelupCards(){
     else if(card.type === 'item_pick') tierLabel = `<div class="tier-label" style="color:${ITEM_TIERS[card.item.tier].color};text-shadow:0 0 12px ${ITEM_TIERS[card.item.tier].glow}">${card.item.tier.toUpperCase()} · ${card.item.kind.toUpperCase()}</div>`;
     else if(card.tier) tierLabel = `<div class="tier-label" style="color:${card.tier.color};text-shadow:0 0 10px ${card.tier.glow}">${card.tier.label}${(card.mult && card.mult !== 1)?' · ×'+card.mult.toFixed(2):''}</div>`;
     else tierLabel = '';
+    const iconHtml = cardIconHtml(card, p, color, title);
     el.innerHTML = `<div class="tag">${tag}</div>
-      <div class="ico"><canvas width="64" height="64" data-card="${G.weaponPickPool.indexOf(card)}"></canvas></div>
+      <div class="ico">${iconHtml}</div>
       <div class="name">${title}</div>
       ${tierLabel}
       <div class="desc">${desc}</div>
       ${statTable}`;
     el.addEventListener('click', ()=> applyLevelupCard(card));
     root.appendChild(el);
-    const cv = el.querySelector('canvas');
-    const cx = cv.getContext('2d');
-    cx.translate(32, 32);
-    if(card.type === 'glyph_pick'){
-      const g = card.glyph;
-      cx.strokeStyle = g.color; cx.shadowColor = g.color; cx.shadowBlur = 18; cx.lineWidth = 2.6;
-      // Inverted triangle "glyph" frame
-      cx.beginPath();
-      cx.moveTo(-22, -16); cx.lineTo(22, -16); cx.lineTo(0, 22); cx.closePath(); cx.stroke();
-      if(g.icon) g.icon(cx, 0, 0, 56);
-    } else if(card.type === 'shrine_pick'){
-      const s = card.shrine;
-      cx.strokeStyle = s.color; cx.shadowColor = s.color; cx.shadowBlur = 20; cx.lineWidth = 3;
-      // Shrine: hexagon outline + central dot.
-      cx.beginPath();
-      for(let k=0;k<6;k++){ const a = k*TAU/6 - Math.PI/2; const xx = Math.cos(a)*22, yy = Math.sin(a)*22; if(k===0) cx.moveTo(xx,yy); else cx.lineTo(xx,yy); }
-      cx.closePath(); cx.stroke();
-      cx.fillStyle = s.color; cx.beginPath(); cx.arc(0, 0, 6, 0, TAU); cx.fill();
-    } else if(card.type === 'item_pick'){
-      const it = card.item;
-      const tcol = ITEM_TIERS[it.tier].color;
-      cx.strokeStyle = tcol; cx.shadowColor = tcol; cx.shadowBlur = 14; cx.lineWidth = 2.4;
-      const isRelic = it.kind === 'relic';
-      cx.beginPath();
-      if(isRelic){
-        for(let k=0;k<6;k++){
-          const a = k*TAU/6 - Math.PI/2;
-          const xx = Math.cos(a)*22, yy = Math.sin(a)*22;
-          if(k===0) cx.moveTo(xx,yy); else cx.lineTo(xx,yy);
-        }
-      } else {
-        cx.moveTo(0, -22); cx.lineTo(22, 0); cx.lineTo(0, 22); cx.lineTo(-22, 0);
-      }
-      cx.closePath(); cx.stroke();
-      if(it.icon) it.icon(cx, 0, 0, 56);
-    } else if(card.type === 'fuse'){
-      const f = card.fuse;
-      cx.strokeStyle = f.color; cx.shadowColor = f.color; cx.shadowBlur = 18; cx.lineWidth = 3;
-      // 10-pt star outer
-      cx.beginPath();
-      for(let k=0;k<10;k++){
-        const a = k*Math.PI/5 - Math.PI/2;
-        const rr = k%2===0 ? 24 : 12;
-        const xx = Math.cos(a)*rr, yy = Math.sin(a)*rr;
-        if(k===0) cx.moveTo(xx,yy); else cx.lineTo(xx,yy);
-      }
-      cx.closePath(); cx.stroke();
-      // small inner ring
-      cx.lineWidth = 2;
-      cx.beginPath(); cx.arc(0, 0, 6, 0, TAU); cx.stroke();
-    } else if(card.type === 'weap_new' || card.type === 'weap_up'){
-      // For fused weapons (only weap_up since you can't pick fused as 'new'),
-      // use the instance's def — they aren't in the global WEAPONS table.
-      const d = WEAPONS[card.key] || (card.type === 'weap_up' ? p.weapons.find(w=>w.key===card.key)?.def : null);
-      if(d) withDrawCtx(cx, ()=> d.icon(cx, 0, 0, 64));
-    } else if(card.type === 'evolve'){
-      const d = WEAPONS[card.key]; cx.save(); cx.globalAlpha = .7; withDrawCtx(cx, ()=> d.icon(cx, 0, 0, 64)); cx.restore();
-      cx.strokeStyle = card.evo.color; cx.shadowColor = card.evo.color; cx.shadowBlur = 18; cx.lineWidth = 3;
-      cx.beginPath(); cx.moveTo(-14, 8); cx.lineTo(14, -8); cx.moveTo(6, -8); cx.lineTo(14, -8); cx.lineTo(14, 0); cx.stroke();
-    } else if(card.type === 'pas'){
-      const d = PASSIVES[card.key];
-      cx.strokeStyle = d.color; cx.shadowColor = d.color; cx.shadowBlur = 16; cx.lineWidth = 3;
-      cx.beginPath(); cx.arc(0, 0, 18, 0, TAU); cx.stroke();
-      cx.shadowBlur = 8; cx.lineWidth = 2;
-      cx.beginPath(); cx.arc(0, 0, 8, 0, TAU); cx.stroke();
-    } else if(card.type === 'heal'){
-      cx.fillStyle = C.red; cx.shadowColor = C.red; cx.shadowBlur = 14;
-      cx.beginPath(); cx.moveTo(0,-12); cx.bezierCurveTo(-24,-30,-30,4,0,22); cx.bezierCurveTo(30,4,24,-30,0,-12); cx.fill();
-    } else if(card.type === 'gold'){
-      cx.fillStyle = C.gold; cx.shadowColor = C.gold; cx.shadowBlur = 14;
-      cx.beginPath(); cx.moveTo(0,-16); cx.lineTo(16,0); cx.lineTo(0,16); cx.lineTo(-16,0); cx.fill();
-    } else if(card.type === 'stat_up'){
-      const su = STAT_UPS[card.stat];
-      cx.strokeStyle = su.color; cx.shadowColor = su.color; cx.shadowBlur = 16; cx.lineWidth = 3;
-      cx.fillStyle = su.color; cx.beginPath();
-      // big up-arrow
-      cx.moveTo(0,-22); cx.lineTo(16,-2); cx.lineTo(8,-2); cx.lineTo(8,22); cx.lineTo(-8,22); cx.lineTo(-8,-2); cx.lineTo(-16,-2); cx.closePath();
-      cx.fill();
-    }
   }
 }
 function applyLevelupCard(card){
@@ -741,11 +721,8 @@ export function updateHUD(){
     ws.innerHTML = '';
     for(const w of p.weapons){
       const el = document.createElement('div'); el.className = 'slot';
-      el.innerHTML = `<canvas width="48" height="48"></canvas><div class="lv">${w.level}</div>`;
+      el.innerHTML = `${slotWeaponIcon(w)}<div class="lv">${w.level}</div>`;
       ws.appendChild(el);
-      const cv = el.querySelector('canvas'); const cx = cv.getContext('2d');
-      cx.translate(24,24);
-      withDrawCtx(cx, ()=> w.def.icon(cx, 0, 0, 48));
     }
   } else {
     for(let i=0;i<p.weapons.length;i++){
@@ -758,14 +735,8 @@ export function updateHUD(){
     ps.innerHTML = '';
     for(const k of pkeys){
       const el = document.createElement('div'); el.className = 'slot passive';
-      el.innerHTML = `<canvas width="48" height="48"></canvas><div class="lv">${p.passives[k]}</div>`;
+      el.innerHTML = `${slotPassiveIcon(k)}<div class="lv">${p.passives[k]}</div>`;
       ps.appendChild(el);
-      const cv = el.querySelector('canvas'); const cx = cv.getContext('2d');
-      cx.translate(24,24);
-      const d = PASSIVES[k];
-      cx.strokeStyle = d.color; cx.fillStyle = 'rgba(0,0,0,0)';
-      cx.shadowColor = d.color; cx.shadowBlur = 12; cx.lineWidth = 2.4;
-      cx.beginPath(); cx.arc(0,0,12,0,TAU); cx.stroke();
     }
   } else {
     let i=0;
@@ -798,23 +769,9 @@ export function updateHUD(){
     rs.innerHTML = '';
     for(const id of relics){
       const it = ITEMS[id]; if(!it) continue;
-      const tierCol = ITEM_TIERS[it.tier].color;
       const el = document.createElement('div'); el.className = 'slot relic';
-      el.innerHTML = `<canvas width="48" height="48"></canvas><div class="ttip">${it.name} · <span style="color:#9ab5d0">${it.desc}</span></div>`;
+      el.innerHTML = `${slotRelicIcon(it)}<div class="ttip">${it.name} · <span style="color:#9ab5d0">${it.desc}</span></div>`;
       rs.appendChild(el);
-      const cv = el.querySelector('canvas'); const cx = cv.getContext('2d');
-      cx.translate(24,24);
-      // Hex tier shell
-      cx.strokeStyle = tierCol; cx.shadowColor = tierCol; cx.shadowBlur = 8; cx.lineWidth = 1.8;
-      cx.beginPath();
-      for(let k=0;k<6;k++){
-        const a = k * TAU/6 - Math.PI/2;
-        const xx = Math.cos(a)*16, yy = Math.sin(a)*16;
-        if(k===0) cx.moveTo(xx,yy); else cx.lineTo(xx,yy);
-      }
-      cx.closePath(); cx.stroke();
-      // Per-item glyph
-      if(it.icon) it.icon(cx, 0, 0, 48);
     }
   }
 }
@@ -963,26 +920,13 @@ function buildClassPicker(){
     const locked = !meta.unlocked.includes(k);
     const el = document.createElement('div');
     el.className = 'class-card' + (locked ? ' locked' : '');
-    el.innerHTML = `<canvas width="80" height="80"></canvas>
+    const art = CLASS_ART[k] ? imgIcon(CLASS_ART[k], cl.name, 'class-art-img') : runeIcon('virtue-' + k.toLowerCase(), cl.color, cl.name);
+    el.style.setProperty('--accent', cl.color);
+    el.innerHTML = `<div class="class-portrait">${art}</div>
       <div class="cname">${cl.name}</div>
       <div class="cdesc">${cl.desc}</div>
       <div class="cstart">${locked ? '◆ ' + cl.unlock + ' 필요' : 'RIFT SKILL: ' + WEAPONS[cl.startWeap].name}</div>`;
     grid.appendChild(el);
-    const cv = el.querySelector('canvas'); const cx = cv.getContext('2d');
-    cx.translate(40,40);
-    cx.shadowBlur = 18; cx.shadowColor = cl.color;
-    if(cl.sides === 0){
-      cx.beginPath(); cx.arc(0,0,22,0,TAU); cx.strokeStyle = cl.color; cx.lineWidth=3; cx.stroke();
-      cx.beginPath(); cx.arc(0,0,8,0,TAU); cx.fillStyle = cl.color; cx.fill();
-    } else {
-      cx.beginPath();
-      for(let i=0;i<cl.sides;i++){
-        const a = i*TAU/cl.sides - Math.PI/2;
-        const x = Math.cos(a)*24, y = Math.sin(a)*24;
-        if(i===0) cx.moveTo(x,y); else cx.lineTo(x,y);
-      }
-      cx.closePath(); cx.strokeStyle = cl.color; cx.lineWidth=3; cx.stroke();
-    }
     if(!locked) el.addEventListener('click', ()=> startRun(k));
   }
 }

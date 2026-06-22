@@ -1,7 +1,7 @@
 /* ===================================================================
    RENDER PRIMITIVES + BACKGROUND
-   - Sprite cache (Canvas 2D): bake stroked shapes with shadowBlur once, blit via drawImage.
-     Used only by HUD/levelup card icons (via withDrawCtx).
+   - Sprite cache (Canvas 2D): bake stroked effects with shadowBlur once, blit via drawImage.
+     UI cards now use generated PNGs or gothic HTML rune icons.
    - Texture cache (PIXI): bakes the same Canvas 2D sprite, then converts to PIXI.Texture
      once. World rendering uses these textures via acquireSprite() pool.
    - BG: animated grid + parallax stars + nebula tint, with gradient/star pre-bake.

@@ -278,6 +278,21 @@ MVP에서 추가할 연출:
 생성 완료:
 
 - `assets/concept/abyssal-rift-keyart.png`
+- `assets/sprites/classes/rift-warden.png`
+- `assets/sprites/classes/blood-seer.png`
+- `assets/sprites/classes/grave-bulwark.png`
+- `assets/sprites/classes/iron-exile.png`
+- `assets/sprites/classes/hex-witch.png`
+- `assets/icons/skills/sanctified-nova.png`
+- `assets/icons/skills/seraph-lance.png`
+- `assets/icons/skills/runic-aegis.png`
+- `assets/icons/skills/bone-shards.png`
+- `assets/icons/skills/hellfire-cross.png`
+- `assets/icons/skills/grave-cleave.png`
+- `assets/icons/skills/hex-lightning.png`
+- `assets/icons/skills/spectral-blades.png`
+- `assets/icons/skills/abyss-well.png`
+- `assets/icons/skills/soul-prism.png`
 
 | 파일 | 용도 | 우선순위 |
 |---|---|---|

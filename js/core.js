@@ -29,9 +29,8 @@ export const hsl    = (h,s,l,a)=> a==null ? `hsl(${h} ${s}% ${l}%)` : `hsla(${h}
 export const pulse  = (t,speed=1)=> .5 + .5*Math.sin(t*speed);
 
 /* ───────── CANVAS / DPR ─────────
-   Legacy 2D canvas kept only for HUD card icons (ui.js), which use their
-   own per-card <canvas> elements via withDrawCtx. World rendering moved to
-   PIXI (see PIXI APP block below). */
+   Legacy 2D canvas stays available for cached sprite baking and fallback
+   drawing. World rendering moved to PIXI (see PIXI APP block below). */
 export const canvas = document.getElementById('canvas');
 export const ctx = canvas.getContext('2d');
 export function resizeCanvas(){
