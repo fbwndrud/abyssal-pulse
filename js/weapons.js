@@ -8,16 +8,40 @@ import { drawCircle, drawDiamond, drawPolygon, drawStar } from './render.js';
 import {
   EGRID, _EQ1,
   firePulse, fireProjectile, fireFanShock, spawnBlackhole,
-  fxBurst, fxLine, fxRing,
-  dealDamage, applySlow, nearestEnemy, nearestEnemyExcept, pointSegDist,
+  fxBurst, fxLine, fxRing, spawnZone,
+  dealDamage, applySlow, applyBurn, applyBleed, applyHex,
+  nearestEnemy, nearestEnemyExcept, pointSegDist,
 } from './entities.js';
+
+function hitLine(x1, y1, x2, y2, width, dmg, color, opts={}){
+  const list = EGRID.queryLine(x1, y1, x2, y2, width + 44, _EQ1);
+  let hits = 0;
+  for(let li = 0; li < list.length; li++){
+    const e = list[li];
+    if(!e.alive) continue;
+    const d = pointSegDist(e.x, e.y, x1, y1, x2, y2);
+    if(d > e.r + width) continue;
+    dealDamage(e, dmg, color);
+    hits++;
+    if(opts.slow) applySlow(e, opts.slow, opts.slowDur || 1);
+    if(opts.burnDps) applyBurn(e, opts.burnDps, opts.burnDur || 1, color);
+    if(opts.bleedDps) applyBleed(e, opts.bleedDps, opts.bleedDur || 1, color);
+    if(opts.hexDmg) applyHex(e, opts.hexDmg, opts.hexR || 100, opts.hexDur || 2, color);
+    if(opts.kb){
+      const a = Math.atan2(e.y - y1, e.x - x1);
+      e.vx += Math.cos(a) * opts.kb;
+      e.vy += Math.sin(a) * opts.kb;
+    }
+  }
+  return hits;
+}
 
 export const WEAPONS = {
   PULSE: {
     name:'SANCTIFIED NOVA', color:C.cyan, kind:'AOE',
-    desc:'주기적 신성 파동으로 주변 적을 정화.',
+    desc:'신성 폭발 후 성역 장판을 남겨 악마를 태움.',
     maxLv:6,
-    baseStats:{ cd:1.6, dmg:24, radius:130, kb:120 },
+    baseStats:{ cd:2.7, dmg:34, radius:132, kb:160, zoneLife:1.8, zoneDps:16 },
     icon(ctx,x,y,s){ for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(x,y, s*.18 + i*s*.18, 0, TAU); ctx.strokeStyle=C.cyan; ctx.lineWidth=1.6; ctx.shadowBlur=8; ctx.shadowColor=C.cyan; ctx.globalAlpha=1-i*.25; ctx.stroke(); ctx.globalAlpha=1; } },
     onUpdate(p,w){
       w.timer = (w.timer||0) - G.dt;
@@ -31,13 +55,20 @@ export const WEAPONS = {
         w.pendingPulses[i].t -= G.dt;
         if(w.pendingPulses[i].t <= 0){
           const s2 = w.stats;
-          firePulse(p.x, p.y, s2.radius, s2.dmg, s2.kb, opts);
+          firePulse(p.x, p.y, s2.radius * p.areaMul, s2.dmg, s2.kb, opts);
           w.pendingPulses.splice(i, 1);
         }
       }
       if(w.timer <= 0){
         const s = w.stats;
-        firePulse(p.x, p.y, s.radius, s.dmg, s.kb, opts);
+        firePulse(p.x, p.y, s.radius * p.areaMul, s.dmg, s.kb, opts);
+        spawnZone(p.x, p.y, s.radius * .72 * p.areaMul, s.zoneLife || 1.6, (s.zoneDps || 0) * p.dmgMul, w.color || C.cyan, {
+          tickRate:.35,
+          slow:.18,
+          slowDur:.45,
+          kind:'sanctuary',
+        });
+        fxBurst(p.x, p.y, w.color || C.cyan, 12, 150, 2.5, .35);
         const extraPulses = ex.triple ? 2 : (ex.double ? 1 : 0);
         const delay = ex.ringDelay || .12;
         for(let i = 1; i <= extraPulses; i++){
@@ -46,71 +77,67 @@ export const WEAPONS = {
         w.timer = s.cd / p.cdMul;
       }
     },
-    levelUp(w,lv){ w.stats.cd *= .92; w.stats.dmg += 8; w.stats.radius += 16; },
+    levelUp(w,lv){
+      w.stats.cd *= .93; w.stats.dmg += 9; w.stats.radius += 14;
+      w.stats.zoneDps += 5;
+      if(lv===3||lv===6) w.stats.zoneLife += .35;
+    },
   },
   BEAM: {
     name:'SERAPH LANCE', color:C.gold, kind:'BEAM',
-    desc:'몸 주위를 도는 천상의 창.',
+    desc:'가장 가까운 적을 꿰뚫는 천상의 관통 창.',
     maxLv:6,
-    baseStats:{ rotSpeed:1.4, dmg:42, length:520, width:6, count:1, tick:.12 },
+    baseStats:{ cd:1.65, dmg:58, length:620, width:12, count:1, tick:.12, rotSpeed:1.2 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.gold; ctx.shadowBlur=10; ctx.shadowColor=C.gold; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x-s*.4,y-s*.4); ctx.lineTo(x+s*.4,y+s*.4); ctx.stroke(); ctx.restore(); },
     onUpdate(p,w){
-      w.angle = (w.angle||0) + w.stats.rotSpeed * G.dt;
-      w.tickT = (w.tickT||0) - G.dt;
-      const s = w.stats;
-      const tickEvery = s.tick / p.cdMul;
-      const damageThisFrame = w.tickT <= 0;
-      if(damageThisFrame) w.tickT = tickEvery;
-      const exFlags = w.extra || {};
-      // Track every enemy that overlapped *any* beam since the last damage tick.
-      // Without this, fast/dashing enemies that crossed the beam between ticks
-      // could escape entirely — the user-visible "beam misses" bug.
-      if(!w._tickHits) w._tickHits = new Set();
-      const beamColor = w.color || '#ffd400';
-      // Trim beams to current count — handles evolutions that REDUCE count
-      // (e.g., VOID LANCE 3→1) so stale higher-index beams aren't rendered
-      // at frozen positions.
-      if(!w.beams) w.beams = [];
-      const _bc = Math.max(0, Math.round(s.count||0)); if(w.beams.length !== _bc) w.beams.length = _bc;
-      for(let b=0;b<s.count;b++){
-        let a = w.angle + (b * TAU/s.count);
-        // PRISM RAY: each beam wobbles randomly
-        if(exFlags.randomAim) a += (Math.random()-.5) * 1.4;
-        const ex = p.x + Math.cos(a)*s.length;
-        const ey = p.y + Math.sin(a)*s.length;
-        w.beams[b] = {x1:p.x,y1:p.y,x2:ex,y2:ey,life:G.dt};
-        const list = EGRID.queryLine(p.x, p.y, ex, ey, s.width + 40, _EQ1);
-        for(let li = 0; li < list.length; li++){
-          const e = list[li];
-          if(!e.alive) continue;
-          const d = pointSegDist(e.x,e.y, p.x,p.y, ex,ey);
-          if(d <= e.r + s.width) w._tickHits.add(e);
+      w.timer = (w.timer||0) - G.dt;
+      w.beams = [];
+      if(w.timer <= 0){
+        const s = w.stats;
+        const col = w.color || C.gold;
+        const ex = w.extra || {};
+        const used = new Set();
+        for(let b=0;b<s.count;b++){
+          const target = nearestEnemyExcept(p, used, s.length * .95) || nearestEnemy(p);
+          if(target) used.add(target);
+          let a = target ? angTo(p, target) : (p.faceA || Math.random()*TAU);
+          if(ex.randomAim) a += (Math.random()-.5) * .9;
+          a += (b - (s.count-1)/2) * .16;
+          const sx = p.x - Math.cos(a) * 48;
+          const sy = p.y - Math.sin(a) * 48;
+          const exx = p.x + Math.cos(a) * s.length * p.areaMul;
+          const eyy = p.y + Math.sin(a) * s.length * p.areaMul;
+          fxLine(sx, sy, exx, eyy, col, .22, Math.max(4, s.width*.55));
+          const hits = hitLine(sx, sy, exx, eyy, s.width, s.dmg * p.dmgMul, col, { kb:90 });
+          const ix = target ? target.x : exx;
+          const iy = target ? target.y : eyy;
+          fxBurst(ix, iy, col, hits ? 12 : 5, 180, 3, .32);
+          fxRing(ix, iy, col, 34 + s.width*2, .24);
         }
-      }
-      if(damageThisFrame){
-        for(const e of w._tickHits){
-          if(!e.alive) continue;
-          dealDamage(e, s.dmg * p.dmgMul, beamColor);
-          fxBurst(e.x, e.y, beamColor, 3, 90, 2, .18);
-        }
-        w._tickHits.clear();
+        AUDIO.laser(p.x);
+        w.timer = s.cd / p.cdMul;
       }
     },
     levelUp(w,lv){
       if(lv===3) w.stats.count = 2;
       if(lv===5) w.stats.count = 3;
-      w.stats.dmg += 12; w.stats.length += 38; w.stats.width += .8;
+      w.stats.dmg += 15; w.stats.length += 36; w.stats.width += 1.2; w.stats.cd *= .96;
     },
   },
   ORBIT: {
     name:'RUNIC AEGIS', color:C.violet, kind:'ORBIT',
-    desc:'주변을 도는 수호 룬.',
+    desc:'공전하는 방패 룬이 탄막을 막고 주기적으로 폭발.',
     maxLv:6,
-    baseStats:{ count:2, radius:90, rotSpeed:2.2, dmg:18, nodeR:12 },
+    baseStats:{ count:2, radius:88, rotSpeed:2.0, dmg:20, nodeR:13, pulseCd:1.35, pulseR:58, pulseDmg:16 },
     icon(ctx,x,y,s){ drawCircle(x,y,s*.2,C.violet,8); for(let i=0;i<3;i++){ const a=(i/3)*TAU; drawCircle(x+Math.cos(a)*s*.3, y+Math.sin(a)*s*.3, s*.08, C.violet, 6, C.violet); } },
     onUpdate(p,w){
       const s = w.stats;
+      const col = w.color || C.violet;
+      const ex = w.extra || {};
       w.angle = (w.angle||0) + s.rotSpeed * G.dt * p.cdMul;
+      w.pulseT = (w.pulseT || 0) - G.dt;
+      const doPulse = w.pulseT <= 0;
+      if(doPulse) w.pulseT = s.pulseCd / p.cdMul;
       for(let i=0;i<s.count;i++){
         const a = w.angle + (i*TAU/s.count);
         const nx = p.x + Math.cos(a)*s.radius * p.areaMul;
@@ -125,10 +152,17 @@ export const WEAPONS = {
             const tag = 'orb_'+w.id+'_'+i;
             if(!e.hitOrbit) e.hitOrbit = {};
             if((e.hitOrbit[tag]||0) <= 0){
-              dealDamage(e, s.dmg * p.dmgMul, C.violet);
+              dealDamage(e, s.dmg * p.dmgMul, col);
+              if(ex.lifesteal) p.hp = Math.min(p.maxHp, p.hp + Math.max(1, s.dmg * ex.lifesteal));
+              if(ex.burst){
+                spawnZone(nx, ny, (ex.burstR || 70) * p.areaMul, .45, s.dmg * p.dmgMul * (ex.burstDmg || .45), col, { tickRate:.22, kind:'ward' });
+              }
               e.hitOrbit[tag] = .35;
             }
           }
+        }
+        if(doPulse){
+          spawnZone(nx, ny, (s.pulseR || 54) * p.areaMul, .72, (s.pulseDmg || s.dmg*.7) * p.dmgMul, col, { tickRate:.24, slow:.12, kind:'ward' });
         }
         if(!w.lastNodes) w.lastNodes = [];
         w.lastNodes[i] = {x:nx, y:ny};
@@ -141,80 +175,152 @@ export const WEAPONS = {
     },
     levelUp(w,lv){
       if(lv===2||lv===4||lv===6) w.stats.count++;
-      w.stats.dmg += 8; w.stats.radius += 8;
+      w.stats.dmg += 8; w.stats.pulseDmg += 6; w.stats.radius += 8;
     },
   },
   HOMING: {
     name:'BONE SHARDS', color:C.teal, kind:'HOMING',
-    desc:'적을 추적하는 뼈 파편.',
+    desc:'부채꼴 뼈창이 적을 관통하며 출혈을 남김.',
     maxLv:6,
-    baseStats:{ cd:1.0, dmg:28, count:1, speed:340, life:1.6 },
+    baseStats:{ cd:1.15, dmg:30, count:2, speed:390, life:1.15, pierce:1, bleedDps:10 },
     icon(ctx,x,y,s){ drawDiamond(x,y,s*.25,0,C.teal,10,C.teal); },
     onUpdate(p,w){
       w.timer = (w.timer||0) - G.dt;
       if(w.timer<=0){
         const s = w.stats;
+        const col = w.color || C.teal;
+        const ex = w.extra || {};
+        const target = nearestEnemy(p);
+        const a = target ? angTo(p, target) : (p.faceA || Math.random()*TAU);
         for(let i=0;i<s.count;i++){
-          const target = nearestEnemy(p);
-          const a = target ? angTo(p, target) : Math.random()*TAU;
-          const ang = a + (i - (s.count-1)/2) * .25;
-          fireProjectile(p.x, p.y, ang, s.speed, s.dmg * p.dmgMul, s.life * p.areaMul, C.teal, 'homing', {target, turn:7});
+          const spread = (i - (s.count-1)/2) * .18;
+          const ang = a + spread;
+          fireProjectile(p.x, p.y, ang, s.speed, s.dmg * p.dmgMul, s.life * p.areaMul, col, 'homing', {
+            target,
+            turn: ex.blast ? 4 : 2.2,
+            pierce: ex.blast ? (s.pierce || 0) + 2 : (s.pierce || 0),
+            bleedDps:(s.bleedDps || 0) * p.dmgMul,
+            bleedDur:1.8,
+            blastR:ex.blast || 0,
+            blastDmg:ex.blast ? s.dmg * p.dmgMul * .45 : 0,
+            burnDps:ex.burn ? (ex.burnDmg || 6) * p.dmgMul : 0,
+            burnDur:ex.burnDur || 1.2,
+          });
         }
+        fxBurst(p.x, p.y, col, 5, 90, 2, .2);
         w.timer = s.cd / p.cdMul;
       }
     },
     levelUp(w,lv){
       if(lv===2||lv===4||lv===6) w.stats.count++;
-      w.stats.dmg += 12; w.stats.cd *= .94;
+      if(lv===3||lv===5) w.stats.pierce++;
+      w.stats.dmg += 11; w.stats.bleedDps += 4; w.stats.cd *= .95;
     },
   },
   CROSS: {
     name:'HELLFIRE CROSS', color:C.pink, kind:'BULLET',
-    desc:'4방향으로 갈라지는 지옥불.',
+    desc:'십자 지옥불이 균열을 남겨 바닥을 태움.',
     maxLv:6,
-    baseStats:{ cd:.7, dmg:18, speed:420, life:1.0, count:4 },
+    baseStats:{ cd:1.15, dmg:24, speed:360, life:1.05, count:4, burnDps:18, fissureR:30 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.pink; ctx.shadowBlur=8; ctx.shadowColor=C.pink; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x-s*.35,y); ctx.lineTo(x+s*.35,y); ctx.moveTo(x,y-s*.35); ctx.lineTo(x,y+s*.35); ctx.stroke(); ctx.restore(); },
     onUpdate(p,w){
       w.timer = (w.timer||0) - G.dt;
       if(w.timer<=0){
         const s = w.stats;
+        const col = w.color || C.pink;
+        const ex = w.extra || {};
         for(let i=0;i<s.count;i++){
           const a = (i / s.count) * TAU + (w.spin||0);
-          fireProjectile(p.x, p.y, a, s.speed, s.dmg * p.dmgMul, s.life, C.pink, 'bullet');
+          fireProjectile(p.x, p.y, a, s.speed, s.dmg * p.dmgMul, s.life * p.areaMul, col, 'bullet', {
+            r:8 * (ex.wide || 1),
+            burnDps:(s.burnDps || 0) * p.dmgMul,
+            burnDur:1.6,
+            slow:ex.slow || 0,
+            slowDur:ex.slowDur || 1,
+            trailZone:{
+              r:(s.fissureR || 28) * (ex.wide || 1) * p.areaMul,
+              life:.75,
+              dmg:(s.burnDps || 0) * .55 * p.dmgMul,
+              burnDps:(s.burnDps || 0) * .65 * p.dmgMul,
+              burnDur:1.1,
+              every:.14,
+              tickRate:.35,
+              kind:'hellfire',
+            },
+            expireZone:{
+              r:(s.fissureR || 28) * 1.4 * p.areaMul,
+              life:.7,
+              dmg:(s.burnDps || 0) * .7 * p.dmgMul,
+              burnDps:(s.burnDps || 0) * .7 * p.dmgMul,
+              burnDur:1.2,
+              tickRate:.35,
+              kind:'hellfire',
+            },
+          });
         }
+        fxRing(p.x, p.y, col, 38, .25);
         w.spin = (w.spin||0) + .2;
         w.timer = s.cd / p.cdMul;
       }
     },
     levelUp(w,lv){
       if(lv===3||lv===5) w.stats.count += 2;
-      w.stats.dmg += 8; w.stats.cd *= .93;
+      w.stats.dmg += 8; w.stats.burnDps += 6; w.stats.cd *= .94;
     },
   },
   SHOCK: {
     name:'GRAVE CLEAVE', color:C.magenta, kind:'AOE',
-    desc:'전방을 베는 묘지의 충격파.',
+    desc:'전방을 베고 잠시 뒤 묘지 균열이 다시 터짐.',
     maxLv:6,
-    baseStats:{ cd:1.4, dmg:38, radius:200, arc:Math.PI*.7 },
+    baseStats:{ cd:1.55, dmg:44, radius:210, arc:Math.PI*.66, bleedDps:14, afterDmg:24 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.magenta; ctx.shadowBlur=10; ctx.shadowColor=C.magenta; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x-s*.15,y, s*.4, -1.0, 1.0); ctx.stroke(); ctx.restore(); },
     onUpdate(p,w){
       w.timer = (w.timer||0) - G.dt;
+      if(!w.pendingCleaves) w.pendingCleaves = [];
+      for(let i = w.pendingCleaves.length - 1; i >= 0; i--){
+        const c = w.pendingCleaves[i];
+        c.t -= G.dt;
+        if(c.t <= 0){
+          fireFanShock(c.x, c.y, c.a, c.r, c.arc, c.dmg, { color:c.color, bleedDps:c.bleedDps, bleedDur:1.4, slow:.16, slowDur:.5 });
+          fxRing(c.x + Math.cos(c.a)*c.r*.55, c.y + Math.sin(c.a)*c.r*.55, c.color, c.r*.28, .28);
+          w.pendingCleaves.splice(i, 1);
+        }
+      }
       if(w.timer<=0){
         const s = w.stats;
         const aim = nearestEnemy(p);
         const a = aim ? angTo(p, aim) : (p.faceA||0);
         const ex = w.extra || {};
-        fireFanShock(p.x, p.y, a, s.radius * p.areaMul, s.arc, s.dmg * p.dmgMul, { color: w.color, slow: ex.slow, slowDur: ex.slowDur });
+        const col = w.color || C.magenta;
+        fireFanShock(p.x, p.y, a, s.radius * p.areaMul, s.arc, s.dmg * p.dmgMul, {
+          color: col,
+          slow: ex.slow || .12,
+          slowDur: ex.slowDur || .45,
+          bleedDps:(s.bleedDps || 0) * p.dmgMul,
+          bleedDur:1.8,
+        });
+        w.pendingCleaves.push({
+          x:p.x, y:p.y, a,
+          r:s.radius * .72 * p.areaMul,
+          arc:Math.max(Math.PI*.28, s.arc*.72),
+          dmg:(s.afterDmg || s.dmg*.5) * p.dmgMul,
+          bleedDps:(s.bleedDps || 0) * .7 * p.dmgMul,
+          color:col,
+          t:.28,
+        });
         w.timer = s.cd / p.cdMul;
       }
     },
-    levelUp(w,lv){ w.stats.dmg += 14; w.stats.radius += 30; if(lv===4||lv===6) w.stats.arc += .4; },
+    levelUp(w,lv){
+      w.stats.dmg += 14; w.stats.afterDmg += 8; w.stats.bleedDps += 5; w.stats.radius += 26;
+      if(lv===4||lv===6) w.stats.arc += .36;
+    },
   },
   CHAIN: {
     name:'HEX LIGHTNING', color:C.lime, kind:'CHAIN',
-    desc:'적을 잇는 저주 번개.',
+    desc:'적을 잇고 죽음 폭발을 남기는 저주 번개.',
     maxLv:6,
-    baseStats:{ cd:1.0, dmg:32, jumps:3, range:280 },
+    baseStats:{ cd:1.1, dmg:34, jumps:3, range:285, hexDmg:18, hexR:92 },
     icon(ctx,x,y,s){ ctx.save(); ctx.strokeStyle=C.lime; ctx.shadowBlur=10; ctx.shadowColor=C.lime; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x-s*.35,y-s*.3); ctx.lineTo(x-s*.05,y); ctx.lineTo(x+s*.1,y-s*.1); ctx.lineTo(x+s*.35,y+s*.3); ctx.stroke(); ctx.restore(); },
     onUpdate(p,w){
       w.timer = (w.timer||0) - G.dt;
@@ -231,6 +337,8 @@ export const WEAPONS = {
           // Beefed-up bolt: thicker line, longer flash, brighter particle burst.
           fxLine(from.x, from.y, tgt.x, tgt.y, col, .35, 4.5);
           dealDamage(tgt, s.dmg * p.dmgMul * (1 - i*.1), col);
+          applyHex(tgt, (s.hexDmg || 0) * p.dmgMul, (s.hexR || 90) * p.areaMul, 3.2, col);
+          applySlow(tgt, .12, .65);
           fxBurst(tgt.x, tgt.y, col, 10, 170, 2.5, .3);
           fxRing(tgt.x, tgt.y, col, 22, .25);
           hit.add(tgt); hitCount++;
@@ -239,6 +347,7 @@ export const WEAPONS = {
             if(!ftgt) break;
             fxLine(tgt.x, tgt.y, ftgt.x, ftgt.y, col, .25, 3);
             dealDamage(ftgt, s.dmg * p.dmgMul * .55, col);
+            applyHex(ftgt, (s.hexDmg || 0) * p.dmgMul * .65, (s.hexR || 90) * p.areaMul, 2.4, col);
             fxBurst(ftgt.x, ftgt.y, col, 6, 120, 2, .25);
             hit.add(ftgt);
           }
@@ -251,34 +360,53 @@ export const WEAPONS = {
         w.timer = s.cd / p.cdMul;
       }
     },
-    levelUp(w,lv){ if(lv===3||lv===5) w.stats.jumps++; w.stats.dmg += 12; w.stats.range += 36; },
+    levelUp(w,lv){
+      if(lv===3||lv===5) w.stats.jumps++;
+      w.stats.dmg += 11; w.stats.hexDmg += 7; w.stats.range += 34;
+    },
   },
   BLADE: {
     name:'SPECTRAL BLADES', color:C.cyan, kind:'BULLET',
-    desc:'관통하는 망령 칼날.',
+    desc:'관통 후 주인에게 돌아오는 망령 단검.',
     maxLv:6,
-    baseStats:{ cd:1.0, dmg:30, speed:330, life:1.2, count:1, pierce:3 },
+    baseStats:{ cd:1.05, dmg:32, speed:360, life:1.45, count:2, pierce:2, bleedDps:8 },
     icon(ctx,x,y,s){ drawStar(x,y,4,s*.4,s*.18,Math.PI/4,C.cyan,10,C.cyan,1.6); },
     onUpdate(p,w){
       w.timer = (w.timer||0) - G.dt;
       if(w.timer<=0){
         const s = w.stats;
+        const ex = w.extra || {};
         // Aim at the nearest enemy; if multiple shuriken, fan them out around the aim.
         const target = nearestEnemy(p);
         const aimA = target ? angTo(p, target) : Math.random()*TAU;
         for(let i=0;i<s.count;i++){
           const spread = (i - (s.count-1)/2) * .22;
           const a = aimA + spread;
-          fireProjectile(p.x, p.y, a, s.speed, s.dmg * p.dmgMul, s.life, C.cyan, 'shuriken', {pierce:s.pierce, spin:Math.random()*TAU});
+          fireProjectile(p.x, p.y, a, s.speed, s.dmg * p.dmgMul, s.life, w.color || C.cyan, 'shuriken', {
+            pierce:s.pierce,
+            spin:Math.random()*TAU,
+            returnToPlayer:true,
+            returnAt:ex.returns ? .52 : .46,
+            target:ex.magnetPull ? target : null,
+            turn:ex.magnetPull ? 2.4 : 0,
+            bleedDps:(s.bleedDps || 0) * p.dmgMul,
+            bleedDur:1.2,
+            blastR:ex.blastOnPierce ? (ex.blastR || 70) : 0,
+            blastDmg:ex.blastOnPierce ? (ex.blastDmg || 14) * p.dmgMul : 0,
+          });
         }
         w.timer = s.cd / p.cdMul;
       }
     },
-    levelUp(w,lv){ if(lv===3||lv===5) w.stats.count++; if(lv===4||lv===6) w.stats.pierce++; w.stats.dmg += 10; },
+    levelUp(w,lv){
+      if(lv===3||lv===5) w.stats.count++;
+      if(lv===4||lv===6) w.stats.pierce++;
+      w.stats.dmg += 10; w.stats.bleedDps += 4;
+    },
   },
   BLACKHOLE: {
     name:'ABYSS WELL', color:C.violet, kind:'BLACKHOLE',
-    desc:'심연의 구멍으로 적을 빨아들임.',
+    desc:'심연의 우물을 열어 적을 끌어당기고 지속 피해.',
     maxLv:6,
     baseStats:{ cd:7, dmg:8, radius:180, life:3, pull:160 },
     icon(ctx,x,y,s){ ctx.save(); for(let i=0;i<3;i++){ ctx.strokeStyle=C.violet; ctx.shadowBlur=10; ctx.shadowColor=C.violet; ctx.lineWidth=1.4; ctx.globalAlpha=1-i*.3; ctx.beginPath(); ctx.arc(x,y, s*.1+i*s*.13, 0, TAU); ctx.stroke(); } ctx.restore(); },
@@ -294,7 +422,15 @@ export const WEAPONS = {
           let tx = aim ? aim.x : p.x + rand(-200,200);
           let ty = aim ? aim.y : p.y + rand(-200,200);
           if(count > 1){ tx += rand(-scatter, scatter); ty += rand(-scatter, scatter); }
-          const bh = spawnBlackhole(tx, ty, s.radius * p.areaMul, s.life * p.areaMul, s.pull, s.dmg * p.dmgMul);
+          const col = w.color || C.violet;
+          const bh = spawnBlackhole(tx, ty, s.radius * p.areaMul, s.life * p.areaMul, s.pull, s.dmg * p.dmgMul, { color:col });
+          spawnZone(tx, ty, s.radius * .46 * p.areaMul, Math.min(1.4, s.life), s.dmg * p.dmgMul * .8, col, {
+            tickRate:.35,
+            pull:s.pull * .12,
+            slow:.22,
+            slowDur:.5,
+            kind:'abyss',
+          });
           // SUPERNOVA: stash burst params on the blackhole; gameloop's blackhole
           // expiry path checks `bh.implodeBurst` to fire a final detonation.
           if(ex.implode && bh){
@@ -309,21 +445,43 @@ export const WEAPONS = {
   },
   PRISM: {
     name:'SOUL PRISM', color:C.gold, kind:'BULLET',
-    desc:'명중 시 분열하는 영혼 결정.',
+    desc:'명중 시 가까운 적을 찾아가는 영혼 파편으로 분열.',
     maxLv:6,
-    baseStats:{ cd:1.4, dmg:26, speed:380, life:1.2, splits:3 },
+    baseStats:{ cd:1.35, dmg:30, speed:390, life:1.25, splits:3, count:1 },
     icon(ctx,x,y,s){ drawPolygon(x,y,3,s*.3,Math.PI,C.gold,10); drawCircle(x,y,s*.08,'#fff',6,'#fff'); },
     onUpdate(p,w){
       w.timer = (w.timer||0) - G.dt;
       if(w.timer<=0){
         const s = w.stats;
+        const col = w.color || C.gold;
+        const ex = w.extra || {};
+        const splitHomes = ex.homingSplit !== false;
         const target = nearestEnemy(p);
-        const a = target ? angTo(p, target) : Math.random()*TAU;
-        fireProjectile(p.x, p.y, a, s.speed, s.dmg * p.dmgMul, s.life, C.gold, 'prism', {splits:s.splits});
+        const aim = target ? angTo(p, target) : (p.faceA || Math.random()*TAU);
+        const count = s.count || 1;
+        for(let i=0;i<count;i++){
+          const a = aim + (i - (count-1)/2) * .2;
+          fireProjectile(p.x, p.y, a, s.speed, s.dmg * p.dmgMul, s.life, col, 'prism', {
+            splits:s.splits,
+            target,
+            turn:ex.homingSplit ? (ex.turn || 4) : 1.2,
+            homingSplit:splitHomes,
+            subSplit:ex.subSplit || 0,
+            splitKind:ex.subSplit ? 'prism' : (splitHomes ? 'homing' : 'bullet'),
+            splitRange:420,
+            blastR:ex.bloomBlast ? (ex.bloomR || 90) : 0,
+            blastDmg:ex.bloomBlast ? (ex.bloomDmg || 20) * p.dmgMul : 0,
+          });
+        }
+        fxRing(p.x, p.y, col, 28, .22);
         w.timer = s.cd / p.cdMul;
       }
     },
-    levelUp(w,lv){ if(lv===3||lv===6) w.stats.splits++; w.stats.dmg += 8; w.stats.cd *= .94; },
+    levelUp(w,lv){
+      if(lv===3||lv===6) w.stats.splits++;
+      if(lv===5) w.stats.count = 2;
+      w.stats.dmg += 9; w.stats.cd *= .95;
+    },
   },
 };
 

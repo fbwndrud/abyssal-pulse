@@ -32,7 +32,7 @@ function _autoAttachSprite(e){
     case 'freeze': case 'chest': case 'item': case 'shrine':
       _attachPickupSprite(e); e.__sprKind = 'tex'; break;
     case 'fx':        _attachFxParticleSprite(e); break;
-    case 'ring': case 'shock': case 'line': case 'fan':
+    case 'ring': case 'shock': case 'line': case 'fan': case 'zone':
                       _attachFxGraphics(e, fxLayer); break;
     case 'blackhole': _attachFxGraphics(e, bhLayer); break;
     case 'text':      _attachFxText(e); break;
@@ -297,6 +297,19 @@ export function fxLine(x1,y1,x2,y2,color,life=.18,width=2){
 export function fxShockwave(x,y,color,maxR=180,life=.5){
   makeEnt({type:'shock', x, y, color, r:8, maxR, life, maxLife:life});
 }
+export function spawnZone(x, y, r, life, dmgPerSec, color=C.gold, opts={}){
+  const z = makeEnt({
+    type:'zone', x, y, r, life, maxLife:life,
+    dmgPerSec, color, tick:0, tickRate:opts.tickRate || .35,
+    slow:opts.slow || 0, slowDur:opts.slowDur || .6,
+    burnDps:opts.burnDps || 0, burnDur:opts.burnDur || 1,
+    bleedDps:opts.bleedDps || 0, bleedDur:opts.bleedDur || 1,
+    pull:opts.pull || 0, kind:opts.kind || 'rune',
+    seed:Math.random()*TAU,
+  });
+  if(z.kind !== 'hellfire') fxRing(x, y, color, r, Math.min(.55, life));
+  return z;
+}
 export function shake(amt){ G.shake = Math.min(1, G.shake + amt); }
 export function hitstop(s){ G.hitstop = Math.max(G.hitstop, s); }
 export function flash(color,a=.4){ G.flash = a; G.flashColor = color; }
@@ -333,6 +346,33 @@ export function applySlow(e, factor, duration){
   if(e.slowMul == null || mul < e.slowMul || (mul === e.slowMul && (e.slowTime||0) < duration)){
     e.slowMul = mul;
     e.slowTime = duration;
+  }
+}
+export function applyBurn(e, dmgPerSec, duration, color=C.red){
+  if(!e || !e.alive || dmgPerSec <= 0) return;
+  if((e.burnDps || 0) <= dmgPerSec || (e.burnTime || 0) < duration){
+    e.burnDps = dmgPerSec;
+    e.burnTime = duration;
+    e.burnColor = color;
+    e._burnTick = Math.min(e._burnTick || .5, .35);
+  }
+}
+export function applyBleed(e, dmgPerSec, duration, color=C.red){
+  if(!e || !e.alive || dmgPerSec <= 0) return;
+  if((e.bleedDps || 0) <= dmgPerSec || (e.bleedTime || 0) < duration){
+    e.bleedDps = dmgPerSec;
+    e.bleedTime = duration;
+    e.bleedColor = color;
+    e._bleedTick = Math.min(e._bleedTick || .5, .5);
+  }
+}
+export function applyHex(e, dmg, radius, duration, color=C.violet){
+  if(!e || !e.alive) return;
+  if((e.hexDmg || 0) <= dmg || (e.hexTime || 0) < duration){
+    e.hexDmg = dmg;
+    e.hexR = radius;
+    e.hexTime = duration;
+    e.hexColor = color;
   }
 }
 export function killEnemy(e){
@@ -387,6 +427,17 @@ export function killEnemy(e){
   } else if(e.eliteAffix === 'voidTouched'){
     spawnBlackhole(e.x, e.y, 120, 1.8, 360, 32);
     fxRing(e.x, e.y, C.violet, 150, .6);
+  }
+  if(e.hexDmg && e.hexR){
+    fxRing(e.x, e.y, e.hexColor || C.violet, e.hexR, .38);
+    fxBurst(e.x, e.y, e.hexColor || C.violet, 14, 180, 3, .35);
+    const hexList = EGRID.query(e.x, e.y, e.hexR + 40, _EQ1);
+    for(let hi = 0; hi < hexList.length; hi++){
+      const o = hexList[hi];
+      if(!o.alive || o === e) continue;
+      const dx = o.x - e.x, dy = o.y - e.y;
+      if(dx*dx + dy*dy <= e.hexR * e.hexR) dealDamage(o, e.hexDmg, e.hexColor || C.violet);
+    }
   }
   if(e.isBoss){ shake(.6); flash(e.color, .35); AUDIO.explode(e.x, e.y); announce('ABYSS LORD SLAIN', 1.6); }
   else { shake(.04); AUDIO.hit(e.x); }
@@ -453,7 +504,7 @@ export function fireProjectile(x,y,angle,speed,dmg,life,color,kind='bullet',extr
     type:'proj', subtype:kind, x, y,
     vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
     angle, speed, dmg, color, life, maxLife:life,
-    r: kind==='shuriken' ? 14 : 6,
+    r: extra.r != null ? extra.r : (kind==='shuriken' ? 14 : kind==='homing' ? 8 : kind==='prism' ? 9 : 6),
     pierce: extra.pierce!=null ? extra.pierce : 0,
     hits: new Set(),
     spin: extra.spin || 0,
@@ -479,6 +530,9 @@ export function firePulse(x,y,r,dmg,kb,opts){
       e.vy += Math.sin(a)*kb;
       dealDamage(e, dmg, opts?.color || C.cyan);
       if(opts?.slow) applySlow(e, opts.slow, opts.slowDur || 1);
+      if(opts?.burnDps) applyBurn(e, opts.burnDps, opts.burnDur || 1, opts.color || C.red);
+      if(opts?.bleedDps) applyBleed(e, opts.bleedDps, opts.bleedDur || 1, opts.color || C.red);
+      if(opts?.hexDmg) applyHex(e, opts.hexDmg, opts.hexR || r*.45, opts.hexDur || 2, opts.color || C.violet);
     }
   }
 }
@@ -502,13 +556,17 @@ export function fireFanShock(x,y,angle,r,arc,dmg,opts){
       e.vx += Math.cos(a)*k;
       e.vy += Math.sin(a)*k;
       if(opts?.slow) applySlow(e, opts.slow, opts.slowDur || 1);
+      if(opts?.burnDps) applyBurn(e, opts.burnDps, opts.burnDur || 1, color);
+      if(opts?.bleedDps) applyBleed(e, opts.bleedDps, opts.bleedDur || 1, color);
+      if(opts?.hexDmg) applyHex(e, opts.hexDmg, opts.hexR || r*.35, opts.hexDur || 2, color);
     }
   }
 }
-export function spawnBlackhole(x,y,r,life,pull,dmgPerSec){
-  const bh = makeEnt({type:'blackhole', x, y, r, life, maxLife:life, pull, dmgPerSec, color:C.violet, t:0});
+export function spawnBlackhole(x,y,r,life,pull,dmgPerSec,opts={}){
+  const col = opts.color || C.violet;
+  const bh = makeEnt({type:'blackhole', x, y, r, life, maxLife:life, pull, dmgPerSec, color:col, t:0});
   AUDIO.boss();
-  fxRing(x,y,C.violet,r,.6);
+  fxRing(x,y,col,r,.6);
   return bh;
 }
 

@@ -29,6 +29,7 @@ The game keeps the original horde-survivor roguelite loop while shifting the fan
 - Generated gothic PNG sprites for Rift Warden, Blood Seer, Grave Bulwark, Iron Exile, Hex Witch, Hollow Imp, Grave Brute, Ashen Butcher, Bone Shards, Hellfire Cross, and Spectral Blades
 - Procedural dungeon floor maps for Ruined Nave, Bone Crypt, and Hellforge Rift
 - Gothic altar-style skill selection cards with generated skill medallion art and matching dark sanctuary overlays
+- Diablo-like skill mechanics: consecrated ground, piercing lances, rune wards, bone bleed, hellfire fissures, grave aftershocks, hex death bursts, returning spectral blades, abyss wells, and soul-prism splits
 - Rune awakenings and legendary skill awakenings
 - Relic, rune, and cursed altar progression
 - Elite affix monsters such as Molten, Frostbound, and Void-Touched

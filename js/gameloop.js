@@ -14,7 +14,8 @@ import {
   EGRID, _EQ1, _EQ2,
   makeEnt, fxBurst, fxRing, fxText, fxShockwave, fxLine, shake, flash,
   spawnEnemy, spawnBoss, spawnCoin, spawnShrine,
-  fireProjectile, dealDamage, nearestEnemy,
+  fireProjectile, dealDamage, nearestEnemy, nearestEnemyExcept,
+  spawnZone, applySlow, applyBurn, applyBleed, applyHex,
   detachSprite,
 } from './entities.js';
 import {
@@ -140,6 +141,9 @@ export function update(){
     else if(e.type === 'line'){
       e.life -= G.dt; if(e.life<=0) e.alive=false;
     }
+    else if(e.type === 'zone'){
+      updateZone(e);
+    }
     else if(e.type === 'text'){
       e.y += e.vy * G.dt; e.vy *= .98;
       e.life -= G.dt; if(e.life<=0) e.alive=false;
@@ -147,7 +151,8 @@ export function update(){
     else if(e.type === 'blackhole'){
       e.life -= G.dt;
       if(e.life<=0){
-        fxShockwave(e.x,e.y,C.violet,e.r*1.4,.6); AUDIO.explode(e.x,e.y); shake(.2);
+        const col = e.color || C.violet;
+        fxShockwave(e.x,e.y,col,e.r*1.4,.6); AUDIO.explode(e.x,e.y); shake(.2);
         // SUPERNOVA implode: AOE detonation at expiry
         if(e.implodeBurst && e.implodeR){
           fxRing(e.x, e.y, C.gold, e.implodeR, .5);
@@ -289,9 +294,11 @@ export function update(){
           for(const b of w.beams){
             if(!b) continue;
             p.beamGfx.moveTo(b.x1, b.y1); p.beamGfx.lineTo(b.x2, b.y2);
-            p.beamGfx.stroke({ color: beamCol, alpha: .55, width: bw + 12 });
+            p.beamGfx.stroke({ color: 0x100604, alpha: .55, width: bw + 18 });
             p.beamGfx.moveTo(b.x1, b.y1); p.beamGfx.lineTo(b.x2, b.y2);
-            p.beamGfx.stroke({ color: '#ffffff', alpha: .95, width: bw });
+            p.beamGfx.stroke({ color: beamCol, alpha: .62, width: bw + 7 });
+            p.beamGfx.moveTo(b.x1, b.y1); p.beamGfx.lineTo(b.x2, b.y2);
+            p.beamGfx.stroke({ color: 0xfff4d0, alpha: .9, width: Math.max(2, bw*.45) });
           }
         }
         if(w.def && w.def.kind === 'ORBIT' && w.lastNodes){
@@ -300,11 +307,13 @@ export function update(){
           for(const n of w.lastNodes){
             if(!n) continue;
             p.beamGfx.circle(n.x, n.y, nr);
-            p.beamGfx.fill({ color: nodeCol, alpha: .35 });
+            p.beamGfx.fill({ color: 0x070504, alpha: .72 });
             p.beamGfx.circle(n.x, n.y, nr);
-            p.beamGfx.stroke({ color: nodeCol, alpha: .9, width: 2 });
+            p.beamGfx.stroke({ color: nodeCol, alpha: .9, width: 2.4 });
+            p.beamGfx.circle(n.x, n.y, nr*.42);
+            p.beamGfx.stroke({ color: 0xfff4d0, alpha: .5, width: 1.2 });
             p.beamGfx.moveTo(p.x, p.y); p.beamGfx.lineTo(n.x, n.y);
-            p.beamGfx.stroke({ color: nodeCol, alpha: .25, width: 1.2 });
+            p.beamGfx.stroke({ color: nodeCol, alpha: .18, width: 1.2 });
           }
         }
       }
@@ -348,6 +357,7 @@ export function update(){
 
 function updateEnemy(e, freezeMul){
   const p = G.player;
+  if(!updateStatusEffects(e)) return;
   if(e.brain === 'chase'){
     const a = Math.atan2(p.y - e.y, p.x - e.x);
     e.vx = lerp(e.vx, Math.cos(a) * e.speed, .14);
@@ -504,9 +514,82 @@ function updateEnemy(e, freezeMul){
     }
   }
 }
+function updateStatusEffects(e){
+  if(e.burnTime > 0){
+    e.burnTime -= G.dt;
+    e._burnTick = (e._burnTick || .35) - G.dt;
+    if(e._burnTick <= 0){
+      e._burnTick = .5;
+      dealDamage(e, (e.burnDps || 0) * .5, e.burnColor || C.red);
+      if(!e.alive) return false;
+      fxBurst(e.x, e.y, e.burnColor || C.red, 2, 55, 1.8, .18);
+    }
+    if(e.burnTime <= 0){ e.burnDps = 0; e.burnTime = 0; }
+  }
+  if(e.bleedTime > 0){
+    e.bleedTime -= G.dt;
+    e._bleedTick = (e._bleedTick || .5) - G.dt;
+    if(e._bleedTick <= 0){
+      e._bleedTick = .55;
+      dealDamage(e, (e.bleedDps || 0) * .55, e.bleedColor || C.red);
+      if(!e.alive) return false;
+    }
+    if(e.bleedTime <= 0){ e.bleedDps = 0; e.bleedTime = 0; }
+  }
+  if(e.hexTime > 0){
+    e.hexTime -= G.dt;
+    if(e.hexTime <= 0){ e.hexDmg = 0; e.hexR = 0; e.hexTime = 0; }
+  }
+  return true;
+}
+function updateZone(e){
+  e.life -= G.dt;
+  if(e.life <= 0){ e.alive = false; return; }
+  e.tick = (e.tick || 0) - G.dt;
+  const tickRate = e.tickRate || .35;
+  const shouldTick = e.tick <= 0;
+  if(shouldTick) e.tick = tickRate;
+  const list = EGRID.query(e.x, e.y, e.r + 40, _EQ1);
+  const rSq = e.r * e.r;
+  for(let zi = 0; zi < list.length; zi++){
+    const en = list[zi];
+    if(!en.alive) continue;
+    const dx = en.x - e.x, dy = en.y - e.y;
+    const d2 = dx*dx + dy*dy;
+    if(d2 > rSq) continue;
+    if(e.pull && !en.isBoss){
+      const dist = Math.sqrt(d2) + .01;
+      const f = (1 - dist/e.r) * e.pull * G.dt;
+      en.vx += (-dx/dist) * f;
+      en.vy += (-dy/dist) * f;
+    }
+    if(e.slow) applySlow(en, e.slow, e.slowDur || .5);
+    if(shouldTick && e.dmgPerSec){
+      dealDamage(en, e.dmgPerSec * tickRate, e.color);
+      if(!en.alive) continue;
+      if(e.burnDps) applyBurn(en, e.burnDps, e.burnDur || 1, e.color);
+      if(e.bleedDps) applyBleed(en, e.bleedDps, e.bleedDur || 1, e.color);
+    }
+  }
+}
 function updateProjectile(pr){
   pr.life -= G.dt;
-  if(pr.life <= 0){ pr.alive = false; return; }
+  if(pr.life <= 0){
+    if(pr.expireZone) spawnZone(pr.x, pr.y, pr.expireZone.r, pr.expireZone.life, pr.expireZone.dmg, pr.color, pr.expireZone);
+    pr.alive = false; return;
+  }
+  if(pr.returnToPlayer && !pr.returning && pr.life <= pr.maxLife * (pr.returnAt || .45)){
+    pr.returning = true;
+    pr.hits = new Set();
+  }
+  if(pr.returning && G.player){
+    const a = angTo(pr, G.player);
+    pr.vx = Math.cos(a) * pr.speed;
+    pr.vy = Math.sin(a) * pr.speed;
+    if(Math.hypot(pr.x - G.player.x, pr.y - G.player.y) < G.player.r + 6){
+      pr.alive = false; return;
+    }
+  }
   if(pr.subtype === 'homing' && pr.target){
     if(!pr.target.alive){ pr.target = nearestEnemy(pr); }
     if(pr.target){
@@ -517,6 +600,13 @@ function updateProjectile(pr){
       const newA = cur + clamp(diff, -turn, turn);
       pr.vx = Math.cos(newA) * pr.speed;
       pr.vy = Math.sin(newA) * pr.speed;
+    }
+  }
+  if(pr.trailZone){
+    pr._trailT = (pr._trailT || 0) - G.dt;
+    if(pr._trailT <= 0){
+      pr._trailT = pr.trailZone.every || .16;
+      spawnZone(pr.x, pr.y, pr.trailZone.r || 28, pr.trailZone.life || .9, pr.trailZone.dmg || 8, pr.color, pr.trailZone);
     }
   }
   pr.x += pr.vx * G.dt;
@@ -532,13 +622,38 @@ function updateProjectile(pr){
     if(dx*dx + dy*dy < rr*rr){
       dealDamage(e, pr.dmg, pr.color);
       fxBurst(pr.x, pr.y, pr.color, 4, 100, 2, .2);
+      if(pr.slow) applySlow(e, pr.slow, pr.slowDur || 1);
+      if(pr.burnDps) applyBurn(e, pr.burnDps, pr.burnDur || 1, pr.color);
+      if(pr.bleedDps) applyBleed(e, pr.bleedDps, pr.bleedDur || 1, pr.color);
+      if(pr.hexDmg) applyHex(e, pr.hexDmg, pr.hexR || 90, pr.hexDur || 2, pr.color);
+      if(pr.blastR && pr.blastDmg){
+        fxRing(pr.x, pr.y, pr.color, pr.blastR, .28);
+        const blast = EGRID.query(pr.x, pr.y, pr.blastR + 40, _EQ2);
+        for(let bi = 0; bi < blast.length; bi++){
+          const o = blast[bi];
+          if(!o.alive || o === e) continue;
+          const bdx = o.x - pr.x, bdy = o.y - pr.y;
+          if(bdx*bdx + bdy*bdy <= pr.blastR * pr.blastR) dealDamage(o, pr.blastDmg, pr.color);
+        }
+      }
+      if(pr.impactZone) spawnZone(pr.x, pr.y, pr.impactZone.r, pr.impactZone.life, pr.impactZone.dmg, pr.color, pr.impactZone);
       pr.hits.add(e);
       if(pr.subtype === 'prism' && pr.splits > 0){
         const n = pr.splits;
+        const splitHits = new Set([e]);
         for(let i=0;i<n;i++){
-          const a = Math.random()*TAU;
-          fireProjectile(pr.x, pr.y, a, pr.speed*.9, pr.dmg*.6, pr.life*.7, pr.color, 'bullet');
+          const tgt = nearestEnemyExcept(pr, splitHits, pr.splitRange || 360);
+          const a = tgt ? angTo(pr, tgt) : Math.random()*TAU;
+          if(tgt) splitHits.add(tgt);
+          fireProjectile(pr.x, pr.y, a, pr.speed*.92, pr.dmg*.58, Math.max(.45, pr.life*.75), pr.color, pr.splitKind || 'bullet', {
+            target:tgt || null,
+            turn:pr.homingSplit ? (pr.turn || 4) : 0,
+            splits:pr.subSplit || 0,
+            subSplit:0,
+            r:5,
+          });
         }
+        fxRing(pr.x, pr.y, pr.color, 46, .25);
         pr.alive = false; return;
       }
       if(pr.pierce > 0){ pr.pierce--; }
@@ -635,7 +750,7 @@ function _syncEntitySprite(e){
   if(e.type === 'ebullet') return; // synced inside updateEnemyBullets after position update
 
   // Static-sprite types: position follows e.x,e.y. Graphics-redraw types use e.x,e.y inside draw.
-  const gfxType = e.type === 'ring' || e.type === 'shock' || e.type === 'fan' || e.type === 'line' || e.type === 'blackhole';
+  const gfxType = e.type === 'ring' || e.type === 'shock' || e.type === 'fan' || e.type === 'line' || e.type === 'blackhole' || e.type === 'zone';
   if(!gfxType) sp.position.set(e.x, e.y);
 
   if(e.type === 'enemy'){
@@ -707,7 +822,15 @@ function _syncEntitySprite(e){
     sp.moveTo(e.x, e.y);
     sp.arc(e.x, e.y, e.r, e.angle - e.arc/2, e.angle + e.arc/2);
     sp.lineTo(e.x, e.y);
-    sp.fill({ color: e.color, alpha: a * .7 });
+    sp.fill({ color: e.color, alpha: a * .34 });
+    sp.arc(e.x, e.y, e.r, e.angle - e.arc/2, e.angle + e.arc/2);
+    sp.stroke({ color: e.color, alpha: a * .85, width: 3 + (1-a)*5 });
+    for(let i = -2; i <= 2; i++){
+      const aa = e.angle + i * e.arc / 5;
+      sp.moveTo(e.x + Math.cos(aa)*18, e.y + Math.sin(aa)*18);
+      sp.lineTo(e.x + Math.cos(aa)*e.r, e.y + Math.sin(aa)*e.r);
+      sp.stroke({ color: 0xffe7c0, alpha: a * .22, width: 1 });
+    }
   }
   else if(e.type === 'line'){
     const a = e.life / e.maxLife;
@@ -739,6 +862,7 @@ function _syncEntitySprite(e){
     sp.fill({ color: 0x000000, alpha: .9 });
     // 5 violet event-horizon spirals on top
     const t = e.t;
+    const col = e.color || 0x9b5cff;
     for(let i = 0; i < 5; i++){
       const ang0 = t*4 + i*TAU/5;
       const r1 = e.r * (.4 + i*.12);
@@ -749,7 +873,50 @@ function _syncEntitySprite(e){
         if(rr <= 0) break;
         sp.lineTo(e.x + Math.cos(aa)*rr, e.y + Math.sin(aa)*rr);
       }
-      sp.stroke({ color: 0x9b5cff, alpha: Math.max(.05, .7 - i*.12), width: 1.5 });
+      sp.stroke({ color: col, alpha: Math.max(.05, .7 - i*.12), width: 1.5 });
+    }
+    sp.circle(e.x, e.y, e.r);
+    sp.stroke({ color: col, alpha: .45, width: 2 });
+  }
+  else if(e.type === 'zone'){
+    const a = e.life / e.maxLife;
+    const k = 1 - a;
+    const col = e.color || 0xd6a84f;
+    sp.clear();
+    if(e.kind === 'hellfire'){
+      sp.circle(e.x, e.y, e.r);
+      sp.fill({ color: 0x2a0503, alpha: .09 + a*.05 });
+      for(let m = 0; m < 3; m++){
+        const aa = e.seed + m*TAU/3 + Math.sin(G.realT*2 + m)*.04;
+        const nx = -Math.sin(aa), ny = Math.cos(aa);
+        const steps = 5;
+        sp.moveTo(e.x - Math.cos(aa)*e.r*.92, e.y - Math.sin(aa)*e.r*.92);
+        for(let j = 1; j <= steps; j++){
+          const t = j / steps;
+          const along = -e.r*.92 + t * e.r*1.84;
+          const jag = Math.sin(e.seed*17 + m*3 + j*2.1) * e.r*.12;
+          sp.lineTo(e.x + Math.cos(aa)*along + nx*jag, e.y + Math.sin(aa)*along + ny*jag);
+        }
+        sp.stroke({ color: col, alpha: (.28 + m*.06)*a, width: 2.2 + k*2 });
+      }
+      sp.circle(e.x, e.y, Math.max(3, e.r*.18));
+      sp.fill({ color: 0xffb15e, alpha: .16*a });
+      return;
+    }
+    sp.circle(e.x, e.y, e.r);
+    sp.fill({ color: col, alpha: .07 + a*.05 });
+    sp.circle(e.x, e.y, e.r * (.82 + Math.sin(G.realT*3 + e.seed)*.03));
+    sp.stroke({ color: col, alpha: .48*a, width: 2.5 + k*3 });
+    sp.circle(e.x, e.y, e.r * .48);
+    sp.stroke({ color: 0xfff1c8, alpha: .18*a, width: 1.2 });
+    const n = e.kind === 'hellfire' ? 8 : 6;
+    for(let i = 0; i < n; i++){
+      const aa = e.seed + G.realT*.18 + i*TAU/n;
+      const r0 = e.r * .34;
+      const r1 = e.r * (e.kind === 'hellfire' ? .95 : .72);
+      sp.moveTo(e.x + Math.cos(aa)*r0, e.y + Math.sin(aa)*r0);
+      sp.lineTo(e.x + Math.cos(aa)*r1, e.y + Math.sin(aa)*r1);
+      sp.stroke({ color: col, alpha: (e.kind === 'hellfire' ? .18 : .13)*a, width: e.kind === 'hellfire' ? 2 : 1.2 });
     }
   }
 }
