@@ -203,20 +203,28 @@ export function getDiamondTexture(r, color='#fff', glow=12, fill=null){
    actors still use procedural textures, so the art rollout can stay incremental. */
 export const SPRITE_ASSETS = Object.freeze({
   players: Object.freeze({
-    CIRCLE: { id:'player.riftWarden', url:'assets/sprites/player/rift-warden.png', width:48, height:64 },
+    CIRCLE: { id:'player.riftWarden', url:'assets/sprites/player/rift-warden.png', width:48, height:64, animProfile:'player' },
   }),
   enemies: Object.freeze({
-    TRI: { id:'enemy.hollowImp', url:'assets/sprites/enemies/hollow-imp.png', width:46, height:54 },
-    SQR: { id:'enemy.graveBrute', url:'assets/sprites/enemies/grave-brute.png', width:62, height:62 },
+    TRI: { id:'enemy.hollowImp', url:'assets/sprites/enemies/hollow-imp.png', width:46, height:54, animProfile:'lightEnemy' },
+    SQR: { id:'enemy.graveBrute', url:'assets/sprites/enemies/grave-brute.png', width:62, height:62, animProfile:'heavyEnemy' },
   }),
   bosses: Object.freeze({
-    SPIKE_KING: { id:'boss.ashenButcher', url:'assets/sprites/bosses/ashen-butcher.png', width:128, height:142 },
+    SPIKE_KING: { id:'boss.ashenButcher', url:'assets/sprites/bosses/ashen-butcher.png', width:128, height:142, animProfile:'boss' },
   }),
   projectiles: Object.freeze({
-    bullet: { id:'projectile.hellfireCross', url:'assets/sprites/projectiles/hellfire-cross.png', width:34, height:34, spinRate:2.2 },
-    homing: { id:'projectile.boneShard', url:'assets/sprites/projectiles/bone-shard.png', width:32, height:36, rotationOffset:-Math.PI/4 },
-    shuriken: { id:'projectile.spectralBlade', url:'assets/sprites/projectiles/spectral-blade.png', width:30, height:42, rotationOffset:-Math.PI/4 },
+    bullet: { id:'projectile.hellfireCross', url:'assets/sprites/projectiles/hellfire-cross.png', width:34, height:34, spinRate:2.2, animProfile:'projectile' },
+    homing: { id:'projectile.boneShard', url:'assets/sprites/projectiles/bone-shard.png', width:32, height:36, rotationOffset:-Math.PI/4, animProfile:'projectile' },
+    shuriken: { id:'projectile.spectralBlade', url:'assets/sprites/projectiles/spectral-blade.png', width:30, height:42, rotationOffset:-Math.PI/4, animProfile:'projectile' },
   }),
+});
+export const ANIM_PROFILES = Object.freeze({
+  player: Object.freeze({ bobAmp:3.0, bobHz:2.0, swayAmp:.025, leanK:.11, squashK:.075, hitJolt:.12, speedRef:280 }),
+  lightEnemy: Object.freeze({ bobAmp:2.8, bobHz:3.8, swayAmp:.035, leanK:.15, squashK:.09, hitJolt:.16, speedRef:190 }),
+  heavyEnemy: Object.freeze({ bobAmp:1.6, bobHz:1.7, swayAmp:.018, leanK:.07, squashK:.055, hitJolt:.20, speedRef:130 }),
+  boss: Object.freeze({ bobAmp:2.0, bobHz:.85, swayAmp:.012, leanK:.025, squashK:.025, hitJolt:.09, speedRef:90 }),
+  projectile: Object.freeze({ bobAmp:0, bobHz:4.2, swayAmp:.04, leanK:0, squashK:.12, hitJolt:0, speedRef:420 }),
+  pickup: Object.freeze({ bobAmp:3.0, bobHz:2.8, swayAmp:.02, leanK:0, squashK:.035, hitJolt:0, speedRef:1 }),
 });
 export const SPRITE_ASSET_LIST = Object.freeze([
   ...Object.values(SPRITE_ASSETS.players),
@@ -250,6 +258,7 @@ export function configureSpriteForAsset(sprite, asset){
   sprite.height = asset.height;
   sprite.__assetScaleX = sprite.scale.x;
   sprite.__assetScaleY = sprite.scale.y;
+  sprite.__assetBaseRot = asset.rotationOffset || 0;
   sprite.tint = 0xffffff;
 }
 
@@ -371,6 +380,7 @@ export function acquireSprite(key, texture){
     s.tint = 0xffffff;
     s.__assetScaleX = null;
     s.__assetScaleY = null;
+    s.__assetBaseRot = 0;
     return s;
   }
   const s = new PIXI.Sprite(texture);

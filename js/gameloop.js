@@ -9,7 +9,7 @@ import {
   app, world, hudC,
 } from './core.js';
 import { AUDIO } from './audio.js';
-import { BG, acquireGraphics } from './render.js';
+import { ANIM_PROFILES, BG, acquireGraphics } from './render.js';
 import {
   EGRID, _EQ1, _EQ2,
   makeEnt, fxBurst, fxRing, fxText, fxShockwave, fxLine, shake, flash,
@@ -36,6 +36,51 @@ let _wpnErrCount = 0;
 export function setLoopHandlers({ doLevelUp, endRun, updateHUD, openChestPick, openShrinePick }){
   _doLevelUp = doLevelUp; _endRun = endRun; _updateHUD = updateHUD;
   _openChestPick = openChestPick; _openShrinePick = openShrinePick;
+}
+
+const _POSE = { ox:0, oy:0, rot:0, sx:1, sy:1, alpha:1, tint:0xffffff };
+function _animSeed(o){
+  if(o.__animSeed == null) o.__animSeed = Math.random() * TAU;
+  return o.__animSeed;
+}
+function _profileForPlayer(p){
+  return ANIM_PROFILES[p.spriteAsset?.animProfile || 'player'] || ANIM_PROFILES.player;
+}
+function _profileForEntity(e){
+  const assetProfile = e.__spriteAsset?.animProfile;
+  if(assetProfile && ANIM_PROFILES[assetProfile]) return ANIM_PROFILES[assetProfile];
+  if(e.type === 'proj') return ANIM_PROFILES.projectile;
+  if(e.isBoss) return ANIM_PROFILES.boss;
+  if(e.type === 'enemy') return e.r >= 16 ? ANIM_PROFILES.heavyEnemy : ANIM_PROFILES.lightEnemy;
+  return ANIM_PROFILES.pickup;
+}
+function _computeSpritePose(out, profile, vx, vy, t, seed, baseRot, hitFlash, alpha, tint){
+  const ref = profile.speedRef || 1;
+  const sx = vx || 0, sy = vy || 0;
+  const speed = Math.min(1.35, Math.sqrt(sx*sx + sy*sy) / ref);
+  const phase = t * (profile.bobHz || 0) * TAU + seed;
+  const bob = (profile.bobAmp || 0) * Math.sin(phase);
+  const sway = (profile.swayAmp || 0) * Math.sin(phase * .55 + seed * .37);
+  const lean = -Math.max(-1, Math.min(1, sx / ref)) * (profile.leanK || 0);
+  const squash = (profile.squashK || 0) * speed;
+  const hit = hitFlash > 0 ? Math.min(1, hitFlash / .12) : 0;
+  const jolt = (profile.hitJolt || 0) * hit;
+  out.ox = 0;
+  out.oy = bob - jolt * 5;
+  out.rot = baseRot + sway + lean;
+  out.sx = Math.max(.2, 1 - squash * .35 + jolt);
+  out.sy = Math.max(.2, 1 + squash + jolt * .35);
+  out.alpha = alpha == null ? 1 : alpha;
+  out.tint = hit > 0 ? 0xffefe0 : (tint == null ? 0xffffff : tint);
+}
+function _applySpritePose(sprite, x, y, pose){
+  const baseX = sprite.__assetScaleX == null ? 1 : sprite.__assetScaleX;
+  const baseY = sprite.__assetScaleY == null ? 1 : sprite.__assetScaleY;
+  sprite.position.set(x + pose.ox, y + pose.oy);
+  sprite.rotation = pose.rot;
+  sprite.scale.set(baseX * pose.sx, baseY * pose.sy);
+  sprite.alpha = pose.alpha;
+  sprite.tint = pose.tint;
 }
 
 /* ===================================================================
@@ -259,16 +304,11 @@ export function update(){
   updateCamera();
   // player sprite sync (player is not in G.ents)
   if(p && p.sprite){
-    p.sprite.position.set(p.x, p.y);
-    p.sprite.rotation = p.spriteAsset ? Math.sin(G.realT * 4) * 0.035 : p.rot;
+    const blink = p.invuln > 0 && (Math.floor(G.realT*16)%2===0);
+    _computeSpritePose(_POSE, _profileForPlayer(p), p.vx, p.vy, G.realT, _animSeed(p), p.spriteAsset ? 0 : p.rot, 0, blink ? .35 : 1, 0xffffff);
+    _applySpritePose(p.sprite, p.x, p.y, _POSE);
     if(p.dotSprite) p.dotSprite.position.set(p.x, p.y);
-    if(p.invuln > 0 && (Math.floor(G.realT*16)%2===0)){
-      p.sprite.alpha = 0.35;
-      if(p.dotSprite) p.dotSprite.alpha = p.spriteAsset ? 0 : 0.35;
-    } else {
-      p.sprite.alpha = 1;
-      if(p.dotSprite) p.dotSprite.alpha = p.spriteAsset ? 0 : 1;
-    }
+    if(p.dotSprite) p.dotSprite.alpha = p.spriteAsset ? 0 : (blink ? .35 : 1);
     if(p.dotSprite) p.dotSprite.visible = !p.spriteAsset;
     // Trail — fading line through trail points (each segment has its own alpha).
     if(p.trailGfx){
@@ -751,34 +791,34 @@ function _syncEntitySprite(e){
 
   // Static-sprite types: position follows e.x,e.y. Graphics-redraw types use e.x,e.y inside draw.
   const gfxType = e.type === 'ring' || e.type === 'shock' || e.type === 'fan' || e.type === 'line' || e.type === 'blackhole' || e.type === 'zone';
-  if(!gfxType) sp.position.set(e.x, e.y);
+  if(!gfxType && e.type !== 'enemy' && e.type !== 'proj') sp.position.set(e.x, e.y);
 
   if(e.type === 'enemy'){
     const visualPulse = e.__spriteAsset && e.eliteAffix
       ? 1 + Math.sin(G.realT * 5 + (e.__elitePulse || 0)) * .04
       : 1;
     if(e.__spriteAsset){
-      sp.rotation = (e.rot || 0) * 0.12;
-      sp.tint = e.hitFlash > 0 ? 0xffefe0 : 0xffffff;
-      if(sp.__assetScaleX && sp.__assetScaleY) sp.scale.set(sp.__assetScaleX * visualPulse, sp.__assetScaleY * visualPulse);
+      _computeSpritePose(_POSE, _profileForEntity(e), e.vx, e.vy, G.realT, _animSeed(e), (e.rot || 0) * .08, e.hitFlash, 1, 0xffffff);
+      _POSE.sx *= visualPulse;
+      _POSE.sy *= visualPulse;
+      _applySpritePose(sp, e.x, e.y, _POSE);
     } else {
-      sp.rotation = e.rot;
       const wantFlash = e.hitFlash > 0;
       if(wantFlash && e.__flashTex && sp.texture !== e.__flashTex.texture) sp.texture = e.__flashTex.texture;
       else if(!wantFlash && e.__normTex && sp.texture !== e.__normTex.texture) sp.texture = e.__normTex.texture;
+      _computeSpritePose(_POSE, _profileForEntity(e), e.vx, e.vy, G.realT, _animSeed(e), e.rot || 0, e.hitFlash, 1, 0xffffff);
+      _applySpritePose(sp, e.x, e.y, _POSE);
     }
     if(e.auraSprite){
       e.auraSprite.position.set(e.x, e.y);
       e.auraSprite.alpha = .35 + Math.sin(G.realT*3) * .12;  // breathing pulse
     }
   } else if(e.type === 'proj'){
-    if(e.__spriteAsset){
-      const baseRot = e.subtype === 'shuriken' ? e.spin : Math.atan2(e.vy, e.vx);
-      const drift = (e.__spriteAsset.spinRate || 0) * G.realT;
-      sp.rotation = baseRot + (e.__spriteAsset.rotationOffset || 0) + drift;
-    } else {
-      sp.rotation = e.subtype === 'shuriken' ? e.spin : Math.atan2(e.vy, e.vx);
-    }
+    const baseRot = e.subtype === 'shuriken' ? e.spin : Math.atan2(e.vy, e.vx);
+    const drift = e.__spriteAsset ? (e.__spriteAsset.spinRate || 0) * G.realT : 0;
+    const assetRot = e.__spriteAsset ? (e.__spriteAsset.rotationOffset || 0) : 0;
+    _computeSpritePose(_POSE, _profileForEntity(e), e.vx, e.vy, G.realT, _animSeed(e), baseRot + assetRot + drift, 0, 1, 0xffffff);
+    _applySpritePose(sp, e.x, e.y, _POSE);
   } else if(e.type === 'xp')     sp.rotation = G.realT * 3;
   else   if(e.type === 'coin')   sp.rotation = G.realT * 4;
   else   if(e.type === 'magnet') sp.rotation = G.realT * 2;
