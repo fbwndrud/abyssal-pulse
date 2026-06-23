@@ -139,3 +139,9 @@ Object.assign(window, {
   togglePause, confirmAbandon,
   closeOverlay, showMenu,
 });
+const pendingInlineActions = window.__pendingInlineActions || [];
+window.__pendingInlineActions = null;
+for(const action of pendingInlineActions){
+  const fn = window[action.name];
+  if(typeof fn === 'function') fn(...(action.args || []));
+}

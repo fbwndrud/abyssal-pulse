@@ -457,6 +457,24 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   </div>
 </div>
 
+<script>
+(()=>{
+  const names = [
+    'openClassPicker', 'openShop', 'openCodex',
+    'openChipset', 'chipsetPull', 'chipsetBuySlot',
+    'rerollLevelup', 'skipLevelup',
+    'returnToMenu', 'restartRun',
+    'togglePause', 'confirmAbandon',
+    'closeOverlay', 'showMenu',
+  ];
+  window.__pendingInlineActions = [];
+  for(const name of names){
+    window[name] = (...args) => {
+      window.__pendingInlineActions.push({ name, args });
+    };
+  }
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>
