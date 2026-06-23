@@ -204,13 +204,25 @@ export function getDiamondTexture(r, color='#fff', glow=12, fill=null){
 export const SPRITE_ASSETS = Object.freeze({
   players: Object.freeze({
     CIRCLE: { id:'player.riftWarden', url:'assets/sprites/player/rift-warden.png', width:48, height:64, animProfile:'player' },
+    TRIANGLE: { id:'player.bloodSeer', url:'assets/sprites/classes/blood-seer.png', width:48, height:64, animProfile:'player' },
+    HEXAGON: { id:'player.graveBulwark', url:'assets/sprites/classes/grave-bulwark.png', width:48, height:64, animProfile:'player' },
+    SQUARE: { id:'player.ironExile', url:'assets/sprites/classes/iron-exile.png', width:48, height:64, animProfile:'player' },
+    STAR: { id:'player.hexWitch', url:'assets/sprites/classes/hex-witch.png', width:48, height:64, animProfile:'player' },
   }),
   enemies: Object.freeze({
     TRI: { id:'enemy.hollowImp', url:'assets/sprites/enemies/hollow-imp.png', width:46, height:54, animProfile:'lightEnemy' },
     SQR: { id:'enemy.graveBrute', url:'assets/sprites/enemies/grave-brute.png', width:62, height:62, animProfile:'heavyEnemy' },
+    HEX: { id:'enemy.boneSplitter', url:'assets/sprites/enemies/bone-splitter.png', width:70, height:80, animProfile:'heavyEnemy' },
+    PEN: { id:'enemy.cinderAcolyte', url:'assets/sprites/enemies/cinder-acolyte.png', width:48, height:68, animProfile:'lightEnemy' },
+    DIA: { id:'enemy.bloodWraith', url:'assets/sprites/enemies/blood-wraith.png', width:52, height:64, animProfile:'lightEnemy' },
+    OCT: { id:'enemy.plagueDeacon', url:'assets/sprites/enemies/plague-deacon.png', width:66, height:82, animProfile:'heavyEnemy' },
+    SWARM: { id:'enemy.riftVermin', url:'assets/sprites/enemies/rift-vermin.png', width:38, height:32, animProfile:'lightEnemy' },
   }),
   bosses: Object.freeze({
+    RING_LORD: { id:'boss.bellPrior', url:'assets/sprites/bosses/bell-prior.png', width:118, height:144, animProfile:'boss' },
     SPIKE_KING: { id:'boss.ashenButcher', url:'assets/sprites/bosses/ashen-butcher.png', width:128, height:142, animProfile:'boss' },
+    HYDRA: { id:'boss.boneHydraMatron', url:'assets/sprites/bosses/bone-hydra-matron.png', width:156, height:144, animProfile:'boss' },
+    PRISMA: { id:'boss.voidSeraph', url:'assets/sprites/bosses/void-seraph.png', width:130, height:162, animProfile:'boss' },
   }),
   projectiles: Object.freeze({
     bullet: { id:'projectile.hellfireCross', url:'assets/sprites/projectiles/hellfire-cross.png', width:34, height:34, spinRate:2.2, animProfile:'projectile' },
@@ -234,10 +246,14 @@ export const SPRITE_ASSET_LIST = Object.freeze([
 ]);
 
 const IMAGE_TEX_CACHE = new Map();
+const FAILED_IMAGE_ASSETS = new Set();
 export async function preloadSpriteAssets(){
   if(!globalThis.PIXI?.Assets) return;
   await Promise.all(SPRITE_ASSET_LIST.map(asset =>
-    PIXI.Assets.load(asset.url).catch(err => {
+    PIXI.Assets.load(asset.url).then(() => {
+      FAILED_IMAGE_ASSETS.delete(asset.id);
+    }).catch(err => {
+      FAILED_IMAGE_ASSETS.add(asset.id);
       console.warn('[sprite asset preload failed]', asset.url, err);
       return null;
     })
@@ -245,6 +261,7 @@ export async function preloadSpriteAssets(){
 }
 export function getImageTextureAsset(asset){
   if(!asset) return null;
+  if(FAILED_IMAGE_ASSETS.has(asset.id)) return null;
   let texture = IMAGE_TEX_CACHE.get(asset.id);
   if(!texture){
     texture = PIXI.Texture.from(asset.url);
@@ -666,7 +683,19 @@ export const BG = {
   },
   tick(){
     const biomeKey = !G.player ? 'nave' : (G.t < 300 ? 'nave' : (G.t < 600 ? 'crypt' : 'hellforge'));
-    if(biomeKey !== this.biomeKey) this.bakeGradient(biomeKey);
+    if(biomeKey !== this.biomeKey){
+      this.bakeGradient(biomeKey);
+      if(G.player && G.biomeKey !== biomeKey){
+        const el = document.getElementById('biome-banner');
+        if(el){
+          el.textContent = BIOMES[biomeKey].name;
+          el.classList.add('show');
+          clearTimeout(el._hideTimer);
+          el._hideTimer = setTimeout(()=> el.classList.remove('show'), 2200);
+        }
+      }
+      G.biomeKey = biomeKey;
+    }
     G.biomeName = BIOMES[biomeKey].name;
 
     // star parallax: 4-quad wrap so stars are continuous in any direction

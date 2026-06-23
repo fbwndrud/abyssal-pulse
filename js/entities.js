@@ -3,7 +3,7 @@
    This is the bottom of the game-logic stack: weapons.js calls into here
    (firePulse / fireProjectile / fxBurst / etc), and player.js calls dealDamage.
    =================================================================== */
-import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce, entityLayer, fxLayer, beamLayer, bhLayer } from './core.js';
+import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce, meta, entityLayer, fxLayer, beamLayer, bhLayer } from './core.js';
 import { AUDIO } from './audio.js';
 import {
   getCircleTexture, getPolygonTexture, getStarTexture, getDiamondTexture,
@@ -121,16 +121,15 @@ function _attachEnemySprite(e){
   const lw = isBoss ? 3 : 2;
   const fillNorm = 'rgba(8,14,30,.55)';
   const fillFlash = 'rgba(255,255,255,.6)';
-  // Boss aura: large radial-gradient backdrop, added BEFORE body so body
-  // renders on top. Gives bosses a distinct visual "presence" beyond polygon
-  // sides (RING_LORD/SPIKE_KING/HYDRA/PRISMA all looked alike without it).
-  if(isBoss){
+  // Bosses and elites get a radial presence aura behind the body. Bosses use a
+  // larger, slower aura; elites use a tighter marker so affixes read instantly.
+  if(isBoss || e.eliteAffix){
     const auraSp = new PIXI.Sprite(getBossAuraTexture());
     auraSp.anchor.set(0.5);
     auraSp.tint = e.color;
-    const auraSize = e.r * 6;
+    const auraSize = isBoss ? e.r * 6 : e.r * 4.3;
     auraSp.scale.set(auraSize / 256);
-    auraSp.alpha = 0.4;
+    auraSp.alpha = isBoss ? 0.4 : 0.28;
     auraSp.position.set(e.x, e.y);
     entityLayer.addChild(auraSp);
     e.auraSprite = auraSp;
@@ -263,6 +262,8 @@ export const _EQ1 = [], _EQ2 = [];
 // is the single biggest FPS lever we have.
 function _particleBudget(count){
   const n = G.ents.length;
+  count = Math.max(1, Math.round(count * (G.qualityScale || 1)));
+  if(meta.settings?.reduceFlash) count = Math.max(1, Math.round(count * .65));
   if(n > 1500) return Math.max(1, count >> 3);    // 12%
   if(n > 900)  return Math.max(1, count >> 2);    // 25%
   if(n > 500)  return Math.max(1, count >> 1);    // 50%
@@ -277,8 +278,11 @@ export function fxBurst(x,y,color,count=14,speed=180,size=3,life=.5){
     makeEnt({type:'fx', x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, color, size:size*(.6+Math.random()*.8), life, maxLife:life});
   }
 }
-export function fxRing(x,y,color,size=60,life=.4){
-  makeEnt({type:'ring', x, y, color, r:8, maxR:size, life, maxLife:life});
+export function fxRing(x,y,color,size=60,life=.4,opts={}){
+  makeEnt({type:'ring', x, y, color, r:8, maxR:size, life, maxLife:life, style:opts.style || '', seed:opts.seed ?? Math.random()*TAU, spokes:opts.spokes || 0});
+}
+export function fxRuneCircle(x,y,color,size=90,life=.55,opts={}){
+  fxRing(x, y, color, size, life, Object.assign({ style:'rune', spokes:opts.spokes || 8 }, opts));
 }
 export function fxText(x,y,text,color='#fff',big=false){
   // Damage-number budget: under heavy load, skip most non-boss numbers.
@@ -291,11 +295,11 @@ export function fxText(x,y,text,color='#fff',big=false){
   }
   makeEnt({type:'text', x, y, text, color, life:.7, maxLife:.7, vy:-50, big});
 }
-export function fxLine(x1,y1,x2,y2,color,life=.18,width=2){
-  makeEnt({type:'line', x1,y1,x2,y2,color,life,maxLife:life,width});
+export function fxLine(x1,y1,x2,y2,color,life=.18,width=2,opts={}){
+  makeEnt({type:'line', x1,y1,x2,y2,color,life,maxLife:life,width,style:opts.style || '', seed:opts.seed ?? Math.random()*TAU});
 }
-export function fxShockwave(x,y,color,maxR=180,life=.5){
-  makeEnt({type:'shock', x, y, color, r:8, maxR, life, maxLife:life});
+export function fxShockwave(x,y,color,maxR=180,life=.5,opts={}){
+  makeEnt({type:'shock', x, y, color, r:8, maxR, life, maxLife:life, style:opts.style || '', seed:opts.seed ?? Math.random()*TAU, spokes:opts.spokes || 0});
 }
 export function spawnZone(x, y, r, life, dmgPerSec, color=C.gold, opts={}){
   const z = makeEnt({
@@ -307,12 +311,21 @@ export function spawnZone(x, y, r, life, dmgPerSec, color=C.gold, opts={}){
     pull:opts.pull || 0, kind:opts.kind || 'rune',
     seed:Math.random()*TAU,
   });
-  if(z.kind !== 'hellfire') fxRing(x, y, color, r, Math.min(.55, life));
+  if(z.kind !== 'hellfire'){
+    const style = (z.kind === 'sanctuary' || z.kind === 'ward' || z.kind === 'abyss') ? 'seal' : '';
+    fxRing(x, y, color, r, Math.min(.55, life), {style, spokes:z.kind === 'abyss' ? 10 : 8});
+  }
   return z;
 }
-export function shake(amt){ G.shake = Math.min(1, G.shake + amt); }
+export function shake(amt){
+  if(meta.settings?.reduceShake) amt *= .22;
+  G.shake = Math.min(1, G.shake + amt);
+}
 export function hitstop(s){ G.hitstop = Math.max(G.hitstop, s); }
-export function flash(color,a=.4){ G.flash = a; G.flashColor = color; }
+export function flash(color,a=.4){
+  if(meta.settings?.reduceFlash) a = Math.min(a * .28, .12);
+  G.flash = a; G.flashColor = color;
+}
 
 /* ───────── COMBAT HELPERS ───────── */
 export function dealDamage(e, dmg, color='#fff'){
@@ -333,6 +346,17 @@ export function dealDamage(e, dmg, color='#fff'){
   e.hp -= dmg;
   e.hitFlash = .12;
   fxText(e.x, e.y - e.r - 4, dmg, color);
+  if(e.hp > 0 && G.player?.hellforgeBurnChance && Math.random() < G.player.hellforgeBurnChance){
+    applyBurn(e, G.player.hellforgeBurnDps || 18, 1.8, C.red);
+  }
+  if(e.hp > 0 && G.player){
+    const thresh = e.isBoss ? (G.player.bossExecuteThresh || 0) : (G.player.executeThresh || 0);
+    if(thresh > 0 && e.hp / e.maxHp <= thresh){
+      e.hp = 0;
+      fxText(e.x, e.y - e.r - 18, 'EXECUTE', C.violet, true);
+      fxRing(e.x, e.y, C.violet, e.r * 3.2, .35, {style:'seal',spokes:8});
+    }
+  }
   if(e.hp <= 0){ killEnemy(e); }
   else { AUDIO.hit(e.x); }
 }
@@ -390,6 +414,13 @@ export function killEnemy(e){
       fxRing(G.player.x, G.player.y, C.gold, 110, .55);
     }
   }
+  if(G.player?.plagueNovaChance && !e.isBoss && Math.random() < G.player.plagueNovaChance){
+    const r = G.player.plagueNovaR || 100;
+    spawnZone(e.x, e.y, r, 1.4, G.player.plagueNovaDps || 18, C.lime, {
+      tickRate:.28, slow:.12, slowDur:.5, kind:'plague',
+    });
+    fxRing(e.x, e.y, C.lime, r, .4, {style:'seal',spokes:8});
+  }
   // FROST CHIP: chance to slow nearby enemies on kill.
   if(G.player && G.player._frostKillChance && Math.random() < G.player._frostKillChance){
     const list = EGRID.query(e.x, e.y, 140, _EQ1);
@@ -445,9 +476,12 @@ export function killEnemy(e){
   if(_onKillHook) _onKillHook(e);
   // boss UI cleanup + music swap
   if(e.isBoss && G.bossActive === e){
+    _showRewardBanner('ABYSS REWARD', 'Relic chest and boss rune unlocked', e.color);
     G.bossActive = null;
     document.getElementById('boss-hp-wrap').style.display='none';
     document.getElementById('boss-name').style.display='none';
+    const subtitle = document.getElementById('boss-subtitle');
+    if(subtitle) subtitle.style.display = 'none';
     AUDIO.setMode('main');
   }
 }
@@ -511,12 +545,15 @@ export function fireProjectile(x,y,angle,speed,dmg,life,color,kind='bullet',extr
     target: extra.target || null,
     turn: extra.turn || 0,
     splits: extra.splits || 0,
+    trailStyle: extra.trailStyle || (kind === 'homing' ? 'bone' : kind === 'shuriken' ? 'spectral' : kind === 'prism' ? 'soul' : 'hellfire'),
   }, extra));
   return p;
 }
 export function firePulse(x,y,r,dmg,kb,opts){
   AUDIO.explode(x, y);
-  fxShockwave(x,y,opts?.color || C.cyan,r,.45);
+  const col = opts?.color || C.cyan;
+  fxShockwave(x,y,col,r,.45,{style:'bloodRune',spokes:12});
+  fxRuneCircle(x,y,col,r*.72,.55,{style:'seal',spokes:8});
   shake(.05);
   const list = EGRID.query(x, y, r + 40, _EQ1);
   for(let i = 0; i < list.length; i++){
@@ -539,7 +576,7 @@ export function firePulse(x,y,r,dmg,kb,opts){
 export function fireFanShock(x,y,angle,r,arc,dmg,opts){
   AUDIO.explode(x, y);
   const color = opts?.color || C.magenta;
-  makeEnt({type:'fan', x,y,angle, r, arc, color, life:.35, maxLife:.35});
+  makeEnt({type:'fan', x,y,angle, r, arc, color, life:.35, maxLife:.35, style:'cleave', seed:Math.random()*TAU});
   shake(.06);
   const list = EGRID.query(x, y, r + 40, _EQ1);
   for(let i = 0; i < list.length; i++){
@@ -564,9 +601,9 @@ export function fireFanShock(x,y,angle,r,arc,dmg,opts){
 }
 export function spawnBlackhole(x,y,r,life,pull,dmgPerSec,opts={}){
   const col = opts.color || C.violet;
-  const bh = makeEnt({type:'blackhole', x, y, r, life, maxLife:life, pull, dmgPerSec, color:col, t:0});
+  const bh = makeEnt({type:'blackhole', x, y, r, life, maxLife:life, pull, dmgPerSec, color:col, t:0, style:'abyss', seed:Math.random()*TAU});
   AUDIO.boss();
-  fxRing(x,y,col,r,.6);
+  fxRuneCircle(x,y,col,r,.6,{style:'abyss',spokes:10});
   return bh;
 }
 
@@ -619,8 +656,24 @@ export function spawnEnemy(typeKey, x, y){
   if(affix){
     e.__elitePulse = rand(0, TAU);
     fxRing(e.x, e.y, affix.color, e.r * 3.2, .5);
+    fxText(e.x, e.y - e.r - 18, affix.name, affix.color, true);
   }
   return e;
+}
+const BOSS_TELLS = {
+  RING_LORD: 'Rings of ruin expand from the bell.',
+  SPIKE_KING: 'Charges, cleaves, then erupts in bone spikes.',
+  HYDRA: 'Splits the arena with plague volleys.',
+  PRISMA: 'Turns light into crossing soul beams.',
+};
+function _showRewardBanner(title, detail, color=C.gold){
+  const el = document.getElementById('reward-banner');
+  if(!el) return;
+  el.style.setProperty('--accent', color);
+  el.innerHTML = `<b>${title}</b><span>${detail}</span>`;
+  el.classList.add('show');
+  clearTimeout(_showRewardBanner._t);
+  _showRewardBanner._t = setTimeout(()=> el.classList.remove('show'), 2600);
 }
 export function spawnBoss(typeKey){
   const def = BOSSES_REF[typeKey];
@@ -649,13 +702,21 @@ export function spawnBoss(typeKey){
     name: def.name,
   });
   G.bossActive = e;
-  G.bannerTimer = 1.4;
+  G.bannerTimer = 2.0;
+  const tell = BOSS_TELLS[typeKey] || 'Abyssal pattern incoming.';
   document.getElementById('boss-banner').textContent = '▼ ' + def.name + ' ▼';
   document.getElementById('boss-banner').classList.add('show');
   document.getElementById('boss-name').textContent = '▼ ' + def.name + ' ▼';
   document.getElementById('boss-name').style.display = 'block';
   document.getElementById('boss-hp-wrap').style.display = 'block';
-  setTimeout(()=> document.getElementById('boss-banner').classList.remove('show'), 1400);
+  const subtitle = document.getElementById('boss-subtitle');
+  if(subtitle){
+    subtitle.textContent = tell;
+    subtitle.style.display = 'block';
+  }
+  fxShockwave(e.x, e.y, def.color, 260, .8);
+  fxRing(e.x, e.y, '#ffffff', 210, .7);
+  setTimeout(()=> document.getElementById('boss-banner').classList.remove('show'), 2000);
   AUDIO.setMode('boss');
   AUDIO.boss();
   shake(.5);

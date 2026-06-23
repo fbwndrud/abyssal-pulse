@@ -37,8 +37,8 @@ export function resizeCanvas(){
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = W * dpr;
   canvas.height = H * dpr;
-  canvas.style.width = W + 'px';
-  canvas.style.height = H + 'px';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
   ctx.setTransform(dpr,0,0,dpr,0,0);
 }
 resizeCanvas();
@@ -71,6 +71,8 @@ export async function initPixi(){
     autoDensity: true,
     antialias: true,
   });
+  pixiCanvas.style.width = '100%';
+  pixiCanvas.style.height = '100%';
   world.addChild(bhLayer, entityLayer, fxLayer, beamLayer);
   app.stage.addChild(bgC, world, hudC);
 }
@@ -86,6 +88,7 @@ function loadMeta(){
   const def = {
     coins: 0, bestTime: 0, runs: 0, wins: 0, kills: 0,
     shop: {hp:0, dmg:0, magnet:0, reroll:0, speed:0, regen:0, start:0, luck:0, armor:0},
+    settings: {reduceFlash:false, reduceShake:false, autoQuality:true, highContrast:false},
     chips: { owned:{}, equipped:[null,null,null], slots:3 },
     unlocked: ['CIRCLE','TRIANGLE'],
     seenCodex: {weapons:[], passives:[], enemies:[]},
@@ -103,6 +106,7 @@ function loadMeta(){
     while(chipsLoaded.equipped.length < chipsLoaded.slots) chipsLoaded.equipped.push(null);
     return Object.assign(def, s, {
       shop: Object.assign(def.shop, s.shop || {}),
+      settings: Object.assign(def.settings, s.settings || {}),
       chips: chipsLoaded,
       unlocked: s.unlocked && s.unlocked.length ? s.unlocked : def.unlocked,
       seenCodex: Object.assign(def.seenCodex, s.seenCodex || {}),
@@ -150,6 +154,9 @@ export const G = {
   pickupMagnetMul: 1,
   superMagnetTimer: 0,
   freezeTimer: 0,
+  qualityScale: 1,
+  qualityLabel: 'HIGH',
+  biomeKey: null,
 };
 
 /* ───────── CAMERA ─────────

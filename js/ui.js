@@ -8,7 +8,7 @@ import {
 } from './core.js';
 import { AUDIO } from './audio.js';
 import {
-  shake, flash, clearAllWorldSprites, fxBurst, fxRing,
+  shake, flash, clearAllWorldSprites, fxBurst, fxRing, fxRuneCircle,
 } from './entities.js';
 import {
   CLASSES, PASSIVES, ENEMIES, UPGRADE_TIERS, SHOP_ITEMS,
@@ -32,6 +32,20 @@ const CLASS_ART = {
   SQUARE:'assets/sprites/classes/iron-exile.png',
   STAR:'assets/sprites/classes/hex-witch.png',
 };
+const SETTINGS = [
+  { key:'reduceFlash',  name:'REDUCE FLASH',  desc:'섬광과 파티클 밀도를 낮춥니다.' },
+  { key:'reduceShake',  name:'REDUCE SHAKE',  desc:'카메라 흔들림을 약하게 합니다.' },
+  { key:'autoQuality',  name:'AUTO QUALITY',  desc:'프레임 저하 시 효과 밀도를 자동 조절합니다.' },
+  { key:'highContrast', name:'HIGH CONTRAST', desc:'작은 UI 텍스트 대비를 높입니다.' },
+];
+const CODEX_TABS = [
+  { key:'skills', label:'SKILLS' },
+  { key:'virtues', label:'VIRTUES' },
+  { key:'awaken', label:'AWAKEN' },
+  { key:'runes', label:'RUNES' },
+  { key:'enemies', label:'ENEMIES' },
+];
+let _codexTab = 'skills';
 const SKILL_ART = {
   PULSE:'assets/icons/skills/sanctified-nova.png',
   BEAM:'assets/icons/skills/seraph-lance.png',
@@ -46,8 +60,20 @@ const SKILL_ART = {
 };
 const STAT_ICON_CLASS = { dmg:'wrath', area:'dominion', cd:'zeal', speed:'fleet', hp:'vitality' };
 function _escAttr(s){ return String(s || '').replace(/"/g, '&quot;'); }
-function imgIcon(src, alt='', cls='ui-art-img'){
-  return `<img class="${cls}" src="${src}" alt="${_escAttr(alt)}" draggable="false">`;
+if(!window.__replaceBrokenIcon){
+  window.__replaceBrokenIcon = img => {
+    const kind = img.dataset.fallbackKind || 'generic';
+    const color = img.dataset.fallbackColor || '#d8c7a1';
+    const node = document.createElement('div');
+    node.className = `rune-icon rune-${kind}`;
+    node.style.setProperty('--accent', color);
+    node.setAttribute('aria-label', img.getAttribute('alt') || '');
+    node.innerHTML = '<span></span>';
+    img.replaceWith(node);
+  };
+}
+function imgIcon(src, alt='', cls='ui-art-img', fallbackKind='generic', fallbackColor='#d8c7a1'){
+  return `<img class="${_escAttr(cls)}" src="${_escAttr(src)}" alt="${_escAttr(alt)}" draggable="false" data-fallback-kind="${_escAttr(fallbackKind)}" data-fallback-color="${_escAttr(fallbackColor)}" onerror="window.__replaceBrokenIcon&&window.__replaceBrokenIcon(this)">`;
 }
 function runeIcon(kind, color, label=''){
   return `<div class="rune-icon rune-${kind || 'generic'}" style="--accent:${color || '#d8c7a1'}" aria-label="${_escAttr(label)}"><span></span></div>`;
@@ -55,7 +81,7 @@ function runeIcon(kind, color, label=''){
 function skillIconSrc(key){ return SKILL_ART[key] || null; }
 function weaponIconHtml(key, label=''){
   const src = skillIconSrc(key);
-  return src ? imgIcon(src, label, 'ui-art-img skill-art-img') : runeIcon('skill', '#d8c7a1', label);
+  return src ? imgIcon(src, label, 'ui-art-img skill-art-img', 'skill', '#d8c7a1') : runeIcon('skill', '#d8c7a1', label);
 }
 function cardIconHtml(card, p, color, title){
   if(card.type === 'weap_new' || card.type === 'weap_up' || card.type === 'evolve'){
@@ -75,6 +101,15 @@ function cardIconHtml(card, p, color, title){
   return runeIcon('generic', color, title);
 }
 function slotWeaponIcon(w){ return weaponIconHtml(w.key, w.def.name); }
+function weaponSlotSignature(w){
+  return [w.key, w.level, w.evolved ? '1' : '0', w.evoName || '', w.color || w.def.color || ''].join('|');
+}
+function renderWeaponSlot(el, w){
+  el.className = 'slot' + (w.evolved ? ' evolved' : '');
+  el.dataset.sig = weaponSlotSignature(w);
+  el.title = w.evolved ? `${w.def.name} → ${w.evoName || 'AWAKENED'}` : w.def.name;
+  el.innerHTML = `${slotWeaponIcon(w)}<div class="lv">${w.level}</div>${w.evolved ? '<div class="evo-mark">▲</div>' : ''}`;
+}
 function slotPassiveIcon(key){
   const d = PASSIVES[key];
   return runeIcon('virtue-' + key.toLowerCase(), d?.color || C.gold, d?.name || key);
@@ -82,6 +117,28 @@ function slotPassiveIcon(key){
 function slotRelicIcon(item){
   const tier = ITEM_TIERS[item.tier];
   return runeIcon('relic-' + item.tier, tier?.color || C.gold, item.name);
+}
+function syncSettingsClasses(){
+  document.body.classList.toggle('high-contrast', !!meta.settings?.highContrast);
+}
+function renderBuffTimers(p){
+  const root = document.getElementById('buff-timers');
+  if(!root) return;
+  const buffs = [];
+  const add = (name, time, color) => {
+    if(time > 0) buffs.push({ name, time, color });
+  };
+  add('WRATH', p._boostDmg || 0, C.red);
+  add('ZEAL', p._boostCdr || 0, C.gold);
+  add('FLEET', p._boostSpd || 0, C.cyan);
+  add('AEGIS', p._boostInvuln || 0, C.violet);
+  add('MAGNET', G.superMagnetTimer || 0, C.pink);
+  add('FREEZE', G.freezeTimer || 0, C.teal);
+  add('STREAK', p._streakActive || 0, C.gold);
+  if(!buffs.length){ root.innerHTML = ''; return; }
+  root.innerHTML = buffs.slice(0, 6).map(b =>
+    `<div class="buff-pill" style="--accent:${b.color}">${b.name}<span>${Math.max(0, b.time).toFixed(1)}</span></div>`
+  ).join('');
 }
 
 /* ===================================================================
@@ -135,6 +192,7 @@ function fmtDelta(d){
   if(Math.abs(d) < 0.005) return '';
   return sign + fmtVal(d);
 }
+function fmtPct(v){ return `${fmtVal(v)}%`; }
 // Stats where a higher number is *worse* (e.g. cooldown). Used to color deltas.
 const LOWER_IS_BETTER = new Set(['cd','tick']);
 
@@ -208,15 +266,16 @@ function passivePreviewRows(passiveKey, mult, currentLv, p){
   const maxLv = PASSIVES[passiveKey].maxLv;
   // Stat-effect line — passives give modest stat per level too now
   const statLine = (() => {
+    const m = mult || 1;
     switch(passiveKey){
-      case 'POWER':   return 'DMG +8%';
-      case 'HASTE':   return '이동 +6%';
-      case 'CADENCE': return '쿨감 +6%';
-      case 'REACH':   return '범위 +8%';
-      case 'ARMOR':   return 'DR +4%';
-      case 'SOUL':    return 'HP +12, 재생 +0.25/s';
-      case 'MAGNET':  return '픽업 +20%';
-      case 'LUCK':    return '행운 +6%';
+      case 'POWER':   return `DMG +${fmtPct(12 * m)}`;
+      case 'HASTE':   return `이동 +${fmtPct(9 * m)}`;
+      case 'CADENCE': return `쿨감 +${fmtPct(9 * m)}`;
+      case 'REACH':   return `범위 +${fmtPct(12 * m)}`;
+      case 'ARMOR':   return `DR +${fmtPct(6 * m)}`;
+      case 'SOUL':    return `HP +${fmtVal(18 * m)}, 재생 +${fmtVal(.4 * m)}/s`;
+      case 'MAGNET':  return `픽업 +${fmtPct(30 * m)}`;
+      case 'LUCK':    return `희귀 +${fmtPct(9 * m)}`;
     }
     return '';
   })();
@@ -261,6 +320,17 @@ function evolutionRows(w, evoDef){
   return rows;
 }
 
+function baseRerollCost(){
+  return Math.max(0, 3 - (meta.shop.reroll || 0));
+}
+function resetRerollCost(){
+  G.rerollCost = baseRerollCost();
+  document.getElementById('reroll-cost').textContent = G.rerollCost;
+}
+function nextRerollCost(cost){
+  return cost <= 0 ? 1 : Math.ceil(cost * 1.4);
+}
+
 /* ===================================================================
    LEVEL UP / CARD CHOOSER
    =================================================================== */
@@ -280,12 +350,11 @@ export function doLevelUp(forceNoXpReset=false){
   AUDIO.level();
   shake(.1); flash('#fff', .25);
   G.mode = 'levelup';
-  // Reroll cost resets every level-up — within a single screen rerolls still
-  // compound, but progressing to the next level starts fresh at the base cost.
-  G.rerollCost = 3;
+  // Reroll cost resets every level-up from the current DIVINATION discount.
+  // Within one screen rerolls still compound, so upgraded free starts don't loop.
   G.weaponPickPool = pickLevelupCards(p, 3);
   document.getElementById('levelup-overlay').classList.remove('hidden');
-  document.getElementById('reroll-cost').textContent = G.rerollCost;
+  resetRerollCost();
   renderLevelupCards();
 }
 // Permanent stat-up cards — only injected late-game when the regular pool dries
@@ -383,7 +452,9 @@ function pickLevelupCards(p, n=3){
 function renderLevelupCards(){
   const p = G.player;
   const root = document.getElementById('cards');
+  G._levelupChoosing = false;
   root.innerHTML = '';
+  root.scrollLeft = 0;
   for(const card of G.weaponPickPool){
     const el = document.createElement('div');
     const rarityClass = card.type === 'evolve' ? 'evo' : (card.rarity || 'common');
@@ -475,9 +546,18 @@ function renderLevelupCards(){
       ${tierLabel}
       <div class="desc">${desc}</div>
       ${statTable}`;
-    el.addEventListener('click', ()=> applyLevelupCard(card));
+    el.addEventListener('click', ()=> chooseLevelupCard(card, el));
     root.appendChild(el);
   }
+}
+function chooseLevelupCard(card, el){
+  if(G._levelupChoosing) return;
+  G._levelupChoosing = true;
+  el.classList.add('selected');
+  window.setTimeout(()=>{
+    G._levelupChoosing = false;
+    applyLevelupCard(card);
+  }, 120);
 }
 function applyLevelupCard(card){
   const p = G.player;
@@ -491,8 +571,8 @@ function applyLevelupCard(card){
     const col = card.evo.color || C.cyan;
     flash(col, .55); shake(.5);
     fxBurst(p.x, p.y, col, 36, 320, 4, .8);
-    fxRing(p.x, p.y, col, 140, .7);
-    fxRing(p.x, p.y, '#ffffff', 200, .9);
+    fxRuneCircle(p.x, p.y, col, 150, .75, {style:'seal',spokes:9});
+    fxRing(p.x, p.y, '#ffffff', 210, .9, {style:'rune',spokes:12});
     AUDIO.level();
     announce('▲ EVOLVE · ' + card.evo.name, 3);
   }
@@ -510,7 +590,7 @@ function applyLevelupCard(card){
     const col = card.shrine.color;
     flash(col, .55); shake(.45);
     fxBurst(p.x, p.y, col, 40, 280, 4, .7);
-    fxRing(p.x, p.y, col, 160, .7);
+    fxRuneCircle(p.x, p.y, col, 170, .75, {style:'seal',spokes:8});
     AUDIO.level();
     announce('◈ ' + card.shrine.name, 2.2);
     updateSynergies(p);
@@ -520,8 +600,8 @@ function applyLevelupCard(card){
     const col = (card.fuse && card.fuse.color) || '#ff3dcb';
     flash(col, .65); shake(.7);
     fxBurst(p.x, p.y, col, 48, 380, 5, 1.0);
-    fxRing(p.x, p.y, col, 180, .8);
-    fxRing(p.x, p.y, '#ffffff', 260, 1.0);
+    fxRuneCircle(p.x, p.y, col, 190, .85, {style:'seal',spokes:12});
+    fxRing(p.x, p.y, '#ffffff', 270, 1.0, {style:'rune',spokes:14});
     AUDIO.level();
     announce('★ FUSE · ' + (card.fuse?.name || 'WEAPON FUSED'), 3);
   }
@@ -545,10 +625,9 @@ export function openShrinePick(){
   if(cards.length === 0) return;
   AUDIO.level();
   G.mode = 'levelup';
-  G.rerollCost = 3;
   G.weaponPickPool = cards;
   document.getElementById('levelup-overlay').classList.remove('hidden');
-  document.getElementById('reroll-cost').textContent = G.rerollCost;
+  resetRerollCost();
   renderLevelupCards();
 }
 /* Glyph pick — opens the level-up overlay with 3 random GLYPH cards.
@@ -569,10 +648,9 @@ export function openGlyphPick(){
   }
   AUDIO.level();
   G.mode = 'levelup';
-  G.rerollCost = 3;
   G.weaponPickPool = cards;
   document.getElementById('levelup-overlay').classList.remove('hidden');
-  document.getElementById('reroll-cost').textContent = G.rerollCost;
+  resetRerollCost();
   renderLevelupCards();
 }
 /* Chest pick — opens the level-up overlay with 3 random RELIC cards (boss-only).
@@ -592,22 +670,23 @@ export function openChestPick(){
   AUDIO.level();
   G.mode = 'levelup';
   // Reroll cost also resets here so chest rerolls don't carry from prior level-ups.
-  G.rerollCost = 3;
   G.weaponPickPool = cards;
   document.getElementById('levelup-overlay').classList.remove('hidden');
-  document.getElementById('reroll-cost').textContent = G.rerollCost;
+  resetRerollCost();
   renderLevelupCards();
 }
 
 export function rerollLevelup(){
+  if(G._levelupChoosing) return;
   if(meta.coins < G.rerollCost) return;
   meta.coins -= G.rerollCost; saveMeta();
-  G.rerollCost = Math.ceil(G.rerollCost * 1.4);
+  G.rerollCost = nextRerollCost(G.rerollCost);
   document.getElementById('reroll-cost').textContent = G.rerollCost;
   G.weaponPickPool = pickLevelupCards(G.player, 3);
   renderLevelupCards();
 }
 export function skipLevelup(){
+  if(G._levelupChoosing) return;
   const p = G.player; p.hp = Math.min(p.maxHp, p.hp + 10);
   document.getElementById('levelup-overlay').classList.add('hidden');
   G.mode = 'play';
@@ -721,12 +800,15 @@ export function updateHUD(){
     ws.innerHTML = '';
     for(const w of p.weapons){
       const el = document.createElement('div'); el.className = 'slot';
-      el.innerHTML = `${slotWeaponIcon(w)}<div class="lv">${w.level}</div>`;
+      renderWeaponSlot(el, w);
       ws.appendChild(el);
     }
   } else {
     for(let i=0;i<p.weapons.length;i++){
-      ws.children[i].querySelector('.lv').textContent = p.weapons[i].level;
+      const w = p.weapons[i];
+      const el = ws.children[i];
+      if(el.dataset.sig !== weaponSlotSignature(w)) renderWeaponSlot(el, w);
+      else el.querySelector('.lv').textContent = w.level;
     }
   }
   const ps = document.getElementById('passive-slots');
@@ -756,6 +838,7 @@ export function updateHUD(){
   } else { ce.classList.remove('show'); }
   const diff = document.getElementById('diff-chip');
   if(diff) diff.textContent = 'RIFT · ' + (G.biomeName || 'RUINED NAVE');
+  renderBuffTimers(p);
   // Progression guide panel — right-side, always-visible during play. Throttled
   // since state only changes on level-up / evolve, not per frame.
   if(!_fgT || G.realT - _fgT > 0.4){
@@ -784,7 +867,7 @@ export function startRun(classKey){
   G.ents = []; G.t = 0; G.spawnTimer = 0; G.combo=0; G.comboTimer=0;
   G.killCount = 0; G.coinsRun = 0; G.bossActive=null; G.bossTimer = 0; G.bossCount = 0;
   G._shrinesSpawned = null;  // re-seed each run so SHRINEs respawn
-  G.endReason = null; G.rerollCost = 3;
+  G.endReason = null; G.rerollCost = baseRerollCost();
   G.classChosen = classKey;
   G.cam = {x:0, y:0, zoom:1, tx:0, ty:0};
   G.shake = 0; G.flash = 0;
@@ -804,14 +887,23 @@ export function endRun(victory){
   G.endReason = victory ? 'victory' : 'death';
   document.getElementById('end-overlay').classList.remove('hidden');
   document.getElementById('end-title').textContent = victory ? 'RIFT SEALED' : 'EXILE FALLEN';
+  const grade = (() => {
+    if(victory) return 'S RANK · RIFT SEALED';
+    if(G.t >= 720) return 'A RANK · DEEP DELVE';
+    if(G.t >= 420 || G.killCount >= 600) return 'B RANK · BLOODIED';
+    return 'C RANK · FIRST BLOOD';
+  })();
+  document.getElementById('end-grade').textContent = grade;
   document.getElementById('end-text').textContent = victory ? '심연이 봉인되었습니다. 전리품이 금고에 적립됩니다.' : '추방자가 균열 속에서 쓰러졌습니다.';
   const stats = document.getElementById('end-stats');
+  const coinsTotal = meta.coins;
   stats.innerHTML = `
     <span>TIME</span><b>${fmtTime(G.t)}</b>
     <span>KILLS</span><b>${G.killCount}</b>
     <span>LEVEL</span><b>${G.player ? G.player.level : 1}</b>
     <span>CORES</span><b>◆ ${G.coinsRun}</b>
     <span>EXILE</span><b>${CLASSES[G.classChosen]?.name || G.classChosen}</b>
+    <span>VAULT</span><b>◆ ${coinsTotal}</b>
   `;
   if(G.t > meta.bestTime){ meta.bestTime = G.t|0; }
   meta.kills += G.killCount;
@@ -820,6 +912,8 @@ export function endRun(victory){
   saveMeta();
   document.getElementById('menu-coins').textContent = meta.coins;
   document.getElementById('menu-best').textContent = fmtTime(meta.bestTime);
+  flash(victory ? C.gold : C.red, victory ? .45 : .55);
+  shake(victory ? .35 : .5);
   AUDIO.setMode(victory ? 'victory' : 'death');
 }
 function unlockMilestones(){
@@ -842,17 +936,25 @@ export function restartRun(){
 }
 export function showMenu(){
   G.mode = 'menu';
+  syncSettingsClasses();
   document.getElementById('menu-overlay').classList.remove('hidden');
   document.getElementById('menu-coins').textContent = meta.coins;
   document.getElementById('menu-best').textContent = fmtTime(meta.bestTime);
   document.getElementById('menu-runs').textContent = meta.runs;
   AUDIO.init().then(()=> AUDIO.setMode('menu'));
 }
-export function closeOverlay(id){ document.getElementById(id).classList.add('hidden'); }
+function setAbandonConfirm(show){
+  document.getElementById('abandon-confirm')?.classList.toggle('hidden', !show);
+}
+export function closeOverlay(id){
+  document.getElementById(id).classList.add('hidden');
+  if(id === 'pause-overlay') setAbandonConfirm(false);
+}
 export function togglePause(){
   if(G.mode === 'play'){
     G.mode = 'pause';
     document.getElementById('pause-overlay').classList.remove('hidden');
+    setAbandonConfirm(false);
     const p = G.player; if(!p) return;
     let html = `<div><b>EXILE:</b> ${CLASSES[G.classChosen]?.name || G.classChosen} · LV ${p.level} · ${fmtTime(G.t)}</div>`;
     html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">SKILLS</div>';
@@ -890,6 +992,7 @@ export function togglePause(){
     document.getElementById('pause-info').innerHTML = html;
   } else if(G.mode === 'pause'){
     G.mode = 'play';
+    setAbandonConfirm(false);
     closeOverlay('pause-overlay');
   }
 }
@@ -897,11 +1000,23 @@ export function toggleMute(){
   AUDIO.setMuted(!AUDIO.isMuted());
   document.getElementById('mute-btn').textContent = AUDIO.isMuted() ? '×' : '♪';
 }
+export function toggleGuide(){
+  const root = document.getElementById('progression-guide');
+  if(!root) return;
+  root.classList.toggle('mobile-open');
+}
 export function confirmAbandon(){
-  if(confirm('이 균열 원정을 포기합니다.')){
-    closeOverlay('pause-overlay');
-    endRun(false);
-  }
+  if(G.mode !== 'pause') return;
+  setAbandonConfirm(true);
+}
+export function cancelAbandon(){
+  setAbandonConfirm(false);
+}
+export function abandonRun(){
+  if(G.mode !== 'pause') return;
+  setAbandonConfirm(false);
+  closeOverlay('pause-overlay');
+  endRun(false);
 }
 
 /* ===================================================================
@@ -920,7 +1035,7 @@ function buildClassPicker(){
     const locked = !meta.unlocked.includes(k);
     const el = document.createElement('div');
     el.className = 'class-card' + (locked ? ' locked' : '');
-    const art = CLASS_ART[k] ? imgIcon(CLASS_ART[k], cl.name, 'class-art-img') : runeIcon('virtue-' + k.toLowerCase(), cl.color, cl.name);
+    const art = CLASS_ART[k] ? imgIcon(CLASS_ART[k], cl.name, 'class-art-img', 'virtue-' + k.toLowerCase(), cl.color) : runeIcon('virtue-' + k.toLowerCase(), cl.color, cl.name);
     el.style.setProperty('--accent', cl.color);
     el.innerHTML = `<div class="class-portrait">${art}</div>
       <div class="cname">${cl.name}</div>
@@ -934,29 +1049,76 @@ function buildClassPicker(){
 /* ===================================================================
    SHOP
    =================================================================== */
+let shopFeedbackTimer = 0;
+function clearShopFeedback(){
+  const el = document.getElementById('shop-feedback');
+  if(!el) return;
+  window.clearTimeout(shopFeedbackTimer);
+  el.textContent = '';
+  el.classList.remove('show');
+}
+function showShopFeedback(text){
+  const el = document.getElementById('shop-feedback');
+  if(!el) return;
+  window.clearTimeout(shopFeedbackTimer);
+  el.textContent = text;
+  el.classList.add('show');
+  shopFeedbackTimer = window.setTimeout(()=>el.classList.remove('show'), 1400);
+}
 function buildShop(){
   document.getElementById('shop-coins').textContent = meta.coins;
+  clearShopFeedback();
   const grid = document.getElementById('shop-grid');
   grid.innerHTML = '';
   for(const it of SHOP_ITEMS){
     const lv = meta.shop[it.key]||0;
     const max = it.max;
     const cost = lv >= max ? null : it.costFn(lv);
-    const el = document.createElement('div'); el.className = 'shop-card' + (lv>=max ? ' maxed' : '');
+    const affordable = cost == null || meta.coins >= cost;
+    const el = document.createElement('div');
+    el.className = 'shop-card' + (lv>=max ? ' maxed' : '') + (!affordable ? ' unaffordable' : '');
     let pips = '';
     for(let i=0;i<max;i++) pips += `<span class="pip ${i<lv?'on':''}"></span>`;
-    el.innerHTML = `<div class="sn">${it.name}</div><div class="sd">${it.desc}</div><div>${pips}</div><div class="sp">${cost==null?'MAX':'◆ '+cost}</div>`;
+    el.innerHTML = `<div class="sn">${it.name}</div><div class="sd">${it.desc}</div><div>${pips}</div><div class="sp" style="color:${cost==null?'#fff':affordable?'#fff1bc':'#ff7aa1'}">${cost==null?'MAX':'◆ '+cost}</div>`;
     if(cost!=null) el.addEventListener('click', ()=>{
       if(meta.coins >= cost){
         meta.coins -= cost; meta.shop[it.key] = lv+1; saveMeta();
         buildShop();
         document.getElementById('menu-coins').textContent = meta.coins;
+      } else {
+        AUDIO.hit?.();
+        announce('◆ 코어 부족', 1.2);
+        showShopFeedback('◆ 코어 부족');
       }
     });
     grid.appendChild(el);
   }
 }
 export function openShop(){ closeOverlay('menu-overlay'); document.getElementById('shop-overlay').classList.remove('hidden'); buildShop(); }
+
+function buildSettings(){
+  syncSettingsClasses();
+  const root = document.getElementById('settings-grid');
+  root.innerHTML = SETTINGS.map(s => {
+    const on = !!meta.settings?.[s.key];
+    return `<button class="setting-card ${on?'on':''}" onclick="toggleSetting('${s.key}')">
+      <div><b>${s.name}</b><span>${s.desc}</span></div>
+      <i class="toggle-dot"></i>
+    </button>`;
+  }).join('');
+}
+export function toggleSetting(key){
+  if(!SETTINGS.some(s => s.key === key)) return;
+  meta.settings[key] = !meta.settings[key];
+  if(key === 'autoQuality' && !meta.settings[key]){ G.qualityScale = 1; G.qualityLabel = 'HIGH'; }
+  saveMeta();
+  buildSettings();
+}
+export function openSettings(){
+  closeOverlay('menu-overlay');
+  document.getElementById('settings-overlay').classList.remove('hidden');
+  buildSettings();
+}
 
 /* ===================================================================
    CHIPSET LAB — gacha + inventory + slot equip + manual fusion.
@@ -1143,7 +1305,7 @@ function buildChipset(){
   const invRoot = document.getElementById('chipset-inventory');
   const ownedIds = Object.keys(meta.chips.owned).filter(id => meta.chips.owned[id] > 0);
   if(ownedIds.length === 0){
-    invRoot.innerHTML = `<div style="color:#5d7290;padding:20px;font-size:12px">아직 룬이 없습니다. 위에서 제련하세요.</div>`;
+    invRoot.innerHTML = `<div class="empty-state">아직 룬이 없습니다.<br>위의 제련 버튼으로 첫 룬을 만든 뒤 소켓에 장착하세요.</div>`;
   } else {
     const tierRank = { legendary:0, epic:1, rare:2, common:3 };
     ownedIds.sort((a, b) => {
@@ -1187,7 +1349,7 @@ export function openChipset(){
   // Friendly empty-state hint — without this the 90px result strip just looked
   // like dead space when the player first arrives.
   document.getElementById('chipset-pull-result').innerHTML =
-    `<div style="padding:18px 22px;border:1px dashed rgba(255,61,203,.4);border-radius:8px;color:#9ab5d0;font-size:11px;letter-spacing:.16em;font-weight:700;text-align:center">
+    `<div class="empty-state" style="border-color:rgba(255,61,203,.4)">
       ◇ 코어로 룬을 제련한 후 금고에서 소켓에 장착하세요 · 같은 룬 ×3 → ★ FORGE 로 다음 등급 변환
     </div>`;
   buildChipset();
@@ -1198,38 +1360,55 @@ export function openChipset(){
    =================================================================== */
 function buildCodex(){
   const root = document.getElementById('codex-content');
-  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
-  html += '<div><div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">SKILLS</div>';
-  for(const k in WEAPONS){
-    const seen = meta.seenCodex.weapons.includes(k);
-    const d = WEAPONS[k];
-    html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${seen?d.color:'#5d7290'}"><b>${seen?d.name:'???'}</b> · <span style="color:#9ab5d0">${seen?d.desc:'미해금'}</span></div>`;
-  }
-  html += '</div><div><div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">VIRTUES</div>';
-  for(const k in PASSIVES){
-    const seen = meta.seenCodex.passives.includes(k);
-    const d = PASSIVES[k];
-    html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${seen?d.color:'#5d7290'}"><b>${seen?d.name:'???'}</b> · <span style="color:#9ab5d0">${seen?d.desc:'미해금'}</span></div>`;
-  }
-  html += '</div></div>';
-  html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">★ AWAKENINGS — 두 스킬을 모두 각성 + 만렙 시 전설 각성</div>';
-  for(const fk in FUSIONS){
-    const f = FUSIONS[fk];
-    html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${f.color}">· <b>${f.name}</b> <span style="color:#9ab5d0">= ${f.sourceA} + ${f.sourceB} — ${f.desc}</span></div>`;
-  }
-  html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">▽ BOSS RUNES — 보스 처치 시 1장 선택 (스택 가능, 한 원정 영구)</div>';
-  for(const gk in GLYPHS){
-    const g = GLYPHS[gk];
-    html += `<div style="padding:6px;border-bottom:1px solid #1c2a4a;color:${g.color}">· <b>${g.name}</b> <span style="color:#9ab5d0">${g.desc}</span></div>`;
-  }
-  html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-top:14px;margin-bottom:6px">ABYSS BESTIARY</div>';
-  for(const k in ENEMIES){
-    const d = ENEMIES[k];
-    html += `<div style="padding:6px;border-bottom:1px solid #322018;color:${d.color}">· ${d.name || k} <span style="color:#9ab5d0">${d.brain} · HP ${d.hp} · DMG ${d.dmg}</span></div>`;
+  const tabs = document.getElementById('codex-tabs');
+  tabs.innerHTML = CODEX_TABS.map(t =>
+    `<button class="codex-tab ${_codexTab===t.key?'active':''}" onclick="setCodexTab('${t.key}')">${t.label}</button>`
+  ).join('');
+  const row = (color, title, desc) =>
+    `<div style="padding:8px 6px;border-bottom:1px solid #1c2a4a;color:${color}"><b>${title}</b> <span style="color:#9ab5d0">${desc}</span></div>`;
+  let html = '';
+  if(_codexTab === 'skills'){
+    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">SKILLS</div>';
+    for(const k in WEAPONS){
+      const seen = meta.seenCodex.weapons.includes(k);
+      const d = WEAPONS[k];
+      html += row(seen?d.color:'#5d7290', seen?d.name:'???', seen?'· '+d.desc:'· 미해금');
+    }
+  } else if(_codexTab === 'virtues'){
+    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">VIRTUES</div>';
+    for(const k in PASSIVES){
+      const seen = meta.seenCodex.passives.includes(k);
+      const d = PASSIVES[k];
+      html += row(seen?d.color:'#5d7290', seen?d.name:'???', seen?'· '+d.desc:'· 미해금');
+    }
+  } else if(_codexTab === 'awaken'){
+    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">★ AWAKENINGS</div>';
+    for(const fk in FUSIONS){
+      const f = FUSIONS[fk];
+      html += row(f.color, f.name, `= ${f.sourceA} + ${f.sourceB} — ${f.desc}`);
+    }
+  } else if(_codexTab === 'runes'){
+    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">▽ BOSS RUNES</div>';
+    for(const gk in GLYPHS){
+      const g = GLYPHS[gk];
+      html += row(g.color, g.name, '· ' + g.desc);
+    }
+  } else {
+    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">ABYSS BESTIARY</div>';
+    for(const k in ENEMIES){
+      const d = ENEMIES[k];
+      html += row(d.color, d.name || k, `· ${d.brain} · HP ${d.hp} · DMG ${d.dmg}`);
+    }
   }
   root.innerHTML = html;
+}
+export function setCodexTab(tab){
+  if(!CODEX_TABS.some(t => t.key === tab)) return;
+  _codexTab = tab;
+  buildCodex();
 }
 export function openCodex(){ closeOverlay('menu-overlay'); document.getElementById('codex-overlay').classList.remove('hidden'); buildCodex(); }
 
 // Wire player.js so applyItem (consumable forced level-up) and damagePlayer (death) can invoke us.
+syncSettingsClasses();
 setUiHandlers({ doLevelUp, endRun, openGlyphPick, openShrinePick });

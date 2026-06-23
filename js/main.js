@@ -14,18 +14,22 @@ import {
   doLevelUp, endRun, updateHUD, openChestPick, openGlyphPick, openShrinePick,
   showMenu, togglePause, toggleMute,
   openClassPicker, openShop, openCodex,
+  openSettings, toggleSetting, setCodexTab, toggleGuide,
   openChipset, chipsetPull, chipsetBuySlot,
   rerollLevelup, skipLevelup, returnToMenu, restartRun,
-  confirmAbandon, closeOverlay,
+  confirmAbandon, cancelAbandon, abandonRun, closeOverlay,
 } from './ui.js';
 import { spawnBoss, killEnemy, spawnShrine } from './entities.js';
+
+const DEBUG = new URLSearchParams(location.search).has('debug');
+document.body.classList.toggle('debug-mode', DEBUG);
 
 // Wire gameloop.js → ui.js handlers (avoids hard cycle at module level)
 setLoopHandlers({ doLevelUp, endRun, updateHUD, openChestPick, openShrinePick });
 
 /* ───────── DEV ERROR OVERLAY ─────────
    Surfaces uncaught errors as a visible banner so we can debug without devtools. */
-(()=>{
+if(DEBUG) (()=>{
   const banner = document.createElement('div');
   banner.style.cssText = 'position:absolute;top:60px;left:14px;right:14px;max-height:50vh;overflow:auto;background:rgba(180,30,40,.92);color:#fff;font:11px/1.5 monospace;padding:8px 12px;border-radius:6px;z-index:200;display:none;white-space:pre-wrap;pointer-events:auto';
   banner.id = 'err-overlay';
@@ -58,7 +62,62 @@ canvas.addEventListener('mousemove', e=>{
 });
 canvas.addEventListener('mousedown', ()=> mouse.down = true);
 canvas.addEventListener('mouseup', ()=> mouse.down = false);
-addEventListener('blur', ()=>{ for(const k in keys) keys[k] = false; mouse.down = false; });
+
+const touchStick = document.getElementById('touch-stick');
+const touchKnob = document.getElementById('touch-knob');
+const touchMoveKeys = ['w','a','s','d'];
+let touchPointerId = null;
+function resetTouchStick(){
+  touchPointerId = null;
+  for(const k of touchMoveKeys) keys[k] = false;
+  touchStick?.classList.remove('active');
+  if(touchKnob) touchKnob.style.transform = 'translate(-50%,-50%)';
+}
+function updateTouchStick(clientX, clientY){
+  if(!touchStick) return;
+  const r = touchStick.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  const dx = clientX - cx;
+  const dy = clientY - cy;
+  const max = r.width * .32;
+  const mag = Math.hypot(dx, dy);
+  const scale = mag > max && mag > 0 ? max / mag : 1;
+  const knobX = dx * scale;
+  const knobY = dy * scale;
+  const dead = r.width * .12;
+  keys.a = dx < -dead;
+  keys.d = dx > dead;
+  keys.w = dy < -dead;
+  keys.s = dy > dead;
+  if(touchKnob){
+    touchKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
+  }
+}
+if(touchStick){
+  touchStick.addEventListener('pointerdown', e=>{
+    if(touchPointerId !== null) return;
+    e.preventDefault();
+    touchPointerId = e.pointerId;
+    touchStick.setPointerCapture?.(e.pointerId);
+    touchStick.classList.add('active');
+    updateTouchStick(e.clientX, e.clientY);
+  });
+  touchStick.addEventListener('pointermove', e=>{
+    if(touchPointerId !== e.pointerId) return;
+    e.preventDefault();
+    updateTouchStick(e.clientX, e.clientY);
+  });
+  const endTouch = e=>{
+    if(touchPointerId !== e.pointerId) return;
+    e.preventDefault();
+    resetTouchStick();
+  };
+  touchStick.addEventListener('pointerup', endTouch);
+  touchStick.addEventListener('pointercancel', endTouch);
+  touchStick.addEventListener('lostpointercapture', resetTouchStick);
+}
+addEventListener('blur', ()=>{ for(const k in keys) keys[k] = false; mouse.down = false; resetTouchStick(); });
 
 /* ───────── MAIN LOOP ───────── */
 let lastT = 0;
@@ -70,8 +129,14 @@ function _updateFps(dt){
   _fpsAccum += dt; _fpsFrames++;
   if(_fpsAccum >= 0.5){
     const fps = _fpsFrames / _fpsAccum;
+    if(meta.settings?.autoQuality){
+      if(fps < 38 && G.qualityScale > .58){ G.qualityScale = .55; G.qualityLabel = 'LOW'; }
+      else if(fps > 55 && G.qualityScale < 1){ G.qualityScale = 1; G.qualityLabel = 'HIGH'; }
+    } else {
+      G.qualityScale = 1; G.qualityLabel = 'HIGH';
+    }
     if(_fpsEl){
-      _fpsEl.textContent = `FPS ${fps.toFixed(0)} · ENT ${G.ents.length}`;
+      _fpsEl.textContent = `FPS ${fps.toFixed(0)} · ENT ${G.ents.length} · ${G.qualityLabel}`;
       const col = fps >= 55 ? '#9eff5b' : (fps >= 30 ? '#ffd400' : '#ff4561');
       _fpsEl.style.color = col;
       _fpsEl.style.borderColor = col;
@@ -114,15 +179,21 @@ addEventListener('visibilitychange', ()=>{ if(document.hidden) flushMetaNow(); }
    app.renderer is defined when render() runs. */
 addEventListener('pointerdown', ()=>{ AUDIO.init().then(()=>{ if(G.mode==='menu') AUDIO.setMode('menu'); }); }, { once:true });
 addEventListener('keydown',     ()=>{ AUDIO.init().then(()=>{ if(G.mode==='menu') AUDIO.setMode('menu'); }); }, { once:true });
+addEventListener('click', e=>{
+  if(e.target.closest?.('.btn,.icon-btn,.card,.shop-card,#chipset-overlay .chip,.codex-tab,.setting-card')){
+    AUDIO.uiClick?.();
+  }
+}, true);
 
 await initPixi();
 await preloadSpriteAssets();
 requestAnimationFrame(t=>{ lastT = t; requestAnimationFrame(loop); });
+document.body.classList.add('booted');
 showMenu();
 
 // Dev-mode handles for in-browser inspection (browser automation, REPL).
 // Same module instances the page uses; safe to read via window.__dev.
-window.__dev = { G, app, world, bgC, entityLayer, fxLayer, beamLayer, hudC, BG, spawnBoss, killEnemy, openGlyphPick, openShrinePick, spawnShrine, update, render };
+if(DEBUG) window.__dev = { G, app, world, bgC, entityLayer, fxLayer, beamLayer, hudC, BG, spawnBoss, killEnemy, openGlyphPick, openShrinePick, spawnShrine, update, render };
 document.getElementById('menu-coins').textContent = meta.coins;
 document.getElementById('menu-best').textContent = fmtTime(meta.bestTime);
 document.getElementById('menu-runs').textContent = meta.runs;
@@ -133,10 +204,11 @@ document.getElementById('menu-runs').textContent = meta.runs;
    explicitly attach the handler set used by the overlays. */
 Object.assign(window, {
   openClassPicker, openShop, openCodex,
+  openSettings, toggleSetting, setCodexTab, toggleGuide,
   openChipset, chipsetPull, chipsetBuySlot,
   rerollLevelup, skipLevelup,
   returnToMenu, restartRun,
-  togglePause, confirmAbandon,
+  togglePause, toggleMute, confirmAbandon, cancelAbandon, abandonRun,
   closeOverlay, showMenu,
 });
 const pendingInlineActions = window.__pendingInlineActions || [];

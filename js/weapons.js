@@ -107,12 +107,12 @@ export const WEAPONS = {
           const sy = p.y - Math.sin(a) * 48;
           const exx = p.x + Math.cos(a) * s.length * p.areaMul;
           const eyy = p.y + Math.sin(a) * s.length * p.areaMul;
-          fxLine(sx, sy, exx, eyy, col, .22, Math.max(4, s.width*.55));
+          fxLine(sx, sy, exx, eyy, col, .22, Math.max(4, s.width*.55), {style:'soul'});
           const hits = hitLine(sx, sy, exx, eyy, s.width, s.dmg * p.dmgMul, col, { kb:90 });
           const ix = target ? target.x : exx;
           const iy = target ? target.y : eyy;
           fxBurst(ix, iy, col, hits ? 12 : 5, 180, 3, .32);
-          fxRing(ix, iy, col, 34 + s.width*2, .24);
+          fxRing(ix, iy, col, 34 + s.width*2, .24, {style:'seal',spokes:6});
         }
         AUDIO.laser(p.x);
         w.timer = s.cd / p.cdMul;
@@ -335,17 +335,17 @@ export const WEAPONS = {
           const tgt = nearestEnemyExcept(from, hit, s.range);
           if(!tgt) break;
           // Beefed-up bolt: thicker line, longer flash, brighter particle burst.
-          fxLine(from.x, from.y, tgt.x, tgt.y, col, .35, 4.5);
+          fxLine(from.x, from.y, tgt.x, tgt.y, col, .35, 4.5, {style:'soul'});
           dealDamage(tgt, s.dmg * p.dmgMul * (1 - i*.1), col);
           applyHex(tgt, (s.hexDmg || 0) * p.dmgMul, (s.hexR || 90) * p.areaMul, 3.2, col);
           applySlow(tgt, .12, .65);
           fxBurst(tgt.x, tgt.y, col, 10, 170, 2.5, .3);
-          fxRing(tgt.x, tgt.y, col, 22, .25);
+          fxRing(tgt.x, tgt.y, col, 22, .25, {style:'seal',spokes:5});
           hit.add(tgt); hitCount++;
           for(let f = 0; f < forkN; f++){
             const ftgt = nearestEnemyExcept(tgt, hit, s.range * .7);
             if(!ftgt) break;
-            fxLine(tgt.x, tgt.y, ftgt.x, ftgt.y, col, .25, 3);
+            fxLine(tgt.x, tgt.y, ftgt.x, ftgt.y, col, .25, 3, {style:'soul'});
             dealDamage(ftgt, s.dmg * p.dmgMul * .55, col);
             applyHex(ftgt, (s.hexDmg || 0) * p.dmgMul * .65, (s.hexR || 90) * p.areaMul, 2.4, col);
             fxBurst(ftgt.x, ftgt.y, col, 6, 120, 2, .25);
@@ -860,7 +860,7 @@ export const FUSIONS = {
           for(let j=0;j<s.jumps;j++){
             const tgt = nearestEnemyExcept(from, hit, s.jumpRange);
             if(!tgt) break;
-            fxLine(from.x, from.y, tgt.x, tgt.y, col, .3, 3.5);
+            fxLine(from.x, from.y, tgt.x, tgt.y, col, .3, 3.5, {style:'soul'});
             dealDamage(tgt, s.dmg * p.dmgMul * s.jumpDmg * (1 - j*.1), col);
             fxBurst(tgt.x, tgt.y, col, 6, 130, 2, .22);
             hit.add(tgt); from = tgt;
@@ -1081,7 +1081,7 @@ export const FUSIONS = {
           for(let j=0;j<s.jumps;j++){
             const tgt = nearestEnemyExcept(from, hit, s.jumpRange);
             if(!tgt) break;
-            fxLine(from.x, from.y, tgt.x, tgt.y, col, .3, 3);
+            fxLine(from.x, from.y, tgt.x, tgt.y, col, .3, 3, {style:'soul'});
             dealDamage(tgt, s.dmg * p.dmgMul * s.jumpDmg * (1 - j*.1), col);
             fxBurst(tgt.x, tgt.y, col, 6, 130, 2, .22);
             hit.add(tgt); from = tgt;
@@ -1267,7 +1267,7 @@ export const FUSIONS = {
       // Inter-node arcs (visual every frame, damage on tick).
       for(let i = 0; i < nodes.length; i++){
         const a = nodes[i], b = nodes[(i+1) % nodes.length];
-        fxLine(a.x, a.y, b.x, b.y, col, .12, 2);
+        fxLine(a.x, a.y, b.x, b.y, col, .12, 2, {style:'soul'});
         if(doArc){
           const list = EGRID.queryLine(a.x, a.y, b.x, b.y, 30, _EQ1);
           for(let li = 0; li < list.length; li++){
@@ -1288,12 +1288,12 @@ export const FUSIONS = {
           if(!seed) continue;
           let from = seed;
           const hit = new Set([seed]);
-          fxLine(start.x, start.y, from.x, from.y, col, .25, 2.2);
+          fxLine(start.x, start.y, from.x, from.y, col, .25, 2.2, {style:'soul'});
           dealDamage(from, s.arcDmg * p.dmgMul * .5, col);
           for(let j = 0; j < s.jumps; j++){
             const tgt = nearestEnemyExcept(from, hit, s.jumpRange);
             if(!tgt) break;
-            fxLine(from.x, from.y, tgt.x, tgt.y, col, .25, 2);
+            fxLine(from.x, from.y, tgt.x, tgt.y, col, .25, 2, {style:'soul'});
             dealDamage(tgt, s.arcDmg * p.dmgMul * .4, col);
             hit.add(tgt); from = tgt;
           }

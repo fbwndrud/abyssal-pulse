@@ -141,7 +141,10 @@ export function update(){
     }
   }
   const _origDmg = p.dmgMul, _origCd = p.cdMul;
-  if(p._boostDmgMul && p._boostDmgMul !== 1) p.dmgMul = _origDmg * p._boostDmgMul;
+  let effectiveDmgMul = _origDmg;
+  if(p.lowHpDmgMul && p.hp / p.maxHp <= (p.lowHpThreshold || .45)) effectiveDmgMul *= (1 + p.lowHpDmgMul);
+  if(p._boostDmgMul && p._boostDmgMul !== 1) effectiveDmgMul *= p._boostDmgMul;
+  if(effectiveDmgMul !== _origDmg) p.dmgMul = effectiveDmgMul;
   if(p._boostCdrMul && p._boostCdrMul !== 1) p.cdMul  = _origCd  * p._boostCdrMul;
   const _origSp = p.speed;
   if(p._boostSpdMul && p._boostSpdMul !== 1) p.speed  = _origSp  * p._boostSpdMul;
@@ -263,12 +266,27 @@ export function update(){
         e.vy += Math.sin(a)*sp;
       }
       if(d < p.r + e.r){
-        if(e.type==='xp'){ const gained = Math.round(e.amount * (p.xpGainMul||1)); p.xp += gained; AUDIO.pickup(e.x); fxText(e.x,e.y,'+'+gained, e.color); }
-        else if(e.type==='coin'){ const m = p.coinMul||1; const amt = Math.floor(m) + (Math.random() < (m - Math.floor(m)) ? 1 : 0) || 1; G.coinsRun += amt; meta.coins += amt; saveMetaLater(); AUDIO.pickup(e.x); fxText(e.x,e.y, amt>1?('◆×'+amt):'◆', C.gold); }
-        else if(e.type==='heart'){ p.hp = Math.min(p.maxHp, p.hp + 25); AUDIO.heal(); fxText(e.x,e.y,'+25 HP', C.red); }
-        else if(e.type==='magnet'){ G.superMagnetTimer = 8; AUDIO.pickup(); announce('MAGNET ACTIVE', 1); }
-        else if(e.type==='freeze'){ G.freezeTimer = 5; AUDIO.freeze(); announce('TIME FREEZE', 1); }
-        else if(e.type==='item'){ applyItem(p, e.item.id); }
+        if(e.type==='xp'){
+          const gained = Math.round(e.amount * (p.xpGainMul||1)); p.xp += gained; AUDIO.pickup(e.x); fxText(e.x,e.y,'+'+gained, e.color);
+        }
+        else if(e.type==='coin'){
+          const m = p.coinMul||1; const amt = Math.floor(m) + (Math.random() < (m - Math.floor(m)) ? 1 : 0) || 1;
+          G.coinsRun += amt; meta.coins += amt; saveMetaLater(); AUDIO.pickup(e.x); fxText(e.x,e.y, amt>1?('◆×'+amt):'◆', C.gold);
+          if(amt > 1) fxRing(e.x, e.y, C.gold, 34, .25);
+        }
+        else if(e.type==='heart'){
+          p.hp = Math.min(p.maxHp, p.hp + 25); AUDIO.heal(); fxText(e.x,e.y,'+25 HP', C.red); fxRing(e.x, e.y, C.red, 44, .32);
+        }
+        else if(e.type==='magnet'){
+          G.superMagnetTimer = 8; AUDIO.pickup(); announce('MAGNET ACTIVE', 1); fxShockwave(e.x, e.y, C.pink, 120, .38);
+        }
+        else if(e.type==='freeze'){
+          G.freezeTimer = 5; AUDIO.freeze(); announce('TIME FREEZE', 1); fxShockwave(e.x, e.y, C.teal, 140, .45);
+        }
+        else if(e.type==='item'){
+          fxRing(e.x, e.y, e.color || C.gold, e.item?.kind === 'relic' ? 92 : 58, .42);
+          applyItem(p, e.item.id);
+        }
         e.alive = false;
         if(p.xp >= p.xpNext){ if(_doLevelUp) _doLevelUp(); }
       }
@@ -334,11 +352,19 @@ export function update(){
           for(const b of w.beams){
             if(!b) continue;
             p.beamGfx.moveTo(b.x1, b.y1); p.beamGfx.lineTo(b.x2, b.y2);
-            p.beamGfx.stroke({ color: 0x100604, alpha: .55, width: bw + 18 });
+            p.beamGfx.stroke({ color: 0x090201, alpha: .72, width: bw + 20 });
             p.beamGfx.moveTo(b.x1, b.y1); p.beamGfx.lineTo(b.x2, b.y2);
-            p.beamGfx.stroke({ color: beamCol, alpha: .62, width: bw + 7 });
+            p.beamGfx.stroke({ color: beamCol, alpha: .66, width: bw + 8 });
             p.beamGfx.moveTo(b.x1, b.y1); p.beamGfx.lineTo(b.x2, b.y2);
-            p.beamGfx.stroke({ color: 0xfff4d0, alpha: .9, width: Math.max(2, bw*.45) });
+            p.beamGfx.stroke({ color: 0xfff4d0, alpha: .78, width: Math.max(1.6, bw*.38) });
+            const mx = (b.x1 + b.x2) * .5, my = (b.y1 + b.y2) * .5;
+            const sigR = 9 + bw * 1.2 + Math.sin(G.realT*5 + mx*.01) * 1.5;
+            p.beamGfx.circle(mx, my, sigR);
+            p.beamGfx.stroke({ color: beamCol, alpha: .24, width: 1.1 });
+            p.beamGfx.moveTo(mx - sigR*.58, my); p.beamGfx.lineTo(mx + sigR*.58, my);
+            p.beamGfx.stroke({ color: 0xfff4d0, alpha: .14, width: .8 });
+            p.beamGfx.moveTo(mx, my - sigR*.58); p.beamGfx.lineTo(mx, my + sigR*.58);
+            p.beamGfx.stroke({ color: 0xfff4d0, alpha: .14, width: .8 });
           }
         }
         if(w.def && w.def.kind === 'ORBIT' && w.lastNodes){
@@ -349,11 +375,14 @@ export function update(){
             p.beamGfx.circle(n.x, n.y, nr);
             p.beamGfx.fill({ color: 0x070504, alpha: .72 });
             p.beamGfx.circle(n.x, n.y, nr);
-            p.beamGfx.stroke({ color: nodeCol, alpha: .9, width: 2.4 });
+            p.beamGfx.stroke({ color: 0x080201, alpha: .62, width: 5.2 });
+            p.beamGfx.circle(n.x, n.y, nr*.92);
+            p.beamGfx.stroke({ color: nodeCol, alpha: .85, width: 2.2 });
+            _drawRuneSigils(p.beamGfx, n.x, n.y, nr*.78, nodeCol, .52, (n.x+n.y)*.01, G.realT*.7, 5);
             p.beamGfx.circle(n.x, n.y, nr*.42);
             p.beamGfx.stroke({ color: 0xfff4d0, alpha: .5, width: 1.2 });
             p.beamGfx.moveTo(p.x, p.y); p.beamGfx.lineTo(n.x, n.y);
-            p.beamGfx.stroke({ color: nodeCol, alpha: .18, width: 1.2 });
+            p.beamGfx.stroke({ color: nodeCol, alpha: .16, width: 1.5 });
           }
         }
       }
@@ -651,6 +680,7 @@ function updateProjectile(pr){
   }
   pr.x += pr.vx * G.dt;
   pr.y += pr.vy * G.dt;
+  _emitProjectileTrail(pr);
   pr.spin += G.dt * 8;
   const _pList = EGRID.query(pr.x, pr.y, pr.r + 40, _EQ1);
   for(let pi = 0; pi < _pList.length; pi++){
@@ -779,6 +809,53 @@ function updateEnemyBullets(){
   }
 }
 
+function _drawRuneSigils(sp, x, y, r, col, alpha, seed=0, spin=0, count=8){
+  const n = Math.max(4, count|0);
+  for(let i = 0; i < n; i++){
+    const a = seed + spin + i*TAU/n;
+    const cx = x + Math.cos(a)*r;
+    const cy = y + Math.sin(a)*r;
+    const tx = -Math.sin(a), ty = Math.cos(a);
+    const rx = Math.cos(a), ry = Math.sin(a);
+    const w = 5 + (i % 3) * 2;
+    sp.moveTo(cx - tx*w, cy - ty*w);
+    sp.lineTo(cx + tx*w, cy + ty*w);
+    sp.stroke({ color: col, alpha: alpha*.42, width: 1.2 });
+    sp.moveTo(cx - rx*w*.6, cy - ry*w*.6);
+    sp.lineTo(cx + rx*w*.7, cy + ry*w*.7);
+    sp.stroke({ color: 0xfff1c8, alpha: alpha*.18, width: .8 });
+  }
+}
+function _drawJaggedCircle(sp, x, y, r, col, alpha, seed=0, width=2){
+  const steps = 22;
+  for(let i = 0; i <= steps; i++){
+    const a = seed + i*TAU/steps;
+    const jag = 1 + Math.sin(seed*13 + i*2.7) * .055 + Math.sin(G.realT*6 + i) * .018;
+    const px = x + Math.cos(a)*r*jag;
+    const py = y + Math.sin(a)*r*jag;
+    if(i === 0) sp.moveTo(px, py); else sp.lineTo(px, py);
+  }
+  sp.stroke({ color: col, alpha, width });
+}
+function _emitProjectileTrail(pr){
+  if(!pr.trailStyle || pr.trailZone || G.ents.length > 850) return;
+  if(meta.settings?.reduceFlash && Math.random() > .45) return;
+  pr._diabloTrailT = (pr._diabloTrailT || 0) - G.dt;
+  const every = pr.trailStyle === 'hellfire' ? .055 : pr.trailStyle === 'spectral' ? .045 : .065;
+  if(pr._diabloTrailT > 0) return;
+  pr._diabloTrailT = every;
+  const a = Math.atan2(pr.vy, pr.vx);
+  const len = pr.trailStyle === 'shuriken' ? 26 : 18 + Math.min(22, pr.speed * .035);
+  const sx = pr.x - Math.cos(a) * len;
+  const sy = pr.y - Math.sin(a) * len;
+  const style = pr.trailStyle === 'bone' ? 'bone'
+    : pr.trailStyle === 'spectral' ? 'spectral'
+    : pr.trailStyle === 'soul' ? 'soul'
+    : 'ember';
+  fxLine(sx, sy, pr.x, pr.y, pr.color, .14, pr.trailStyle === 'hellfire' ? 3 : 2, { style });
+  if(pr.trailStyle === 'hellfire' && Math.random() < .28) fxBurst(pr.x, pr.y, pr.color, 1, 42, 2.2, .18);
+}
+
 /* ───────── SPRITE SYNC ─────────
    Called once per frame per alive entity at the end of the update loop.
    Position mirrors e.x/e.y; rotation and texture-swap (hitFlash) are
@@ -811,7 +888,9 @@ function _syncEntitySprite(e){
     }
     if(e.auraSprite){
       e.auraSprite.position.set(e.x, e.y);
-      e.auraSprite.alpha = .35 + Math.sin(G.realT*3) * .12;  // breathing pulse
+      e.auraSprite.alpha = e.isBoss
+        ? .35 + Math.sin(G.realT*3) * .12
+        : .18 + Math.sin(G.realT*5 + (e.__elitePulse || 0)) * .06;
     }
   } else if(e.type === 'proj'){
     const baseRot = e.subtype === 'shuriken' ? e.spin : Math.atan2(e.vy, e.vx);
@@ -841,7 +920,27 @@ function _syncEntitySprite(e){
   else if(e.type === 'ring'){
     const a = e.life / e.maxLife;
     const w = 2 + (1-a)*4;
+    const k = 1 - a;
     sp.clear();
+    if(e.style === 'rune' || e.style === 'seal' || e.style === 'abyss'){
+      sp.circle(e.x, e.y, e.r);
+      sp.fill({ color: e.style === 'abyss' ? 0x030104 : 0x1c0805, alpha: .05 + a*.08 });
+      sp.circle(e.x, e.y, e.r);
+      sp.stroke({ color: 0x070201, alpha: a*.45, width: w + 8 });
+      _drawJaggedCircle(sp, e.x, e.y, e.r, e.color, a*.78, e.seed || 0, w);
+      sp.circle(e.x, e.y, e.r*.66);
+      sp.stroke({ color: e.color, alpha: a*.32, width: Math.max(1, w*.45) });
+      _drawRuneSigils(sp, e.x, e.y, e.r*.82, e.color, a, e.seed || 0, G.realT*.35, e.spokes || 8);
+      if(e.style === 'seal'){
+        for(let i = 0; i < 4; i++){
+          const aa = (e.seed || 0) + i*TAU/4 + k*.8;
+          sp.moveTo(e.x + Math.cos(aa)*e.r*.22, e.y + Math.sin(aa)*e.r*.22);
+          sp.lineTo(e.x + Math.cos(aa)*e.r*.92, e.y + Math.sin(aa)*e.r*.92);
+          sp.stroke({ color: 0xffe2b6, alpha: a*.16, width: 1 });
+        }
+      }
+      return;
+    }
     sp.circle(e.x, e.y, e.r);
     sp.stroke({ color: e.color, alpha: a * .35, width: w + 6 });
     sp.circle(e.x, e.y, e.r);
@@ -850,7 +949,26 @@ function _syncEntitySprite(e){
   else if(e.type === 'shock'){
     const k = 1 - e.life/e.maxLife;
     const w = 4 + k*10;
+    const a = 1 - k;
     sp.clear();
+    if(e.style === 'bloodRune' || e.style === 'infernal'){
+      sp.circle(e.x, e.y, e.r);
+      sp.fill({ color: 0x250302, alpha: a*.05 });
+      _drawJaggedCircle(sp, e.x, e.y, e.r, 0x0b0302, a*.42, e.seed || 0, w + 10);
+      _drawJaggedCircle(sp, e.x, e.y, e.r, e.color, a*.88, (e.seed || 0) + .7, w);
+      sp.circle(e.x, e.y, e.r*.48);
+      sp.stroke({ color: 0xffe2b6, alpha: a*.18, width: Math.max(1.2, w*.18) });
+      const n = e.spokes || 12;
+      for(let i = 0; i < n; i++){
+        const aa = (e.seed || 0) + i*TAU/n + k*.3;
+        const r0 = e.r * (.22 + (i%2)*.08);
+        const r1 = e.r * (.78 + (i%3)*.06);
+        sp.moveTo(e.x + Math.cos(aa)*r0, e.y + Math.sin(aa)*r0);
+        sp.lineTo(e.x + Math.cos(aa)*r1, e.y + Math.sin(aa)*r1);
+        sp.stroke({ color: e.color, alpha: a*.18, width: 1.2 + k*2 });
+      }
+      return;
+    }
     sp.circle(e.x, e.y, e.r);
     sp.stroke({ color: e.color, alpha: (1-k) * .35, width: w + 8 });
     sp.circle(e.x, e.y, e.r);
@@ -859,6 +977,32 @@ function _syncEntitySprite(e){
   else if(e.type === 'fan'){
     const a = e.life / e.maxLife;
     sp.clear();
+    if(e.style === 'cleave'){
+      const edgeA = e.angle - e.arc/2, edgeB = e.angle + e.arc/2;
+      sp.moveTo(e.x, e.y);
+      sp.arc(e.x, e.y, e.r, edgeA, edgeB);
+      sp.lineTo(e.x, e.y);
+      sp.fill({ color: 0x260304, alpha: a*.22 });
+      for(let i = 0; i < 5; i++){
+        const t = i / 4;
+        const aa = lerp(edgeA, edgeB, t) + Math.sin((e.seed || 0) + i)*.035;
+        sp.moveTo(e.x + Math.cos(aa)*22, e.y + Math.sin(aa)*22);
+        sp.lineTo(e.x + Math.cos(aa)*e.r, e.y + Math.sin(aa)*e.r);
+        sp.stroke({ color: i === 2 ? 0xfff1c8 : e.color, alpha: a*(i === 2 ? .38 : .28), width: i === 2 ? 2.4 : 1.4 });
+      }
+      const steps = 14;
+      for(let i = 0; i <= steps; i++){
+        const t = i/steps;
+        const aa = lerp(edgeA, edgeB, t);
+        const jag = 1 + Math.sin((e.seed || 0)*9 + i*1.7) * .035;
+        const px = e.x + Math.cos(aa)*e.r*jag;
+        const py = e.y + Math.sin(aa)*e.r*jag;
+        if(i === 0) sp.moveTo(px, py); else sp.lineTo(px, py);
+      }
+      sp.stroke({ color: 0x090202, alpha: a*.45, width: 10 + (1-a)*7 });
+      sp.stroke({ color: e.color, alpha: a*.92, width: 3.5 + (1-a)*5 });
+      return;
+    }
     sp.moveTo(e.x, e.y);
     sp.arc(e.x, e.y, e.r, e.angle - e.arc/2, e.angle + e.arc/2);
     sp.lineTo(e.x, e.y);
@@ -874,17 +1018,20 @@ function _syncEntitySprite(e){
   }
   else if(e.type === 'line'){
     const a = e.life / e.maxLife;
+    const width = e.width || 2;
+    const glow = e.style ? width + 8 : width + 6;
     sp.clear();
     sp.moveTo(e.x1, e.y1);
-    const segs = 6;
+    const segs = e.style ? 8 : 6;
     for(let i=1;i<segs;i++){
       const t = i/segs;
-      const mx = lerp(e.x1, e.x2, t) + (Math.random()-.5)*16;
-      const my = lerp(e.y1, e.y2, t) + (Math.random()-.5)*16;
+      const jag = e.style === 'bone' ? 9 : e.style === 'spectral' ? 12 : 16;
+      const mx = lerp(e.x1, e.x2, t) + (Math.random()-.5)*jag;
+      const my = lerp(e.y1, e.y2, t) + (Math.random()-.5)*jag;
       sp.lineTo(mx, my);
     }
     sp.lineTo(e.x2, e.y2);
-    sp.stroke({ color: e.color, alpha: a * .35, width: (e.width || 2) + 6 });
+    sp.stroke({ color: e.style ? 0x070201 : e.color, alpha: e.style ? a*.38 : a * .35, width: glow });
     sp.moveTo(e.x1, e.y1);
     for(let i=1;i<segs;i++){
       const t = i/segs;
@@ -893,16 +1040,23 @@ function _syncEntitySprite(e){
       sp.lineTo(mx, my);
     }
     sp.lineTo(e.x2, e.y2);
-    sp.stroke({ color: e.color, alpha: a, width: e.width || 2 });
+    sp.stroke({ color: e.color, alpha: a, width });
+    if(e.style === 'ember' || e.style === 'soul'){
+      const mx = (e.x1 + e.x2) * .5, my = (e.y1 + e.y2) * .5;
+      sp.circle(mx, my, width + 1);
+      sp.fill({ color: e.style === 'soul' ? 0xfff1c8 : 0xff7a2c, alpha: a*.16 });
+    }
   }
   else if(e.type === 'blackhole'){
     sp.clear();
-    // Single dark core (no inner purple ring — flat one-color disk).
+    // Abyss well: dark core, rotating event horizon, and outer rune teeth.
     sp.circle(e.x, e.y, e.r);
     sp.fill({ color: 0x000000, alpha: .9 });
-    // 5 violet event-horizon spirals on top
     const t = e.t;
     const col = e.color || 0x9b5cff;
+    sp.circle(e.x, e.y, e.r*1.08);
+    sp.stroke({ color: 0x090107, alpha: .72, width: 9 });
+    _drawRuneSigils(sp, e.x, e.y, e.r*.95, col, .72, e.seed || 0, -G.realT*.55, 10);
     for(let i = 0; i < 5; i++){
       const ang0 = t*4 + i*TAU/5;
       const r1 = e.r * (.4 + i*.12);
@@ -916,7 +1070,9 @@ function _syncEntitySprite(e){
       sp.stroke({ color: col, alpha: Math.max(.05, .7 - i*.12), width: 1.5 });
     }
     sp.circle(e.x, e.y, e.r);
-    sp.stroke({ color: col, alpha: .45, width: 2 });
+    sp.stroke({ color: col, alpha: .52, width: 2.4 });
+    sp.circle(e.x, e.y, e.r*.55 + Math.sin(G.realT*5 + (e.seed || 0))*e.r*.035);
+    sp.stroke({ color: 0xffe2b6, alpha: .14, width: 1 });
   }
   else if(e.type === 'zone'){
     const a = e.life / e.maxLife;
@@ -944,12 +1100,18 @@ function _syncEntitySprite(e){
       return;
     }
     sp.circle(e.x, e.y, e.r);
-    sp.fill({ color: col, alpha: .07 + a*.05 });
+    sp.fill({ color: e.kind === 'abyss' ? 0x050106 : 0x1a0805, alpha: .05 + a*.05 });
     sp.circle(e.x, e.y, e.r * (.82 + Math.sin(G.realT*3 + e.seed)*.03));
     sp.stroke({ color: col, alpha: .48*a, width: 2.5 + k*3 });
     sp.circle(e.x, e.y, e.r * .48);
     sp.stroke({ color: 0xfff1c8, alpha: .18*a, width: 1.2 });
-    const n = e.kind === 'hellfire' ? 8 : 6;
+    if(e.kind === 'sanctuary' || e.kind === 'ward' || e.kind === 'abyss'){
+      sp.circle(e.x, e.y, e.r*.68);
+      sp.stroke({ color: 0x080201, alpha: .26*a, width: 5 });
+      _drawJaggedCircle(sp, e.x, e.y, e.r*.92, col, .2*a, e.seed || 0, 1.1);
+      _drawRuneSigils(sp, e.x, e.y, e.r*.76, col, .5*a, e.seed || 0, G.realT*(e.kind === 'abyss' ? -.18 : .12), e.kind === 'ward' ? 7 : 9);
+    }
+    const n = e.kind === 'abyss' ? 10 : 6;
     for(let i = 0; i < n; i++){
       const aa = e.seed + G.realT*.18 + i*TAU/n;
       const r0 = e.r * .34;

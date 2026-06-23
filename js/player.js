@@ -7,7 +7,7 @@
 import { G, W, H, C, TAU, rand, meta, saveMeta, saveMetaLater, announce, entityLayer, beamLayer } from './core.js';
 import { AUDIO } from './audio.js';
 import {
-  makeEnt, fxBurst, fxRing, fxText, fxLine, shake, flash,
+  makeEnt, fxBurst, fxRing, fxRuneCircle, fxText, fxLine, shake, flash,
   spawnXP, spawnCoin, spawnHeart, spawnMagnet, spawnFreeze, spawnChest, spawnEnemy,
   setOnKillHook, dealDamage,
 } from './entities.js';
@@ -239,7 +239,8 @@ export function applyEvo(p, weaponKey, evoId){
   // Some evos grant passive player buffs via extra flags (regenBoost, etc.)
   // Apply those at evo-time so the player carries them through the run.
   if(w.extra?.regenBoost){ p.regen += w.extra.regenBoost; }
-  fxRing(p.x, p.y, e.color, 180, .9);
+  fxRuneCircle(p.x, p.y, e.color, 190, .9, {style:'seal',spokes:10});
+  fxRing(p.x, p.y, '#ffffff', 240, .85, {style:'rune',spokes:12});
   fxBurst(p.x, p.y, e.color, 60, 360, 5, .8);
   shake(.4); flash(e.color, .4);
   AUDIO.explode();
@@ -326,7 +327,8 @@ export function applyFusion(p, fuseKey){
   };
   p.weapons.push(inst);
   // Dramatic fx
-  fxRing(p.x, p.y, fuse.color, 220, 1.0);
+  fxRuneCircle(p.x, p.y, fuse.color, 230, 1.0, {style:'seal',spokes:12});
+  fxRing(p.x, p.y, '#ffffff', 300, .9, {style:'rune',spokes:14});
   fxBurst(p.x, p.y, fuse.color, 80, 400, 6, .9);
   shake(.5); flash(fuse.color, .5);
   AUDIO.explode();
@@ -427,6 +429,9 @@ setOnKillHook(function onKill(e){
   spawnXP(e.x, e.y, e.xp || 1);
   if(Math.random() < (e.gold || 0) + (G.player ? G.player.luck*.05 : 0)){
     spawnCoin(e.x, e.y);
+  }
+  if(G.player?.killCoinChance && !e.isBoss && Math.random() < G.player.killCoinChance){
+    spawnCoin(e.x + rand(-10,10), e.y + rand(-10,10));
   }
   const pLuck = G.player ? G.player.luck : 0;
   // Drop rate caps — luck never breaks the game economy.
