@@ -1,12 +1,12 @@
 /* ===================================================================
-   AUDIO — Dark-synthwave mix bus system with ducking, procedural
-   reverb, voice pool, vertical (intensity overlay) + horizontal
+   AUDIO — Abyssal dark-fantasy mix bus system with ducking, procedural
+   cathedral reverb, voice pool, vertical (intensity overlay) + horizontal
    (mode crossfade) music. CC0 assets in ./audio/.
    Self-contained — exports a single AUDIO API object.
    =================================================================== */
 export const AUDIO = (()=>{
   // ---- State ----
-  let ctx = null, ready = false, muted = false;
+  let ctx = null, ready = false, muted = false, initPromise = null;
   let mode = 'none';
   let intensity = 0, targetIntensity = 0;
   let bossWasActive = false;
@@ -14,6 +14,7 @@ export const AUDIO = (()=>{
   let master, preMaster, glueComp, limiter, dcBlock;
   let musicBus, sfxBus, uiBus, ambientBus;
   let convolver, reverbSend, reverbGain;
+  const MUSIC_BASE_GAIN = 0.54;
   // ---- Samples ----
   const ASSETS = {
     menu:          'audio/menu.ogg',
@@ -33,7 +34,7 @@ export const AUDIO = (()=>{
   const layers = {};
   let mainAltUsesHigh = false;
 
-  function makeIR(duration=2.2, decay=3.2, darkness=0.18){
+  function makeIR(duration=3.1, decay=4.1, darkness=0.11){
     const rate = ctx.sampleRate, len = (rate*duration)|0;
     const buf = ctx.createBuffer(2, len, rate);
     for(let c=0;c<2;c++){
@@ -44,7 +45,7 @@ export const AUDIO = (()=>{
         const env = Math.pow(1 - t, decay);
         const n = (Math.random()*2-1) * env;
         lp += (n - lp) * darkness;
-        d[i] = lp * 0.9;
+        d[i] = lp * 0.82;
       }
     }
     return buf;
@@ -58,26 +59,26 @@ export const AUDIO = (()=>{
     glueComp = ctx.createDynamicsCompressor();
     glueComp.threshold.value = -18; glueComp.knee.value = 12; glueComp.ratio.value = 3;
     glueComp.attack.value = 0.01;  glueComp.release.value = 0.2;
-    preMaster = ctx.createGain();   preMaster.gain.value = 0.5;
+    preMaster = ctx.createGain();   preMaster.gain.value = 0.48;
     dcBlock = ctx.createBiquadFilter();
     dcBlock.type = 'highpass'; dcBlock.frequency.value = 22; dcBlock.Q.value = 0.707;
     preMaster.connect(dcBlock); dcBlock.connect(glueComp); glueComp.connect(limiter);
     limiter.connect(master); master.connect(ctx.destination);
 
-    musicBus   = ctx.createGain(); musicBus.gain.value   = 0.62;
-    sfxBus     = ctx.createGain(); sfxBus.gain.value     = 0.95;
-    uiBus      = ctx.createGain(); uiBus.gain.value      = 0.85;
-    ambientBus = ctx.createGain(); ambientBus.gain.value = 0.7;
+    musicBus   = ctx.createGain(); musicBus.gain.value   = MUSIC_BASE_GAIN;
+    sfxBus     = ctx.createGain(); sfxBus.gain.value     = 0.9;
+    uiBus      = ctx.createGain(); uiBus.gain.value      = 0.78;
+    ambientBus = ctx.createGain(); ambientBus.gain.value = 0.62;
     musicBus.connect(preMaster);
     sfxBus.connect(preMaster);
     uiBus.connect(preMaster);
     ambientBus.connect(preMaster);
 
     const rLP = ctx.createBiquadFilter();
-    rLP.type = 'lowpass'; rLP.frequency.value = 3800; rLP.Q.value = 0.6;
-    convolver  = ctx.createConvolver(); convolver.buffer = makeIR(2.4, 3.0, 0.18);
-    reverbSend = ctx.createGain(); reverbSend.gain.value = 1.0;
-    reverbGain = ctx.createGain(); reverbGain.gain.value = 0.28;
+    rLP.type = 'lowpass'; rLP.frequency.value = 2300; rLP.Q.value = 0.55;
+    convolver  = ctx.createConvolver(); convolver.buffer = makeIR(3.1, 4.1, 0.11);
+    reverbSend = ctx.createGain(); reverbSend.gain.value = 0.9;
+    reverbGain = ctx.createGain(); reverbGain.gain.value = 0.34;
     reverbSend.connect(rLP); rLP.connect(convolver);
     convolver.connect(reverbGain); reverbGain.connect(preMaster);
   }
@@ -95,39 +96,52 @@ export const AUDIO = (()=>{
   }
 
   async function init(){
-    if(ctx){ if(ctx.state==='suspended' && ctx.resume) await ctx.resume(); return ready; }
-    try{
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
-      buildGraph();
+    if(ready && ctx){
       if(ctx.state==='suspended' && ctx.resume) await ctx.resume();
-      await loadBuffers();
-      ready = true;
-      if(typeof window !== 'undefined'){
-        window.__neonPulseAudio = {
-          get ctx(){ return ctx; },
-          get ready(){ return ready; },
-          get mode(){ return mode; },
-          get intensity(){ return intensity; },
-          get buffers(){ return buffers; },
-          get layers(){ return layers; },
-          buses(){ return { master, preMaster, musicBus, sfxBus, uiBus, ambientBus, reverbGain }; },
-          call: (fn, ...a)=> API[fn] && API[fn](...a),
-        };
+      return true;
+    }
+    if(initPromise) return initPromise;
+    initPromise = (async()=>{
+      try{
+        if(!ctx){
+          ctx = new (window.AudioContext || window.webkitAudioContext)();
+          buildGraph();
+        }
+        if(ctx.state==='suspended' && ctx.resume) await ctx.resume();
+        await loadBuffers();
+        ready = true;
+        if(typeof window !== 'undefined'){
+          window.__neonPulseAudio = {
+            get ctx(){ return ctx; },
+            get ready(){ return ready; },
+            get mode(){ return mode; },
+            get intensity(){ return intensity; },
+            get buffers(){ return buffers; },
+            get layers(){ return layers; },
+            buses(){ return { master, preMaster, musicBus, sfxBus, uiBus, ambientBus, reverbGain }; },
+            call: (fn, ...a)=> API[fn] && API[fn](...a),
+          };
+        }
+      } catch(e){
+        console.warn('[AUDIO] init failed', e);
+        ready = false;
+        initPromise = null;
       }
-    } catch(e){ console.warn('[AUDIO] init failed', e); ready = false; }
-    return ready;
+      return ready;
+    })();
+    return initPromise;
   }
 
   function duck(depthDb=-8, attack=0.03, hold=0.12, release=0.5){
     if(!musicBus) return;
-    const target = Math.pow(10, depthDb/20);
+    const target = MUSIC_BASE_GAIN * Math.pow(10, depthDb/20);
     const g = musicBus.gain, now = ctx.currentTime;
     const cur = g.value;
     g.cancelScheduledValues(now);
-    g.setValueAtTime(Math.min(cur, 1), now);
+    g.setValueAtTime(Math.min(cur, MUSIC_BASE_GAIN), now);
     g.linearRampToValueAtTime(Math.min(target, cur), now + attack);
     g.setValueAtTime(Math.min(target, cur), now + attack + hold);
-    g.linearRampToValueAtTime(1.0, now + attack + hold + release);
+    g.linearRampToValueAtTime(MUSIC_BASE_GAIN, now + attack + hold + release);
   }
 
   function setCamera(x,y,w){ camX = x; camY = y; if(w) screenW = w; }
@@ -178,6 +192,41 @@ export const AUDIO = (()=>{
     }
     src.start();
   }
+  function darkBell(freq=220, dur=.8, vol=.12, bus=null, panVal=0){
+    ping(freq, dur, 'sine', vol, freq * 0.58, bus, panVal);
+    ping(freq * 1.997, dur * 0.55, 'triangle', vol * 0.22, freq * 0.82, bus, panVal);
+  }
+  function subHit(freq=58, dur=.5, vol=.24, slide=30, bus=null, panVal=0){
+    ping(freq, dur, 'sawtooth', vol, slide, bus, panVal);
+    ping(freq * 0.5, dur * 0.9, 'sine', vol * 0.35, Math.max(18, slide * 0.55), bus, panVal);
+  }
+  function ritualChord(root=55, dur=2.2, vol=.055, bus=null, panVal=0){
+    if(!ctx || muted) return;
+    const now = ctx.currentTime;
+    const out = bus || musicBus;
+    const ratios = [1, 1.189207, 1.498307, 2];
+    ratios.forEach((ratio, i)=>{
+      const o = ctx.createOscillator();
+      const f = ctx.createBiquadFilter();
+      const g = ctx.createGain();
+      o.type = i === 0 ? 'sawtooth' : 'triangle';
+      o.frequency.setValueAtTime(root * ratio * (1 + (Math.random()-0.5)*0.006), now);
+      f.type = 'lowpass';
+      f.frequency.value = 240 + i * 95;
+      f.Q.value = 0.8;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(vol / (i + 1.4), now + 0.18 + i * 0.035);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+      o.connect(f); f.connect(g);
+      if(panVal){
+        const pn = ctx.createStereoPanner(); pn.pan.value = panVal;
+        g.connect(pn); pn.connect(out); pn.connect(reverbSend);
+      } else {
+        g.connect(out); g.connect(reverbSend);
+      }
+      o.start(now); o.stop(now + dur + 0.05);
+    });
+  }
   function playBuf(name, {vol=1, panVal=0, rate=1, bus=null, lpHz=null, loop=false, startAt=null}={}){
     if(!ctx || muted || !buffers[name]) return null;
     const src = ctx.createBufferSource();
@@ -207,66 +256,74 @@ export const AUDIO = (()=>{
   }
 
   function shoot(x){ if(!gate('shoot')) return;
-    const pv = pan(x), pitch = 1 + (Math.random()-0.5)*0.08;
-    ping(880*pitch, 0.06, 'square', 0.11, 1200*pitch, null, pv);
+    const pv = pan(x), pitch = 1 + (Math.random()-0.5)*0.07;
+    ping(180*pitch, 0.08, 'sawtooth', 0.09, 74*pitch, null, pv);
+    noise(0.045, 0.035, 520, 1800, null, pv);
   }
   function hit(x){ if(!gate('hit')) return;
     const pv = pan(x);
-    ping(140*(1+(Math.random()-0.5)*0.2), 0.08, 'sawtooth', 0.22, 60, null, pv);
-    noise(0.04, 0.1, 300, 4000, null, pv);
+    subHit(118*(1+(Math.random()-0.5)*0.14), 0.12, 0.17, 48, null, pv);
+    noise(0.06, 0.075, 220, 1500, null, pv);
   }
   function explode(x,y){
     const pv = pan(x);
-    duck(-6, 0.02, 0.1, 0.45);
-    noise(0.3, 0.28, 80, Math.min(1600, distLP(x,y)), null, pv);
-    ping(80*(1+(Math.random()-0.5)*0.15), 0.25, 'sawtooth', 0.22, 30, null, pv);
-    if(buffers.sfx_explosion) playBuf('sfx_explosion', { vol: 0.55, panVal: pv*0.8, rate: 0.9 + Math.random()*0.2, lpHz: distLP(x,y) });
+    duck(-8, 0.018, 0.16, 0.58);
+    noise(0.42, 0.3, 50, Math.min(1050, distLP(x,y)), null, pv);
+    subHit(62*(1+(Math.random()-0.5)*0.12), 0.42, 0.27, 24, null, pv);
+    if(buffers.sfx_explosion) playBuf('sfx_explosion', { vol: 0.5, panVal: pv*0.8, rate: 0.72 + Math.random()*0.14, lpHz: Math.min(1700, distLP(x,y)) });
   }
   function pickup(x){ if(!gate('pickup')) return;
     const pv = pan(x);
-    ping(1320 + Math.random()*200, 0.07, 'triangle', 0.18, 2400, null, pv);
+    darkBell(360 + Math.random()*42, 0.24, 0.085, null, pv);
+    noise(0.025, 0.02, 1200, 2600, null, pv);
   }
   function level(){
-    duck(-10, 0.03, 0.2, 0.7);
-    ping(660, 0.12, 'sine', 0.22, 990);
-    setTimeout(()=>ping(990, 0.15, 'sine', 0.22, 1480), 80);
-    setTimeout(()=>ping(1480, 0.25, 'sine', 0.22, 2200), 160);
-    if(buffers.sfx_levelup) setTimeout(()=>playBuf('sfx_levelup', { vol: 0.45 }), 40);
+    duck(-11, 0.035, 0.24, 0.86);
+    ritualChord(73.42, 1.45, 0.085, sfxBus);
+    darkBell(293.66, 0.72, 0.17);
+    setTimeout(()=>darkBell(440, 0.85, 0.14), 120);
+    setTimeout(()=>noise(0.38, 0.09, 180, 1600), 70);
+    if(buffers.sfx_levelup) setTimeout(()=>playBuf('sfx_levelup', { vol: 0.36, rate: 0.78, lpHz: 2200 }), 40);
   }
   function boss(){
-    duck(-12, 0.05, 0.35, 1.2);
-    ping(80, 0.8, 'sawtooth', 0.4, 50);
-    noise(0.6, 0.3, 80, 800);
-    if(buffers.sfx_bosslaser) setTimeout(()=>playBuf('sfx_bosslaser', { vol: 0.35, rate: 0.75 }), 180);
+    duck(-13, 0.05, 0.42, 1.4);
+    subHit(48, 0.95, 0.38, 22);
+    ritualChord(36.71, 1.8, 0.1, sfxBus);
+    noise(0.75, 0.28, 55, 760);
+    if(buffers.sfx_bosslaser) setTimeout(()=>playBuf('sfx_bosslaser', { vol: 0.3, rate: 0.58, lpHz: 1900 }), 180);
   }
   function damage(){
-    duck(-4, 0.02, 0.08, 0.28);
-    ping(220, 0.15, 'square', 0.3, 80);
-    noise(0.1, 0.2, 200, 800);
+    duck(-5, 0.018, 0.1, 0.32);
+    subHit(92, 0.18, 0.23, 36);
+    noise(0.13, 0.16, 120, 720);
   }
   function heal(){
-    ping(523, 0.1, 'sine', 0.2);
-    setTimeout(()=>ping(784, 0.14, 'sine', 0.2), 70);
-    if(buffers.sfx_shield) playBuf('sfx_shield', { vol: 0.22 });
+    ritualChord(82.41, 0.9, 0.045, sfxBus);
+    darkBell(246.94, 0.45, 0.12);
+    setTimeout(()=>darkBell(329.63, 0.52, 0.1), 90);
+    if(buffers.sfx_shield) playBuf('sfx_shield', { vol: 0.18, rate: 0.78, lpHz: 2600 });
   }
   function freeze(){
-    if(buffers.sfx_shield) playBuf('sfx_shield', { vol: 0.32, rate: 0.85 });
-    ping(1760, 0.25, 'sine', 0.12, 220);
+    if(buffers.sfx_shield) playBuf('sfx_shield', { vol: 0.26, rate: 0.68, lpHz: 2400 });
+    darkBell(523.25, 0.55, 0.09);
+    noise(0.16, 0.045, 1500, 3900);
   }
   function laser(x){ if(!gate('laser')) return;
-    ping(660, 0.04, 'sawtooth', 0.06, null, null, pan(x));
+    const pv = pan(x);
+    ping(210, 0.055, 'sawtooth', 0.055, 118, null, pv);
+    noise(0.035, 0.028, 760, 2200, null, pv);
   }
   function blip(){ if(!gate('blip')) return;
-    ping(1200, 0.03, 'square', 0.08);
+    darkBell(520, 0.08, 0.045, uiBus);
   }
   function uiClick(){
-    if(buffers.sfx_ui) playBuf('sfx_ui', { vol: 0.45, bus: uiBus });
-    else ping(1400, 0.04, 'square', 0.08, null, uiBus);
+    if(buffers.sfx_ui) playBuf('sfx_ui', { vol: 0.34, rate: 0.72, lpHz: 2400, bus: uiBus });
+    else darkBell(430, 0.08, 0.055, uiBus);
   }
 
-  function startLayer(key, { vol=1, loop=true, fade=1.2, startAt=null } = {}){
+  function startLayer(key, { vol=1, loop=true, fade=1.2, startAt=null, rate=1, lpHz=2600 } = {}){
     if(!buffers[key]) return null;
-    const h = playBuf(key, { vol: 0, loop, bus: musicBus, startAt });
+    const h = playBuf(key, { vol: 0, loop, bus: musicBus, startAt, rate, lpHz });
     if(!h) return null;
     const t = ctx.currentTime;
     h.gain.gain.setValueAtTime(0, t);
@@ -296,26 +353,25 @@ export const AUDIO = (()=>{
   function stopAllLayers(fade=1.0){ for(const k of Object.keys(layers)) stopLayer(k, fade); }
 
   let arpTimer = 0, arpStep = 0;
-  const arpScale = [110, 130.81, 146.83, 164.81, 196, 220, 261.63];
+  const ritualRoots = [55, 55, 41.2, 49, 55, 65.41, 46.25, 36.71];
   function arpTick(){
     if(!ctx || muted) return;
-    if(mode !== 'main') return;
-    if(intensity < 0.35) return;
+    if(mode !== 'main' && mode !== 'boss') return;
+    if(mode === 'main' && intensity < 0.18) return;
     const now = ctx.currentTime;
     if(now < arpTimer) return;
-    const bpm = 129, beat = 60/bpm, step = beat/2;
-    const note = arpScale[arpStep % arpScale.length];
+    const bossMode = mode === 'boss';
+    const step = bossMode ? 1.12 : Math.max(1.05, 1.85 - intensity * 0.62);
+    const root = ritualRoots[arpStep % ritualRoots.length] * (bossMode ? 0.73 : 1);
+    const side = (arpStep % 2) ? -0.24 : 0.24;
     arpStep++;
-    const vol = 0.07 + (intensity-0.35) * 0.13;
-    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = note * 2;
-    const f = ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value = 900 + intensity*2400; f.Q.value = 4;
-    const g = ctx.createGain(); g.gain.value = 0;
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(vol, now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0005, now + step*0.9);
-    const pn = ctx.createStereoPanner(); pn.pan.value = ((arpStep%2)?-0.3:0.3);
-    o.connect(f); f.connect(g); g.connect(pn); pn.connect(musicBus); g.connect(reverbSend);
-    o.start(now); o.stop(now + step + 0.05);
+    ritualChord(root, bossMode ? 2.25 : 2.7, (bossMode ? 0.07 : 0.035) + intensity * 0.045, musicBus, side);
+    if(bossMode || intensity > 0.48){
+      darkBell(root * (bossMode ? 5.34 : 4), bossMode ? 1.0 : 0.8, 0.035 + intensity * 0.04, musicBus, -side);
+    }
+    if((arpStep % (bossMode ? 3 : 5)) === 0){
+      noise(bossMode ? 0.36 : 0.28, bossMode ? 0.055 : 0.035, 70, bossMode ? 720 : 520, ambientBus, side * 0.5);
+    }
     arpTimer = now + step;
   }
 
@@ -325,30 +381,30 @@ export const AUDIO = (()=>{
     const prev = mode; mode = newMode;
     if(newMode === 'menu'){
       stopAllLayers(0.8);
-      startLayer('menu', { vol: 1.25, fade: 1.5 });
+      startLayer('menu', { vol: 0.88, fade: 1.8, rate: 0.92, lpHz: 2100 });
     } else if(newMode === 'main'){
       stopAllLayers(0.8);
       const pickHigh = mainAltUsesHigh && buffers.main_high;
       const key = pickHigh ? 'main_high' : 'main_low';
       mainAltUsesHigh = !mainAltUsesHigh;
-      startLayer(key, { vol: 0.78, fade: 1.4 });
+      startLayer(key, { vol: pickHigh ? 0.58 : 0.72, fade: 1.8, rate: pickHigh ? 0.88 : 0.9, lpHz: pickHigh ? 2450 : 2200 });
     } else if(newMode === 'boss'){
       duck(-16, 0.08, 0.25, 1.0);
       stopAllLayers(0.6);
-      setTimeout(()=> startLayer('boss', { vol: 0.88, fade: 1.2 }), 550);
+      setTimeout(()=> startLayer('boss', { vol: 0.78, fade: 1.4, rate: 0.84, lpHz: 2000 }), 550);
     } else if(newMode === 'victory'){
       stopAllLayers(0.4);
       setTimeout(()=>{
-        const notes = [523, 659, 784, 1046, 1318];
+        ritualChord(65.41, 1.6, 0.09, musicBus);
+        const notes = [220, 261.63, 329.63, 440, 523.25];
         notes.forEach((n,i)=> setTimeout(()=>{
-          ping(n, 0.35, 'triangle', 0.25, null, musicBus);
-          ping(n*2, 0.25, 'sine', 0.08, null, musicBus);
-        }, i*130));
+          darkBell(n, 0.48 + i*0.06, 0.12, musicBus);
+        }, i*170));
       }, 400);
     } else if(newMode === 'death'){
       stopAllLayers(2.2);
-      ping(220, 1.5, 'sawtooth', 0.28, 40, musicBus);
-      noise(1.4, 0.15, 50, 400, musicBus);
+      subHit(73.42, 1.6, 0.3, 24, musicBus);
+      noise(1.6, 0.16, 40, 360, musicBus);
     } else if(newMode === 'none'){
       stopAllLayers(0.6);
     }

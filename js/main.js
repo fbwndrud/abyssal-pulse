@@ -55,69 +55,56 @@ addEventListener('keydown', e=>{
   if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
 });
 addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; });
-canvas.addEventListener('mousemove', e=>{
+function updatePointerPosition(clientX, clientY){
   const r = canvas.getBoundingClientRect();
-  mouse.x = (e.clientX - r.left) * (W / r.width);
-  mouse.y = (e.clientY - r.top) * (H / r.height);
-});
+  mouse.x = (clientX - r.left) * (W / r.width);
+  mouse.y = (clientY - r.top) * (H / r.height);
+}
+canvas.addEventListener('mousemove', e=> updatePointerPosition(e.clientX, e.clientY));
 canvas.addEventListener('mousedown', ()=> mouse.down = true);
 canvas.addEventListener('mouseup', ()=> mouse.down = false);
 
-const touchStick = document.getElementById('touch-stick');
-const touchKnob = document.getElementById('touch-knob');
 const touchMoveKeys = ['w','a','s','d'];
 let touchPointerId = null;
-function resetTouchStick(){
+let touchOriginX = 0, touchOriginY = 0;
+function resetTouchMove(){
   touchPointerId = null;
   for(const k of touchMoveKeys) keys[k] = false;
-  touchStick?.classList.remove('active');
-  if(touchKnob) touchKnob.style.transform = 'translate(-50%,-50%)';
 }
-function updateTouchStick(clientX, clientY){
-  if(!touchStick) return;
-  const r = touchStick.getBoundingClientRect();
-  const cx = r.left + r.width / 2;
-  const cy = r.top + r.height / 2;
-  const dx = clientX - cx;
-  const dy = clientY - cy;
-  const max = r.width * .32;
-  const mag = Math.hypot(dx, dy);
-  const scale = mag > max && mag > 0 ? max / mag : 1;
-  const knobX = dx * scale;
-  const knobY = dy * scale;
-  const dead = r.width * .12;
+function updateTouchMove(clientX, clientY){
+  updatePointerPosition(clientX, clientY);
+  const dx = clientX - touchOriginX;
+  const dy = clientY - touchOriginY;
+  const dead = 18;
   keys.a = dx < -dead;
   keys.d = dx > dead;
   keys.w = dy < -dead;
   keys.s = dy > dead;
-  if(touchKnob){
-    touchKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
-  }
 }
-if(touchStick){
-  touchStick.addEventListener('pointerdown', e=>{
-    if(touchPointerId !== null) return;
-    e.preventDefault();
-    touchPointerId = e.pointerId;
-    touchStick.setPointerCapture?.(e.pointerId);
-    touchStick.classList.add('active');
-    updateTouchStick(e.clientX, e.clientY);
-  });
-  touchStick.addEventListener('pointermove', e=>{
-    if(touchPointerId !== e.pointerId) return;
-    e.preventDefault();
-    updateTouchStick(e.clientX, e.clientY);
-  });
-  const endTouch = e=>{
-    if(touchPointerId !== e.pointerId) return;
-    e.preventDefault();
-    resetTouchStick();
-  };
-  touchStick.addEventListener('pointerup', endTouch);
-  touchStick.addEventListener('pointercancel', endTouch);
-  touchStick.addEventListener('lostpointercapture', resetTouchStick);
-}
-addEventListener('blur', ()=>{ for(const k in keys) keys[k] = false; mouse.down = false; resetTouchStick(); });
+canvas.addEventListener('pointerdown', e=>{
+  if(e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+  if(touchPointerId !== null || G.mode !== 'play') return;
+  e.preventDefault();
+  touchPointerId = e.pointerId;
+  touchOriginX = e.clientX;
+  touchOriginY = e.clientY;
+  canvas.setPointerCapture?.(e.pointerId);
+  updateTouchMove(e.clientX, e.clientY);
+}, { passive:false });
+canvas.addEventListener('pointermove', e=>{
+  if(touchPointerId !== e.pointerId) return;
+  e.preventDefault();
+  updateTouchMove(e.clientX, e.clientY);
+}, { passive:false });
+const endTouchMove = e=>{
+  if(touchPointerId !== e.pointerId) return;
+  e.preventDefault();
+  resetTouchMove();
+};
+canvas.addEventListener('pointerup', endTouchMove, { passive:false });
+canvas.addEventListener('pointercancel', endTouchMove, { passive:false });
+canvas.addEventListener('lostpointercapture', resetTouchMove);
+addEventListener('blur', ()=>{ for(const k in keys) keys[k] = false; mouse.down = false; resetTouchMove(); });
 
 /* ───────── MAIN LOOP ───────── */
 let lastT = 0;
