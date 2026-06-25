@@ -1,7 +1,7 @@
 /* ===================================================================
-   AUDIO — Abyssal dark-fantasy mix bus system with ducking, procedural
-   cathedral reverb, voice pool, vertical (intensity overlay) + horizontal
-   (mode crossfade) music. CC0 assets in ./audio/.
+   AUDIO — Abyssal dark-fantasy mix bus system with ducking, cathedral
+   reverb, voice pool, vertical (intensity overlay) + horizontal
+   (mode crossfade) music. Licensed external assets in ./audio/.
    Self-contained — exports a single AUDIO API object.
    =================================================================== */
 export const AUDIO = (()=>{
@@ -16,23 +16,34 @@ export const AUDIO = (()=>{
   let convolver, reverbSend, reverbGain;
   const MUSIC_BASE_GAIN = 0.54;
   // ---- Samples ----
+  const AUDIO_ASSET_VERSION = 'abyssal-licensed-v4';
   const ASSETS = {
     menu:          'audio/menu.ogg',
     main_low:      'audio/main_low.ogg',
     main_high:     'audio/main_high.ogg',
+    ai_fight:      'audio/ai_fight.ogg',
     boss:          'audio/boss.ogg',
     sfx_explosion: 'audio/sfx_explosion.ogg',
     sfx_shield:    'audio/sfx_shield.ogg',
     sfx_ui:        'audio/sfx_ui.ogg',
     sfx_levelup:   'audio/sfx_levelup.ogg',
-    sfx_bosslaser: 'audio/sfx_bosslaser.ogg'
+    sfx_bosslaser: 'audio/sfx_bosslaser.ogg',
+    sfx_shoot:     'audio/sfx_shoot.ogg',
+    sfx_hit:       'audio/sfx_hit.ogg',
+    sfx_pickup:    'audio/sfx_pickup.ogg',
+    sfx_damage:    'audio/sfx_damage.ogg',
+    sfx_heal:      'audio/sfx_heal.ogg',
+    sfx_freeze:    'audio/sfx_freeze.ogg',
+    sfx_laser:     'audio/sfx_laser.ogg',
+    sfx_blip:      'audio/sfx_blip.ogg'
   };
   const buffers = {};
-  const cooldowns = { shoot:0.022, hit:0.018, pickup:0.04, laser:0.025, blip:0.035 };
+  const cooldowns = { shoot:0.045, hit:0.045, pickup:0.075, laser:0.055, blip:0.05 };
   const lastPlayed = {};
   let camX = 0, camY = 0, screenW = 1280;
   const layers = {};
-  let mainAltUsesHigh = false;
+  const mainPlaylist = ['main_low', 'main_high', 'ai_fight'];
+  let mainPlaylistIndex = 0;
 
   function makeIR(duration=3.1, decay=4.1, darkness=0.11){
     const rate = ctx.sampleRate, len = (rate*duration)|0;
@@ -87,7 +98,8 @@ export const AUDIO = (()=>{
     const entries = Object.entries(ASSETS);
     await Promise.all(entries.map(async ([k,url])=>{
       try{
-        const r = await fetch(url);
+        const bustedUrl = url + (url.includes('?') ? '&' : '?') + 'v=' + AUDIO_ASSET_VERSION;
+        const r = await fetch(bustedUrl, { cache: 'reload' });
         if(!r.ok) throw new Error(r.status+' '+url);
         const ab = await r.arrayBuffer();
         buffers[k] = await ctx.decodeAudioData(ab);
@@ -118,6 +130,8 @@ export const AUDIO = (()=>{
             get intensity(){ return intensity; },
             get buffers(){ return buffers; },
             get layers(){ return layers; },
+            get assetVersion(){ return AUDIO_ASSET_VERSION; },
+            get sources(){ return ASSETS; },
             buses(){ return { master, preMaster, musicBus, sfxBus, uiBus, ambientBus, reverbGain }; },
             call: (fn, ...a)=> API[fn] && API[fn](...a),
           };
@@ -256,68 +270,92 @@ export const AUDIO = (()=>{
   }
 
   function shoot(x){ if(!gate('shoot')) return;
-    const pv = pan(x), pitch = 1 + (Math.random()-0.5)*0.07;
+    const pv = pan(x);
+    if(buffers.sfx_shoot){
+      playBuf('sfx_shoot', { vol: 0.18, panVal: pv, rate: 0.92 + Math.random()*0.16, lpHz: 6500 });
+      return;
+    }
+    const pitch = 1 + (Math.random()-0.5)*0.07;
     ping(180*pitch, 0.08, 'sawtooth', 0.09, 74*pitch, null, pv);
-    noise(0.045, 0.035, 520, 1800, null, pv);
   }
   function hit(x){ if(!gate('hit')) return;
     const pv = pan(x);
+    if(buffers.sfx_hit){
+      playBuf('sfx_hit', { vol: 0.16, panVal: pv, rate: 0.92 + Math.random()*0.13, lpHz: 5200 });
+      return;
+    }
     subHit(118*(1+(Math.random()-0.5)*0.14), 0.12, 0.17, 48, null, pv);
-    noise(0.06, 0.075, 220, 1500, null, pv);
   }
   function explode(x,y){
     const pv = pan(x);
     duck(-8, 0.018, 0.16, 0.58);
-    noise(0.42, 0.3, 50, Math.min(1050, distLP(x,y)), null, pv);
-    subHit(62*(1+(Math.random()-0.5)*0.12), 0.42, 0.27, 24, null, pv);
-    if(buffers.sfx_explosion) playBuf('sfx_explosion', { vol: 0.5, panVal: pv*0.8, rate: 0.72 + Math.random()*0.14, lpHz: Math.min(1700, distLP(x,y)) });
+    if(buffers.sfx_explosion) playBuf('sfx_explosion', { vol: 0.54, panVal: pv*0.8, rate: 0.96 + Math.random()*0.08, lpHz: Math.min(6200, distLP(x,y)) });
+    else {
+      noise(0.42, 0.3, 50, Math.min(1050, distLP(x,y)), null, pv);
+      subHit(62*(1+(Math.random()-0.5)*0.12), 0.42, 0.27, 24, null, pv);
+    }
   }
   function pickup(x){ if(!gate('pickup')) return;
     const pv = pan(x);
+    if(buffers.sfx_pickup){
+      playBuf('sfx_pickup', { vol: 0.22, panVal: pv, rate: 0.96 + Math.random()*0.1, lpHz: 7200 });
+      return;
+    }
     darkBell(360 + Math.random()*42, 0.24, 0.085, null, pv);
-    noise(0.025, 0.02, 1200, 2600, null, pv);
   }
   function level(){
     duck(-11, 0.035, 0.24, 0.86);
-    ritualChord(73.42, 1.45, 0.085, sfxBus);
-    darkBell(293.66, 0.72, 0.17);
-    setTimeout(()=>darkBell(440, 0.85, 0.14), 120);
-    setTimeout(()=>noise(0.38, 0.09, 180, 1600), 70);
-    if(buffers.sfx_levelup) setTimeout(()=>playBuf('sfx_levelup', { vol: 0.36, rate: 0.78, lpHz: 2200 }), 40);
+    if(buffers.sfx_levelup) playBuf('sfx_levelup', { vol: 0.56, rate: 1.0, lpHz: 7200 });
+    else {
+      ritualChord(73.42, 1.45, 0.085, sfxBus);
+      darkBell(293.66, 0.72, 0.17);
+      setTimeout(()=>darkBell(440, 0.85, 0.14), 120);
+    }
   }
   function boss(){
     duck(-13, 0.05, 0.42, 1.4);
-    subHit(48, 0.95, 0.38, 22);
-    ritualChord(36.71, 1.8, 0.1, sfxBus);
-    noise(0.75, 0.28, 55, 760);
-    if(buffers.sfx_bosslaser) setTimeout(()=>playBuf('sfx_bosslaser', { vol: 0.3, rate: 0.58, lpHz: 1900 }), 180);
+    if(buffers.sfx_bosslaser) playBuf('sfx_bosslaser', { vol: 0.48, rate: 0.92, lpHz: 5200 });
+    else {
+      subHit(48, 0.95, 0.38, 22);
+      ritualChord(36.71, 1.8, 0.1, sfxBus);
+      noise(0.75, 0.28, 55, 760);
+    }
   }
   function damage(){
     duck(-5, 0.018, 0.1, 0.32);
+    if(buffers.sfx_damage){
+      playBuf('sfx_damage', { vol: 0.22, rate: 0.94 + Math.random()*0.08, lpHz: 5200 });
+      return;
+    }
     subHit(92, 0.18, 0.23, 36);
-    noise(0.13, 0.16, 120, 720);
   }
   function heal(){
-    ritualChord(82.41, 0.9, 0.045, sfxBus);
-    darkBell(246.94, 0.45, 0.12);
-    setTimeout(()=>darkBell(329.63, 0.52, 0.1), 90);
-    if(buffers.sfx_shield) playBuf('sfx_shield', { vol: 0.18, rate: 0.78, lpHz: 2600 });
+    if(buffers.sfx_heal) playBuf('sfx_heal', { vol: 0.3, rate: 1.0, lpHz: 7600 });
+    else if(buffers.sfx_shield) playBuf('sfx_shield', { vol: 0.22, rate: 1.0, lpHz: 3600 });
+    else {
+      ritualChord(82.41, 0.9, 0.045, sfxBus);
+      darkBell(246.94, 0.45, 0.12);
+    }
   }
   function freeze(){
-    if(buffers.sfx_shield) playBuf('sfx_shield', { vol: 0.26, rate: 0.68, lpHz: 2400 });
-    darkBell(523.25, 0.55, 0.09);
-    noise(0.16, 0.045, 1500, 3900);
+    if(buffers.sfx_freeze) playBuf('sfx_freeze', { vol: 0.26, rate: 0.94, lpHz: 7200 });
+    else if(buffers.sfx_shield) playBuf('sfx_shield', { vol: 0.26, rate: 0.92, lpHz: 3200 });
+    else darkBell(523.25, 0.55, 0.09);
   }
   function laser(x){ if(!gate('laser')) return;
     const pv = pan(x);
+    if(buffers.sfx_laser){
+      playBuf('sfx_laser', { vol: 0.1, panVal: pv, rate: 0.98 + Math.random()*0.08, lpHz: 6800 });
+      return;
+    }
     ping(210, 0.055, 'sawtooth', 0.055, 118, null, pv);
-    noise(0.035, 0.028, 760, 2200, null, pv);
   }
   function blip(){ if(!gate('blip')) return;
-    darkBell(520, 0.08, 0.045, uiBus);
+    if(buffers.sfx_blip) playBuf('sfx_blip', { vol: 0.22, bus: uiBus, lpHz: 6500 });
+    else darkBell(520, 0.08, 0.045, uiBus);
   }
   function uiClick(){
-    if(buffers.sfx_ui) playBuf('sfx_ui', { vol: 0.34, rate: 0.72, lpHz: 2400, bus: uiBus });
+    if(buffers.sfx_ui) playBuf('sfx_ui', { vol: 0.32, rate: 1.0, lpHz: 6800, bus: uiBus });
     else darkBell(430, 0.08, 0.055, uiBus);
   }
 
@@ -355,6 +393,9 @@ export const AUDIO = (()=>{
   let arpTimer = 0, arpStep = 0;
   const ritualRoots = [55, 55, 41.2, 49, 55, 65.41, 46.25, 36.71];
   function arpTick(){
+    // Gameplay music now uses only the licensed OpenGameArt BGM files above.
+    // Keep this legacy generator available for non-loop stingers/fallbacks only.
+    return;
     if(!ctx || muted) return;
     if(mode !== 'main' && mode !== 'boss') return;
     if(mode === 'main' && intensity < 0.18) return;
@@ -381,17 +422,17 @@ export const AUDIO = (()=>{
     const prev = mode; mode = newMode;
     if(newMode === 'menu'){
       stopAllLayers(0.8);
-      startLayer('menu', { vol: 0.88, fade: 1.8, rate: 0.92, lpHz: 2100 });
+      startLayer('menu', { vol: 0.78, fade: 1.8, rate: 1.0, lpHz: 9000 });
     } else if(newMode === 'main'){
       stopAllLayers(0.8);
-      const pickHigh = mainAltUsesHigh && buffers.main_high;
-      const key = pickHigh ? 'main_high' : 'main_low';
-      mainAltUsesHigh = !mainAltUsesHigh;
-      startLayer(key, { vol: pickHigh ? 0.58 : 0.72, fade: 1.8, rate: pickHigh ? 0.88 : 0.9, lpHz: pickHigh ? 2450 : 2200 });
+      const available = mainPlaylist.filter(k => buffers[k]);
+      const key = available.length ? available[mainPlaylistIndex % available.length] : 'main_low';
+      mainPlaylistIndex++;
+      startLayer(key, { vol: key === 'main_low' ? 0.78 : 0.74, fade: 1.8, rate: 1.0, lpHz: key === 'main_low' ? 8200 : 9000 });
     } else if(newMode === 'boss'){
       duck(-16, 0.08, 0.25, 1.0);
       stopAllLayers(0.6);
-      setTimeout(()=> startLayer('boss', { vol: 0.78, fade: 1.4, rate: 0.84, lpHz: 2000 }), 550);
+      setTimeout(()=>{ if(mode === 'boss') startLayer('boss', { vol: 0.84, fade: 1.4, rate: 1.0, lpHz: 9000 }); }, 550);
     } else if(newMode === 'victory'){
       stopAllLayers(0.4);
       setTimeout(()=>{

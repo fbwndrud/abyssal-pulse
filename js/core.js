@@ -81,6 +81,7 @@ export async function initPixi(){
    Input handler wiring lives in main.js (needs refs to togglePause/toggleMute). */
 export const keys = {};
 export const mouse = {x:W/2, y:H/2, down:false};
+export const touchMove = {active:false, x:0, y:0, strength:0};
 
 /* ───────── SAVE / META ───────── */
 export const meta = loadMeta();
@@ -135,7 +136,7 @@ export const G = {
   ents: [],
   player: null,
   bgT: 0,
-  cam: {x:0, y:0, zoom:1, tx:0, ty:0},
+  cam: {x:0, y:0, zoom:1, tx:0, ty:0, lookX:0, lookY:0},
   combo: 0, comboTimer: 0,
   killCount: 0,
   coinsRun: 0,
@@ -166,9 +167,19 @@ export const G = {
    Initial spawn snap (in player.js) avoids the (0,0)→target ramp-in. */
 export function updateCamera(){
   if(!G.player) return;
-  G.cam.tx = G.player.x - W/2;
-  G.cam.ty = G.player.y - H/2;
-  const k = 1 - Math.pow(1 - .14, G.dt * 60);
+  const p = G.player;
+  const speed = Math.hypot(p.vx || 0, p.vy || 0);
+  const speedN = clamp(speed / Math.max(1, p.speed || 280), 0, 1);
+  const maxLook = Math.min(82, W * .06);
+  const targetLookX = clamp((p.vx || 0) * .13, -maxLook, maxLook);
+  const targetLookY = clamp((p.vy || 0) * .10, -maxLook * .72, maxLook * .72);
+  const lookK = 1 - Math.pow(1 - .10, G.dt * 60);
+  G.cam.lookX = lerp(G.cam.lookX || 0, targetLookX, lookK);
+  G.cam.lookY = lerp(G.cam.lookY || 0, targetLookY, lookK);
+  G.cam.tx = p.x + G.cam.lookX - W/2;
+  G.cam.ty = p.y + G.cam.lookY - H/2;
+  const baseFollow = .105 + speedN * .065;
+  const k = 1 - Math.pow(1 - baseFollow, G.dt * 60);
   G.cam.x = lerp(G.cam.x, G.cam.tx, k);
   G.cam.y = lerp(G.cam.y, G.cam.ty, k);
 }

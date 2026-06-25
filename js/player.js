@@ -5,7 +5,7 @@
    without entities.js having to import data.js.
    =================================================================== */
 import { G, W, H, C, TAU, rand, meta, saveMeta, saveMetaLater, announce, entityLayer, beamLayer } from './core.js';
-import { AUDIO } from './audio.js';
+import { AUDIO } from './audio.js?v=abyssal-audio-v4';
 import {
   makeEnt, fxBurst, fxRing, fxRuneCircle, fxText, fxLine, shake, flash,
   spawnXP, spawnCoin, spawnHeart, spawnMagnet, spawnFreeze, spawnChest, spawnEnemy,
@@ -53,6 +53,8 @@ export function spawnPlayer(classKey){
     faceA: 0,
     rot: 0,
     trail: [],
+    _stridePhase: 0,
+    _motion: {speedN:0, accelN:0, turnN:0, turnSign:0, stridePhase:0, inputPower:0},
   };
   addWeapon(p, cl.startWeap);
   p.maxHp += meta.shop.hp * 20;
@@ -96,6 +98,8 @@ export function spawnPlayer(classKey){
   G.cam.y = p.y - H/2;
   G.cam.tx = G.cam.x;
   G.cam.ty = G.cam.y;
+  G.cam.lookX = 0;
+  G.cam.lookY = 0;
   // PRELOADED shop bonus: auto-apply N random relics at start (one per upgrade level).
   // Relics only (consumables wouldn't make sense here — they're transient).
   const startCount = meta.shop.start || 0;

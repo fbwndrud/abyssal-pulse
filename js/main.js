@@ -3,12 +3,12 @@
    and exposes the small set of inline-onclick globals used in index.html.
    =================================================================== */
 import {
-  G, keys, mouse, canvas, W, H, fmtTime, meta,
+  G, keys, mouse, touchMove, canvas, W, H, fmtTime, meta,
   flushMetaIfNeeded, flushMetaNow, initPixi,
   app, world, bgC, entityLayer, fxLayer, beamLayer, hudC,
 } from './core.js';
 import { BG, preloadSpriteAssets } from './render.js';
-import { AUDIO } from './audio.js';
+import { AUDIO } from './audio.js?v=abyssal-audio-v4';
 import { update, render, setLoopHandlers } from './gameloop.js';
 import {
   doLevelUp, endRun, updateHUD, openChestPick, openGlyphPick, openShrinePick,
@@ -64,22 +64,34 @@ canvas.addEventListener('mousemove', e=> updatePointerPosition(e.clientX, e.clie
 canvas.addEventListener('mousedown', ()=> mouse.down = true);
 canvas.addEventListener('mouseup', ()=> mouse.down = false);
 
-const touchMoveKeys = ['w','a','s','d'];
 let touchPointerId = null;
 let touchOriginX = 0, touchOriginY = 0;
 function resetTouchMove(){
   touchPointerId = null;
-  for(const k of touchMoveKeys) keys[k] = false;
+  touchMove.active = false;
+  touchMove.x = 0;
+  touchMove.y = 0;
+  touchMove.strength = 0;
 }
 function updateTouchMove(clientX, clientY){
   updatePointerPosition(clientX, clientY);
   const dx = clientX - touchOriginX;
   const dy = clientY - touchOriginY;
-  const dead = 18;
-  keys.a = dx < -dead;
-  keys.d = dx > dead;
-  keys.w = dy < -dead;
-  keys.s = dy > dead;
+  const mag = Math.hypot(dx, dy);
+  const dead = 14;
+  const maxRadius = 112;
+  touchMove.active = true;
+  if(mag <= dead){
+    touchMove.x = 0;
+    touchMove.y = 0;
+    touchMove.strength = 0;
+    return;
+  }
+  const raw = Math.min(1, (mag - dead) / (maxRadius - dead));
+  const strength = Math.pow(raw, .72);
+  touchMove.x = (dx / mag) * strength;
+  touchMove.y = (dy / mag) * strength;
+  touchMove.strength = strength;
 }
 canvas.addEventListener('pointerdown', e=>{
   if(e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
@@ -88,7 +100,7 @@ canvas.addEventListener('pointerdown', e=>{
   touchPointerId = e.pointerId;
   touchOriginX = e.clientX;
   touchOriginY = e.clientY;
-  canvas.setPointerCapture?.(e.pointerId);
+  try { canvas.setPointerCapture?.(e.pointerId); } catch(e) {}
   updateTouchMove(e.clientX, e.clientY);
 }, { passive:false });
 canvas.addEventListener('pointermove', e=>{

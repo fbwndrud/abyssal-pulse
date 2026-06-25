@@ -6,7 +6,7 @@ import {
   G, C, fmtTime, meta, saveMeta,
   setBar, announce,
 } from './core.js';
-import { AUDIO } from './audio.js';
+import { AUDIO } from './audio.js?v=abyssal-audio-v4';
 import {
   shake, flash, clearAllWorldSprites, fxBurst, fxRing, fxRuneCircle,
 } from './entities.js';

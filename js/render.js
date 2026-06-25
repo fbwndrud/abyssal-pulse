@@ -6,7 +6,7 @@
      once. World rendering uses these textures via acquireSprite() pool.
    - BG: animated grid + parallax stars + nebula tint, with gradient/star pre-bake.
    =================================================================== */
-import { TAU, W, H, C, ctx, choice, hsl, G, worldToScreen, bgC } from './core.js';
+import { TAU, W, H, C, ctx, choice, hsl, clamp, G, worldToScreen, bgC } from './core.js';
 
 const SPRITE_CACHE = new Map();
 // Bumped from 384 → 1024 to reduce eviction churn. Eviction creates GC pressure
@@ -203,11 +203,11 @@ export function getDiamondTexture(r, color='#fff', glow=12, fill=null){
    actors still use procedural textures, so the art rollout can stay incremental. */
 export const SPRITE_ASSETS = Object.freeze({
   players: Object.freeze({
-    CIRCLE: { id:'player.riftWarden', url:'assets/sprites/player/rift-warden.png', width:48, height:64, animProfile:'player' },
-    TRIANGLE: { id:'player.bloodSeer', url:'assets/sprites/classes/blood-seer.png', width:48, height:64, animProfile:'player' },
-    HEXAGON: { id:'player.graveBulwark', url:'assets/sprites/classes/grave-bulwark.png', width:48, height:64, animProfile:'player' },
-    SQUARE: { id:'player.ironExile', url:'assets/sprites/classes/iron-exile.png', width:48, height:64, animProfile:'player' },
-    STAR: { id:'player.hexWitch', url:'assets/sprites/classes/hex-witch.png', width:48, height:64, animProfile:'player' },
+    CIRCLE: { id:'player.riftWarden', url:'assets/sprites/player/rift-warden.png', width:48, height:64, animProfile:'playerRift', walkFrames:6 },
+    TRIANGLE: { id:'player.bloodSeer', url:'assets/sprites/classes/blood-seer.png', width:48, height:64, animProfile:'playerWraith', walkFrames:6 },
+    HEXAGON: { id:'player.graveBulwark', url:'assets/sprites/classes/grave-bulwark.png', width:48, height:64, animProfile:'playerBulwark', walkFrames:6 },
+    SQUARE: { id:'player.ironExile', url:'assets/sprites/classes/iron-exile.png', width:48, height:64, animProfile:'playerExile', walkFrames:6 },
+    STAR: { id:'player.hexWitch', url:'assets/sprites/classes/hex-witch.png', width:48, height:64, animProfile:'playerWitch', walkFrames:6 },
   }),
   enemies: Object.freeze({
     TRI: { id:'enemy.hollowImp', url:'assets/sprites/enemies/hollow-imp.png', width:46, height:54, animProfile:'lightEnemy' },
@@ -231,7 +231,12 @@ export const SPRITE_ASSETS = Object.freeze({
   }),
 });
 export const ANIM_PROFILES = Object.freeze({
-  player: Object.freeze({ bobAmp:3.0, bobHz:2.0, swayAmp:.025, leanK:.11, squashK:.075, hitJolt:.12, speedRef:280 }),
+  player: Object.freeze({ bobAmp:3.0, bobHz:2.0, idleBobAmp:.55, swayAmp:.025, leanK:.11, squashK:.075, hitJolt:.12, speedRef:280, stepSideAmp:.7, stepSkewK:.014 }),
+  playerRift: Object.freeze({ bobAmp:3.1, bobHz:2.08, idleBobAmp:.6, swayAmp:.026, leanK:.12, squashK:.078, hitJolt:.12, speedRef:280, stepSideAmp:.75, stepSkewK:.015, accelSquashK:.04, brakeStretchK:.03 }),
+  playerWraith: Object.freeze({ bobAmp:3.8, bobHz:2.42, idleBobAmp:.9, idleHz:1.18, swayAmp:.038, leanK:.145, squashK:.086, hitJolt:.11, speedRef:300, stepSideAmp:.95, stepSkewK:.019, turnLeanK:.042, accelDip:1.25 }),
+  playerBulwark: Object.freeze({ bobAmp:2.0, bobHz:1.38, idleBobAmp:.35, idleHz:.82, swayAmp:.014, leanK:.062, squashK:.048, hitJolt:.16, speedRef:220, stepSideAmp:.42, stepSkewK:.008, turnLeanK:.02, brakeStretchK:.045, brakeLift:.9 }),
+  playerExile: Object.freeze({ bobAmp:2.55, bobHz:1.72, idleBobAmp:.42, idleHz:.9, swayAmp:.019, leanK:.082, squashK:.058, hitJolt:.15, speedRef:245, stepSideAmp:.55, stepSkewK:.01, turnLeanK:.026, brakeStretchK:.04 }),
+  playerWitch: Object.freeze({ bobAmp:4.15, bobHz:2.2, idleBobAmp:1.05, idleHz:1.24, swayAmp:.046, leanK:.13, squashK:.07, hitJolt:.1, speedRef:290, stepSideAmp:1.05, stepSkewK:.017, turnLeanK:.038, accelDip:.72, brakeLift:1.15 }),
   lightEnemy: Object.freeze({ bobAmp:2.8, bobHz:3.8, swayAmp:.035, leanK:.15, squashK:.09, hitJolt:.16, speedRef:190 }),
   heavyEnemy: Object.freeze({ bobAmp:1.6, bobHz:1.7, swayAmp:.018, leanK:.07, squashK:.055, hitJolt:.20, speedRef:130 }),
   boss: Object.freeze({ bobAmp:2.0, bobHz:.85, swayAmp:.012, leanK:.025, squashK:.025, hitJolt:.09, speedRef:90 }),
@@ -247,6 +252,7 @@ export const SPRITE_ASSET_LIST = Object.freeze([
 
 const IMAGE_TEX_CACHE = new Map();
 const FAILED_IMAGE_ASSETS = new Set();
+const WALK_FRAME_CACHE = new Map();
 export async function preloadSpriteAssets(){
   if(!globalThis.PIXI?.Assets) return;
   await Promise.all(SPRITE_ASSET_LIST.map(asset =>
@@ -269,14 +275,85 @@ export function getImageTextureAsset(asset){
   }
   return { texture, key:`IMG|${asset.id}`, asset, w:asset.width, h:asset.height };
 }
+function _makeWalkFrameTexture(asset, frameIndex, frameCount=6){
+  const baseTex = IMAGE_TEX_CACHE.get(asset.id) || PIXI.Texture.from(asset.url);
+  const src = baseTex.source?.resource;
+  const w = baseTex.source?.width || baseTex.width || asset.width;
+  const h = baseTex.source?.height || baseTex.height || asset.height;
+  if(!src || !w || !h) return null;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const cx = c.getContext('2d');
+  const phase = (frameIndex / frameCount) * TAU;
+  const stride = Math.sin(phase);
+  const cross = Math.cos(phase);
+  const bob = Math.round(Math.max(0, -cross) * 3);
+  const hip = stride * 3.8;
+  const shoulder = -stride * 1.5;
+  const footKick = cross * 2.2;
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = 'high';
+  for(let y = 0; y < h; y++){
+    const yn = y / h;
+    const lower = clamp((yn - .46) / .54, 0, 1);
+    const upper = clamp((.58 - yn) / .58, 0, 1);
+    const hem = clamp((yn - .76) / .24, 0, 1);
+    const sway = hip * lower + shoulder * upper + footKick * hem * Math.sin(phase + yn * Math.PI * 2);
+    const dx = Math.round(sway);
+    const dy = bob - Math.round(Math.abs(stride) * lower * 1.1);
+    cx.drawImage(src, 0, y, w, 1, dx, y + dy, w, 1);
+  }
+  cx.globalCompositeOperation = 'source-atop';
+  const shade = cx.createLinearGradient(0, 0, 0, h);
+  shade.addColorStop(0, 'rgba(255,255,255,0)');
+  shade.addColorStop(.58, 'rgba(255,255,255,0)');
+  shade.addColorStop(.92, `rgba(255,236,190,${0.035 + Math.abs(stride) * .035})`);
+  shade.addColorStop(1, `rgba(0,0,0,${0.06 + Math.abs(cross) * .035})`);
+  cx.fillStyle = shade;
+  cx.fillRect(0, 0, w, h);
+  cx.globalCompositeOperation = 'source-over';
+  const texture = PIXI.Texture.from(c);
+  texture.label = `${asset.id}.walk.${frameIndex}`;
+  return texture;
+}
+function getWalkFrameTextures(asset){
+  if(!asset?.walkFrames) return null;
+  const cached = WALK_FRAME_CACHE.get(asset.id);
+  if(cached) return cached;
+  const frames = [];
+  for(let i = 0; i < asset.walkFrames; i++){
+    const texture = _makeWalkFrameTexture(asset, i, asset.walkFrames);
+    if(texture) frames.push(texture);
+  }
+  const usable = frames.length >= 2 ? frames : null;
+  if(usable) WALK_FRAME_CACHE.set(asset.id, usable);
+  return usable;
+}
 export function configureSpriteForAsset(sprite, asset){
   if(!sprite || !asset) return;
+  sprite.__assetBaseTexture = sprite.texture;
   sprite.width = asset.width;
   sprite.height = asset.height;
   sprite.__assetScaleX = sprite.scale.x;
   sprite.__assetScaleY = sprite.scale.y;
   sprite.__assetBaseRot = asset.rotationOffset || 0;
+  sprite.__walkTextures = getWalkFrameTextures(asset);
+  sprite.__walkFrameIndex = -1;
   sprite.tint = 0xffffff;
+}
+export function setSpriteWalkFrame(sprite, motion){
+  if(!sprite?.__walkTextures?.length || !sprite.__assetBaseTexture) return;
+  const speedN = Math.max(0, Math.min(1, motion?.speedN || 0));
+  const walking = speedN > .08;
+  let idx = -1;
+  if(walking){
+    const phase = ((motion?.stridePhase || 0) % TAU + TAU) % TAU;
+    idx = Math.floor((phase / TAU) * sprite.__walkTextures.length) % sprite.__walkTextures.length;
+  }
+  if(sprite.__walkFrameIndex === idx) return;
+  sprite.texture = walking ? sprite.__walkTextures[idx] : sprite.__assetBaseTexture;
+  sprite.__walkFrameIndex = idx;
 }
 
 /* ───────── BOSS AURA TEX (large white radial fade, tinted per-boss) ───────── */
@@ -390,14 +467,19 @@ export function acquireSprite(key, texture){
   const pool = SPRITE_POOL.get(key);
   if(pool && pool.length){
     const s = pool.pop();
+    s.texture = texture;
     s.visible = true;
     s.alpha = 1;
     s.scale.set(1);
+    if(s.skew) s.skew.set(0, 0);
     s.rotation = 0;
     s.tint = 0xffffff;
+    s.__assetBaseTexture = null;
     s.__assetScaleX = null;
     s.__assetScaleY = null;
     s.__assetBaseRot = 0;
+    s.__walkTextures = null;
+    s.__walkFrameIndex = -1;
     return s;
   }
   const s = new PIXI.Sprite(texture);

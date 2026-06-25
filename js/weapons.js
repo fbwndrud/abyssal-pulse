@@ -3,7 +3,7 @@
    This is the file to extend for evolution paths and (future) fusion trees.
    =================================================================== */
 import { G, TAU, C, rand, angTo } from './core.js';
-import { AUDIO } from './audio.js';
+import { AUDIO } from './audio.js?v=abyssal-audio-v4';
 import { drawCircle, drawDiamond, drawPolygon, drawStar } from './render.js';
 import {
   EGRID, _EQ1,

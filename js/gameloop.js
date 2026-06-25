@@ -2,14 +2,14 @@
    GAMELOOP — update + render + spawn director + entity-type updates.
    =================================================================== */
 import {
-  G, W, H, TAU, C, RUN_LENGTH_SEC, keys,
+  G, W, H, TAU, C, RUN_LENGTH_SEC, keys, touchMove,
   rand, clamp, lerp, choice, hsl, pulse, angTo, fmtTime,
   meta, saveMeta, saveMetaLater,
   updateCamera, setBar, announce,
   app, world, hudC,
 } from './core.js';
-import { AUDIO } from './audio.js';
-import { ANIM_PROFILES, BG, acquireGraphics } from './render.js';
+import { AUDIO } from './audio.js?v=abyssal-audio-v4';
+import { ANIM_PROFILES, BG, acquireGraphics, setSpriteWalkFrame } from './render.js';
 import {
   EGRID, _EQ1, _EQ2,
   makeEnt, fxBurst, fxRing, fxText, fxShockwave, fxLine, shake, flash,
@@ -43,6 +43,15 @@ function _animSeed(o){
   if(o.__animSeed == null) o.__animSeed = Math.random() * TAU;
   return o.__animSeed;
 }
+function _dtK(rate){
+  return 1 - Math.exp(-rate * Math.max(0, Math.min(.066, G.dt || 0)));
+}
+function _angleDelta(to, from){
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
+}
+function _lerpAngle(from, to, k){
+  return from + _angleDelta(to, from) * k;
+}
 function _profileForPlayer(p){
   return ANIM_PROFILES[p.spriteAsset?.animProfile || 'player'] || ANIM_PROFILES.player;
 }
@@ -54,22 +63,34 @@ function _profileForEntity(e){
   if(e.type === 'enemy') return e.r >= 16 ? ANIM_PROFILES.heavyEnemy : ANIM_PROFILES.lightEnemy;
   return ANIM_PROFILES.pickup;
 }
-function _computeSpritePose(out, profile, vx, vy, t, seed, baseRot, hitFlash, alpha, tint){
+function _computeSpritePose(out, profile, vx, vy, t, seed, baseRot, hitFlash, alpha, tint, motion=null){
   const ref = profile.speedRef || 1;
   const sx = vx || 0, sy = vy || 0;
-  const speed = Math.min(1.35, Math.sqrt(sx*sx + sy*sy) / ref);
-  const phase = t * (profile.bobHz || 0) * TAU + seed;
-  const bob = (profile.bobAmp || 0) * Math.sin(phase);
+  const speed = Math.min(1.35, motion?.speedN ?? (Math.sqrt(sx*sx + sy*sy) / ref));
+  const walkN = Math.min(1, speed);
+  const idlePhase = t * (profile.idleHz || 1.05) * TAU + seed;
+  const phase = motion?.stridePhase != null ? motion.stridePhase + seed * .17 : t * (profile.bobHz || 0) * TAU + seed;
+  const idleBob = (profile.idleBobAmp ?? (profile.bobAmp || 0) * .22) * Math.sin(idlePhase);
+  const walkBob = (profile.bobAmp || 0) * Math.sin(phase) * (.35 + walkN * .65);
+  const bob = idleBob * (1 - walkN) + walkBob * walkN;
+  const accelN = clamp(motion?.accelN || 0, -1, 1);
+  const turnN = clamp(motion?.turnN || 0, 0, 1);
+  const turnSign = motion?.turnSign || 0;
   const sway = (profile.swayAmp || 0) * Math.sin(phase * .55 + seed * .37);
-  const lean = -Math.max(-1, Math.min(1, sx / ref)) * (profile.leanK || 0);
+  const lean = -clamp(sx / ref, -1, 1) * (profile.leanK || 0) + turnSign * turnN * (profile.turnLeanK || .032);
   const squash = (profile.squashK || 0) * speed;
+  const accelSquash = Math.max(0, accelN) * (profile.accelSquashK || .035);
+  const brakeStretch = Math.max(0, -accelN) * (profile.brakeStretchK || .028);
+  const stepSkew = Math.sin(phase) * walkN * (profile.stepSkewK || 0);
   const hit = hitFlash > 0 ? Math.min(1, hitFlash / .12) : 0;
   const jolt = (profile.hitJolt || 0) * hit;
-  out.ox = 0;
-  out.oy = bob - jolt * 5;
-  out.rot = baseRot + sway + lean;
-  out.sx = Math.max(.2, 1 - squash * .35 + jolt);
-  out.sy = Math.max(.2, 1 + squash + jolt * .35);
+  out.ox = Math.cos(phase) * walkN * (profile.stepSideAmp || 0) + turnSign * turnN * (profile.turnOffset || 0);
+  out.oy = bob - jolt * 5 - Math.max(0, accelN) * (profile.accelDip || 1.0) + Math.max(0, -accelN) * (profile.brakeLift || .65);
+  out.rot = baseRot + sway + lean + stepSkew * .35;
+  out.sx = Math.max(.2, 1 - squash * .35 + jolt + brakeStretch * .25 - accelSquash * .2);
+  out.sy = Math.max(.2, 1 + squash + jolt * .35 + accelSquash + brakeStretch);
+  out.skewX = stepSkew;
+  out.skewY = turnSign * turnN * (profile.turnSkewK || .01);
   out.alpha = alpha == null ? 1 : alpha;
   out.tint = hit > 0 ? 0xffefe0 : (tint == null ? 0xffffff : tint);
 }
@@ -79,6 +100,7 @@ function _applySpritePose(sprite, x, y, pose){
   sprite.position.set(x + pose.ox, y + pose.oy);
   sprite.rotation = pose.rot;
   sprite.scale.set(baseX * pose.sx, baseY * pose.sy);
+  if(sprite.skew) sprite.skew.set(pose.skewX || 0, pose.skewY || 0);
   sprite.alpha = pose.alpha;
   sprite.tint = pose.tint;
 }
@@ -103,13 +125,25 @@ export function update(){
   }
   const p = G.player; if(!p) return;
   // input vector
-  let dx = 0, dy = 0;
+  let dx = 0, dy = 0, inputPower = 0;
   if(keys['w']||keys['arrowup'])    dy -= 1;
   if(keys['s']||keys['arrowdown'])  dy += 1;
   if(keys['a']||keys['arrowleft'])  dx -= 1;
   if(keys['d']||keys['arrowright']) dx += 1;
   const len = Math.hypot(dx,dy);
-  if(len>0){ dx/=len; dy/=len; }
+  if(len>0){ dx/=len; dy/=len; inputPower = 1; }
+  if(touchMove.active){
+    const tl = Math.hypot(touchMove.x, touchMove.y);
+    if(tl > .001){
+      dx = touchMove.x / tl;
+      dy = touchMove.y / tl;
+      inputPower = clamp(touchMove.strength || tl, 0, 1);
+    } else {
+      dx = 0;
+      dy = 0;
+      inputPower = 0;
+    }
+  }
   // Effective movement speed: includes BATTERY consumable boost, clamped so a
   // stack of buffs can't punt the player off-screen faster than camera can follow.
   // (Original code applied boost AFTER movement and immediately restored — so
@@ -117,14 +151,57 @@ export function update(){
   if(p._eliteSlowTimer > 0) p._eliteSlowTimer -= G.dt;
   const eliteSlowMul = p._eliteSlowTimer > 0 ? 0.72 : 1;
   const moveSpeed = Math.min(p.speed * (p._boostSpdMul || 1) * eliteSlowMul, 720);
-  p.vx = dx * moveSpeed;
-  p.vy = dy * moveSpeed;
+  const prevVx = p.vx || 0, prevVy = p.vy || 0;
+  const prevSpeed = Math.hypot(prevVx, prevVy);
+  const targetSpeed = moveSpeed * inputPower;
+  const targetVx = dx * targetSpeed;
+  const targetVy = dy * targetSpeed;
+  let curVx = prevVx, curVy = prevVy;
+  let turnN = 0, turnSign = 0;
+  if(inputPower > .01 && prevSpeed > 8 && targetSpeed > 8){
+    const dot = clamp((prevVx * targetVx + prevVy * targetVy) / Math.max(1, prevSpeed * targetSpeed), -1, 1);
+    turnN = clamp((-dot - .15) / .85, 0, 1);
+    turnSign = Math.sign(prevVx * targetVy - prevVy * targetVx) || 0;
+    if(turnN > 0){
+      const brakeK = _dtK(28 * turnN);
+      curVx = lerp(curVx, 0, brakeK);
+      curVy = lerp(curVy, 0, brakeK);
+    }
+  }
+  const moveK = _dtK(inputPower > .01 ? (20 - turnN * 5) : 26);
+  p.vx = lerp(curVx, targetVx, moveK);
+  p.vy = lerp(curVy, targetVy, moveK);
+  if(inputPower <= .01 && Math.hypot(p.vx, p.vy) < .35){ p.vx = 0; p.vy = 0; }
   p.x += p.vx * G.dt;
   p.y += p.vy * G.dt;
-  if(len>0) p.faceA = Math.atan2(dy,dx);
+  const newSpeed = Math.hypot(p.vx, p.vy);
+  const speedN = clamp(newSpeed / Math.max(1, moveSpeed), 0, 1.35);
+  const accelN = clamp((newSpeed - prevSpeed) / Math.max(1, moveSpeed * Math.max(G.dt, .001)), -1, 1);
+  const distMoved = newSpeed * G.dt;
+  if(newSpeed > 5) p._stridePhase = ((p._stridePhase || 0) + (distMoved / Math.max(18, p.r * 2.15)) * TAU * (.82 + speedN * .24)) % TAU;
+  else p._stridePhase = ((p._stridePhase || 0) + G.dt * TAU * .16) % TAU;
+  const motion = p._motion || (p._motion = {});
+  motion.speedN = speedN;
+  motion.accelN = accelN;
+  motion.turnN = turnN;
+  motion.turnSign = turnSign;
+  motion.stridePhase = p._stridePhase;
+  motion.inputPower = inputPower;
+  if(inputPower > .03 || newSpeed > 8){
+    const faceTarget = inputPower > .03 ? Math.atan2(dy, dx) : Math.atan2(p.vy, p.vx);
+    p.faceA = _lerpAngle(p.faceA == null ? faceTarget : p.faceA, faceTarget, _dtK(18 + speedN * 10));
+  }
   p.rot += G.dt * 1.5;
-  p.trail.push({x:p.x, y:p.y, t:G.realT});
-  if(p.trail.length > 16) p.trail.shift();
+  const lastTrail = p.trail[p.trail.length - 1];
+  p._trailCarry = (p._trailCarry || 0) + distMoved;
+  const trailGap = newSpeed > 240 ? 7 : (newSpeed > 95 ? 12 : 22);
+  const trailAge = lastTrail ? G.realT - lastTrail.t : 999;
+  if(!lastTrail || (newSpeed > 16 && (p._trailCarry >= trailGap || trailAge > .12))){
+    p.trail.push({x:p.x, y:p.y, t:G.realT, v:speedN});
+    p._trailCarry = 0;
+  }
+  const maxTrail = Math.round(8 + Math.min(1, speedN) * 12);
+  while(p.trail.length > maxTrail) p.trail.shift();
   if(p.regen > 0 && p.hp < p.maxHp){ p.hp = Math.min(p.maxHp, p.hp + p.regen * G.dt); }
   if(p.invuln > 0) p.invuln -= G.dt;
   if(p._boostSpd > 0)    { p._boostSpd    -= G.dt; if(p._boostSpd <= 0) p._boostSpdMul = 1; }
@@ -323,7 +400,8 @@ export function update(){
   // player sprite sync (player is not in G.ents)
   if(p && p.sprite){
     const blink = p.invuln > 0 && (Math.floor(G.realT*16)%2===0);
-    _computeSpritePose(_POSE, _profileForPlayer(p), p.vx, p.vy, G.realT, _animSeed(p), p.spriteAsset ? 0 : p.rot, 0, blink ? .35 : 1, 0xffffff);
+    setSpriteWalkFrame(p.sprite, p._motion);
+    _computeSpritePose(_POSE, _profileForPlayer(p), p.vx, p.vy, G.realT, _animSeed(p), p.spriteAsset ? 0 : p.rot, 0, blink ? .35 : 1, 0xffffff, p._motion);
     _applySpritePose(p.sprite, p.x, p.y, _POSE);
     if(p.dotSprite) p.dotSprite.position.set(p.x, p.y);
     if(p.dotSprite) p.dotSprite.alpha = p.spriteAsset ? 0 : (blink ? .35 : 1);
@@ -331,12 +409,35 @@ export function update(){
     // Trail — fading line through trail points (each segment has its own alpha).
     if(p.trailGfx){
       p.trailGfx.clear();
+      const motion = p._motion || {};
+      const speedN = clamp(motion.speedN || 0, 0, 1);
+      if(speedN > .05){
+        const phase = motion.stridePhase || 0;
+        const sideA = (p.faceA || 0) + Math.PI / 2;
+        const backA = (p.faceA || 0) + Math.PI;
+        const baseX = p.x + Math.cos(backA) * p.r * .42;
+        const baseY = p.y + Math.sin(backA) * p.r * .42 + p.r * .34;
+        const press = [(.5 - Math.sin(phase) * .5), (.5 + Math.sin(phase) * .5)];
+        for(let f = 0; f < 2; f++){
+          const side = f === 0 ? -1 : 1;
+          const px = baseX + Math.cos(sideA) * side * p.r * .38;
+          const py = baseY + Math.sin(sideA) * side * p.r * .22;
+          const alpha = (.06 + press[f] * .14) * speedN;
+          const rr = 2.4 + press[f] * 2.8;
+          p.trailGfx.circle(px, py, rr * 1.8);
+          p.trailGfx.fill({ color: 0x050201, alpha });
+          p.trailGfx.circle(px, py, rr * .55);
+          p.trailGfx.fill({ color: p.color, alpha: alpha * .38 });
+        }
+      }
       for(let i = 0; i < p.trail.length - 1; i++){
         const ta = p.trail[i], tb = p.trail[i+1];
         const k = i / p.trail.length;
+        const age = clamp(1 - (G.realT - ta.t) / .55, 0, 1);
+        const v = clamp(ta.v || 0, 0, 1);
         p.trailGfx.moveTo(ta.x, ta.y);
         p.trailGfx.lineTo(tb.x, tb.y);
-        p.trailGfx.stroke({ color: p.color, alpha: k * .5, width: 1 + k*4 });
+        p.trailGfx.stroke({ color: p.color, alpha: k * age * (.16 + v * .44), width: 1 + k * (2.2 + v * 3.3) });
       }
     }
     // Beams + orbit nodes — per-frame redraw based on weapon state.

@@ -4,7 +4,7 @@
    (firePulse / fireProjectile / fxBurst / etc), and player.js calls dealDamage.
    =================================================================== */
 import { G, TAU, C, rand, clamp, lerp, dist, dist2, angTo, announce, meta, entityLayer, fxLayer, beamLayer, bhLayer } from './core.js';
-import { AUDIO } from './audio.js';
+import { AUDIO } from './audio.js?v=abyssal-audio-v4';
 import {
   getCircleTexture, getPolygonTexture, getStarTexture, getDiamondTexture,
   SPRITE_ASSETS, getImageTextureAsset, configureSpriteForAsset,
