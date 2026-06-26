@@ -1,23 +1,31 @@
 # Abyssal Pulse
 
-Dark loot roguelite version of Neon Pulse. Survive a 15-minute rift, draft skills and virtues, awaken rune evolutions, defeat abyss bosses, and collect relic drops.
+A dark gothic horde-survivor roguelite. Survive a 15-minute abyssal rift, draft skills and virtues, awaken rune evolutions, defeat abyss bosses, and collect relic drops.
 
 ## Play
 
-- Public GitHub Pages URL: https://fbwndrud.github.io/neon-pulse/
+- Repository: https://github.com/fbwndrud/abyssal-pulse
+- Public GitHub Pages URL: https://fbwndrud.github.io/abyssal-pulse/
 - Local URL after starting a server: http://localhost:8000/
 
 ## Run Locally
 
 ```bash
-python3 -m http.server 8000
+npm start
 ```
 
 Then open `http://localhost:8000/`.
 
+You can also run:
+
+```bash
+python3 -m http.server 8000
+```
+
 ## Controls
 
 - `WASD` or arrow keys: move
+- Touch and drag on mobile: analog movement
 - `Space`: pause
 - `M`: mute
 
@@ -34,5 +42,18 @@ The game keeps the original horde-survivor roguelite loop while shifting the fan
 - Relic, rune, and cursed altar progression
 - Elite affix monsters such as Molten, Frostbound, and Void-Touched
 - Time-based dungeon biomes: Ruined Nave, Bone Crypt, and Hellforge Rift
+- Licensed dark fantasy BGM from OpenGameArt and JC Sounds fantasy SFX
+- Mobile-optimized skill and level-up selection surfaces
+- Smoother movement feel with acceleration, camera look-ahead, speed-based trails, and runtime walk-frame textures
 
 See [DIABLO_STYLE_REDESIGN.md](DIABLO_STYLE_REDESIGN.md) for the full redesign plan.
+
+## Audio Credits
+
+Music and SFX attribution is tracked in [audio/CREDITS.md](audio/CREDITS.md). The current audio pass uses:
+
+- `Dark Quest`
+- `A Darkness Opus`
+- `Dark Dungeon Ambience`
+- `Dark souls type boss theme`
+- `JC Sounds - Fantasy SFX Pack Vol 1`
