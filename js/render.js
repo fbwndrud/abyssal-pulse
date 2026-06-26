@@ -764,10 +764,11 @@ export const BG = {
     }
   },
   tick(){
-    const biomeKey = !G.player ? 'nave' : (G.t < 300 ? 'nave' : (G.t < 600 ? 'crypt' : 'hellforge'));
-    if(biomeKey !== this.biomeKey){
+    const biomeKey = !G.player ? 'nave' : (G.biomeKey || 'nave');
+    const prevKey = this.biomeKey;
+    if(biomeKey !== prevKey){
       this.bakeGradient(biomeKey);
-      if(G.player && G.biomeKey !== biomeKey){
+      if(G.player && prevKey && G.t > .35){
         const el = document.getElementById('biome-banner');
         if(el){
           el.textContent = BIOMES[biomeKey].name;
@@ -776,9 +777,9 @@ export const BG = {
           el._hideTimer = setTimeout(()=> el.classList.remove('show'), 2200);
         }
       }
-      G.biomeKey = biomeKey;
     }
     G.biomeName = BIOMES[biomeKey].name;
+    if(!G.player) G.biomeKey = biomeKey;
 
     // star parallax: 4-quad wrap so stars are continuous in any direction
     const sw = this.starLayerW, sh = this.starLayerH;

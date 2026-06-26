@@ -13,7 +13,7 @@ import { ANIM_PROFILES, BG, acquireGraphics, setSpriteWalkFrame } from './render
 import {
   EGRID, _EQ1, _EQ2,
   makeEnt, fxBurst, fxRing, fxText, fxShockwave, fxLine, shake, flash,
-  spawnEnemy, spawnBoss, spawnCoin, spawnShrine,
+  spawnEnemy, spawnBoss, spawnCoin, spawnShrine, spawnBiomeGate,
   fireProjectile, dealDamage, nearestEnemy, nearestEnemyExcept,
   spawnZone, applySlow, applyBurn, applyBleed, applyHex,
   detachSprite,
@@ -36,6 +36,24 @@ let _wpnErrCount = 0;
 export function setLoopHandlers({ doLevelUp, endRun, updateHUD, openChestPick, openShrinePick }){
   _doLevelUp = doLevelUp; _endRun = endRun; _updateHUD = updateHUD;
   _openChestPick = openChestPick; _openShrinePick = openShrinePick;
+}
+
+const BIOME_ROUTE = [
+  { key:'nave', name:'붕괴한 성당', color:C.gold },
+  { key:'crypt', name:'뼈 납골당', gateAt:285, gateLabel:'뼈 납골당 관문', gateVerb:'뼈의 계단으로 이동', color:C.teal, index:1 },
+  { key:'hellforge', name:'지옥대장간 균열', gateAt:585, gateLabel:'지옥대장간 승강기', gateVerb:'지옥대장간으로 이동', color:C.red, index:2 },
+];
+function _nextBiomeStep(){
+  const idx = (G.biomeIndex || 0) + 1;
+  return BIOME_ROUTE[idx] || null;
+}
+function _showBiomeBanner(name){
+  const el = document.getElementById('biome-banner');
+  if(!el) return;
+  el.textContent = name;
+  el.classList.add('show');
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(()=> el.classList.remove('show'), 2200);
 }
 
 const _POSE = { ox:0, oy:0, rot:0, sx:1, sy:1, alpha:1, tint:0xffffff };
@@ -124,6 +142,7 @@ export function update(){
     }
   }
   const p = G.player; if(!p) return;
+  _updateBiomeTransition();
   // input vector
   let dx = 0, dy = 0, inputPower = 0;
   if(keys['w']||keys['arrowup'])    dy -= 1;
@@ -324,11 +343,31 @@ export function update(){
         }
       }
     }
+    else if(e.type === 'biomeGate'){
+      e._fxT = (e._fxT || 0) - G.dt;
+      if(e._fxT <= 0){
+        e._fxT = .38;
+        const pulseR = e.r * (2.5 + Math.sin(G.realT * 2.2 + (e.seed || 0)) * .24);
+        fxRing(e.x, e.y, e.color || C.violet, pulseR, .48, {style:'abyss', spokes:10});
+      }
+      const d = Math.hypot(e.x - p.x, e.y - p.y);
+      const age = G.t - (e.openedAt || G.t);
+      if(age > 24 && d > 820 && (!e._lastReposition || G.t - e._lastReposition > 18)){
+        _repositionBiomeGate(e);
+      }
+      if(d < p.r + e.r + 12){
+        _startBiomeTransition(e);
+        e.alive = false;
+      }
+    }
     else if(e.type === 'xp' || e.type === 'coin' || e.type === 'heart' || e.type === 'magnet' || e.type === 'freeze' || e.type === 'item'){
       e.vx *= .94; e.vy *= .94;
       e.x += e.vx * G.dt; e.y += e.vy * G.dt;
       const d = Math.hypot(e.x - p.x, e.y - p.y);
-      const range = (e.type==='xp' ? p.magnet : e.type==='coin' ? p.magnet*1.2 : e.type==='item' ? 280 : 220) * G.pickupMagnetMul;
+      let range = (e.type==='xp' ? p.magnet : e.type==='coin' ? p.magnet*1.2 : e.type==='item' ? 280 : 220) * G.pickupMagnetMul;
+      if(e.type === 'xp' || e.type === 'coin'){
+        range *= 1 + Math.min(.9, Math.max(0, G.ents.length - 650) / 650);
+      }
       if(G.superMagnetTimer > 0){
         // Super magnet — directly drive pickup velocity toward player at high speed.
         // Additive forces couldn't overcome dampening across the whole map; this
@@ -497,6 +536,8 @@ export function update(){
   G.shake = Math.max(0, G.shake * Math.pow(.001, G.dt));
   G.flash = Math.max(0, G.flash - G.dt * .8);
   if(G.comboTimer > 0){ G.comboTimer -= G.dt; if(G.comboTimer <= 0) G.combo = 0; }
+  pickupPressureDirector();
+  biomeGateDirector();
   spawnDirector();
   shrineDirector();
   // Pause boss interval timer during a fight — otherwise a long boss kill
@@ -1227,12 +1268,119 @@ function _syncEntitySprite(e){
 /* ===================================================================
    SPAWN DIRECTOR
    =================================================================== */
-// Active-enemy cap, ramped by run time so late game (10min+) actually feels
-// dense. Was a flat 250 — that saturated at 4min and made minutes 10-30 feel
-// strangely safe (per balance audit). 250→400 ramp over 0~10min.
+// Active-enemy cap by region. Late-game pressure should come from enemy mix,
+// elites and bosses, not from letting hundreds of bodies pile up indefinitely.
+function _gateOverdue(t){
+  const next = _nextBiomeStep();
+  return next ? Math.max(0, t - next.gateAt) : 0;
+}
+function _pressureStage(t){
+  const stage = clamp(G.biomeIndex || 0, 0, 2);
+  return clamp(stage + Math.floor(_gateOverdue(t) / 150), 0, 2);
+}
 function _enemyCap(t){
-  const r = Math.min(1, t / 600);
-  return Math.round(250 + 150 * r);
+  const stage = _pressureStage(t);
+  const r = Math.min(1, t / 720);
+  const overdueBonus = Math.min(30, _gateOverdue(t) / 6);
+  return Math.round(Math.min(380, 220 + stage * 40 + r * 80 + overdueBonus));
+}
+function _gateSpawnPoint(minR=520, maxR=660){
+  const p = G.player;
+  const speed = Math.hypot(p.vx || 0, p.vy || 0);
+  const facing = speed > 20 ? Math.atan2(p.vy, p.vx) : Math.random() * TAU;
+  const a = facing + rand(-.75, .75);
+  const r = rand(minR, maxR);
+  return { x:p.x + Math.cos(a) * r, y:p.y + Math.sin(a) * r };
+}
+function _repositionBiomeGate(gate){
+  const pos = _gateSpawnPoint(420, 540);
+  gate.x = pos.x;
+  gate.y = pos.y;
+  gate._lastReposition = G.t;
+  gate.seed = Math.random() * TAU;
+  announce('관문이 가까이 공명합니다 · ' + gate.targetName, 1.2);
+  fxShockwave(gate.x, gate.y, gate.color || C.violet, 150, .55, {style:'infernal'});
+  fxRing(gate.x, gate.y, gate.color || C.violet, 105, .58, {style:'abyss', spokes:10});
+}
+function biomeGateDirector(){
+  if(!G.player || G.bossActive || G.biomeTransition) return;
+  const next = _nextBiomeStep();
+  if(!next || G.t < next.gateAt) return;
+  if(G.biomeGate && G.biomeGate.alive) return;
+  if(!G._biomeGatesSpawned) G._biomeGatesSpawned = new Set();
+  if(G._biomeGatesSpawned.has(next.key)) return;
+  const pos = _gateSpawnPoint();
+  const gate = spawnBiomeGate(pos.x, pos.y, next);
+  gate.openedAt = G.t;
+  G.biomeGate = gate;
+  G.biomeGateTarget = next;
+  G._biomeGatesSpawned.add(next.key);
+  announce('관문 개방 · ' + next.name, 1.8);
+  fxShockwave(gate.x, gate.y, next.color, 180, .65, {style:'infernal'});
+  fxRing(gate.x, gate.y, next.color, 120, .7, {style:'abyss', spokes:10});
+  shake(.16);
+}
+function _startBiomeTransition(gate){
+  if(G.biomeTransition) return;
+  G.biomeGate = null;
+  G.biomeGateTarget = null;
+  G.biomeTransition = {
+    targetKey: gate.targetKey,
+    targetName: gate.targetName,
+    targetIndex: gate.targetIndex,
+    color: gate.color || C.violet,
+    timer: 0,
+    dur: 3.4,
+    fxT: 0,
+  };
+  announce(gate.gateVerb || '관문 통과', 1.4);
+  fxShockwave(gate.x, gate.y, gate.color || C.violet, 260, .75, {style:'infernal'});
+  fxRing(gate.x, gate.y, gate.color || C.violet, 160, .8, {style:'abyss', spokes:12});
+  flash(gate.color || C.violet, .25);
+  shake(.24);
+}
+function _updateBiomeTransition(){
+  const tr = G.biomeTransition;
+  if(!tr || !G.player) return;
+  tr.timer += G.dt;
+  tr.fxT -= G.dt;
+  if(tr.fxT <= 0){
+    tr.fxT = .22;
+    const k = clamp(tr.timer / tr.dur, 0, 1);
+    fxRing(G.player.x, G.player.y, tr.color, 90 + k * 120, .38, {style:'abyss', spokes:10});
+    shake(.015 + k * .02);
+  }
+  if(tr.timer >= tr.dur){
+    G.biomeKey = tr.targetKey;
+    G.biomeName = tr.targetName;
+    G.biomeIndex = Math.max(G.biomeIndex || 0, tr.targetIndex || 0);
+    G.biomeTransition = null;
+    announce('도착 · ' + G.biomeName, 1.5);
+    fxShockwave(G.player.x, G.player.y, tr.color, 300, .8, {style:'infernal'});
+    flash(tr.color, .32);
+    shake(.28);
+  }
+}
+function pickupPressureDirector(){
+  if(!G.player) return;
+  if(G.superMagnetTimer > 0) return;
+  G._pickupCullTimer = (G._pickupCullTimer || 0) - G.dt;
+  if(G._pickupCullTimer > 0) return;
+  G._pickupCullTimer = .8;
+  if(G.ents.length < 850) return;
+  let eased = 0;
+  const px = G.player.x, py = G.player.y;
+  for(const e of G.ents){
+    if(eased >= 45) break;
+    if(e.type !== 'xp' && e.type !== 'coin') continue;
+    if(e.type === 'xp' && e.kind !== 'sm' && e.kind !== 'md') continue;
+    const age = (e.maxLife || 0) - (e.life || 0);
+    if(age < 10) continue;
+    const dx = e.x - px, dy = e.y - py;
+    if(dx*dx + dy*dy < 900*900) continue;
+    e.life = Math.min(e.life, .7);
+    eased++;
+  }
 }
 // SHRINE director — spawns a single shrine at each SHRINE_TIMES checkpoint.
 // G._shrinesSpawned is a Set of seconds-of-trigger so a checkpoint never
@@ -1263,30 +1411,34 @@ function spawnDirector(){
   G.spawnTimer -= G.dt;
   if(G.spawnTimer > 0) return;
   const t = G.t;
+  const stage = clamp(G.biomeIndex || 0, 0, 2);
+  const pressureStage = _pressureStage(t);
+  const overdue = _gateOverdue(t);
   // Base cadence + count. During a boss fight, slow spawns by 2x and halve count
   // so the boss is the focus instead of a wall of adds.
-  // Floor 0.18→0.10 lets late-game pressure scale further (was saturating at
-  // 6min; now stays climbing through ~9min when it caps).
   const bossSlow = G.bossActive ? 2.0 : 1.0;
-  G.spawnTimer = Math.max(.10, 1.6 - t*.0040) * bossSlow;
+  const longRunRelief = 1 + Math.min(.35, Math.max(0, t - 720) / 720 * .35);
+  const overduePressure = 1 - Math.min(.12, overdue / 900);
+  G.spawnTimer = Math.max(.14, 1.55 - t*.0028) * bossSlow * longRunRelief * overduePressure;
   // Hard cap — at the cap, skip the entire tick. Late-game pressure comes
   // from elite mix + boss patterns, not raw population.
   const room = _enemyCap(t) - EGRID.enemies.length;
   if(room <= 0) return;
-  let n = clamp(Math.round(1 + t*.045), 1, 14);
+  let n = clamp(Math.round(1 + t*.027 + pressureStage * .9 + Math.min(2, overdue / 150)), 1, 11);
+  if(t > 720) n = Math.min(n, 9 + pressureStage);
   if(G.bossActive) n = Math.max(1, Math.floor(n * 0.5));
   n = Math.min(n, room);
   const min = t/60;
   const pool = ['TRI'];
   if(min > .3) pool.push('TRI');
-  if(min > 1) pool.push('SQR');
-  if(min > 1.5) pool.push('DIA');
-  if(min > 2.5) pool.push('PEN');
-  if(min > 3.5) pool.push('HEX');
-  if(min > 5) pool.push('OCT');
-  if(min > 6) pool.push('SQR','HEX');
-  if(min > 8) pool.push('DIA','PEN');
-  if(min > 10) pool.push('SWARM','SWARM','HEX');
+  if(min > .9) pool.push('SQR');
+  if(min > 1.6) pool.push('DIA');
+  if(stage >= 1) pool.push('HEX', 'DIA');
+  if(stage >= 1 && min > 6) pool.push('OCT');
+  if(stage >= 2) pool.push('PEN', 'HEX', 'DIA');
+  if(stage >= 2 && min > 10) pool.push('SWARM', 'OCT');
+  if(overdue > 90) pool.push(stage >= 1 ? 'PEN' : 'HEX');
+  if(overdue > 180) pool.push('OCT');
   for(let i=0;i<n;i++){
     const a = Math.random()*TAU;
     const r = rand(420, 560);
@@ -1295,9 +1447,9 @@ function spawnDirector(){
     spawnEnemy(choice(pool), x, y);
   }
   // Swarm bursts also respect the cap.
-  if(min > 4 && Math.random() < .15){
+  if((stage >= 2 || min > 11) && EGRID.enemies.length < _enemyCap(G.t) * .78 && Math.random() < .08){
     const burstRoom = Math.max(0, _enemyCap(G.t) - EGRID.enemies.length);
-    const burstN = Math.min(22, burstRoom);
+    const burstN = Math.min(stage >= 2 ? 14 : 8, burstRoom);
     for(let i=0;i<burstN;i++){
       const a = Math.random()*TAU;
       const r = rand(440, 620);

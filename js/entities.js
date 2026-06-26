@@ -29,7 +29,7 @@ function _autoAttachSprite(e){
     case 'proj':      _attachProjectileSprite(e); e.__sprKind = 'tex'; break;
     case 'ebullet':   _attachEnemyBulletSprite(e); e.__sprKind = 'tex'; break;
     case 'xp': case 'coin': case 'heart': case 'magnet':
-    case 'freeze': case 'chest': case 'item': case 'shrine':
+    case 'freeze': case 'chest': case 'item': case 'shrine': case 'biomeGate':
       _attachPickupSprite(e); e.__sprKind = 'tex'; break;
     case 'fx':        _attachFxParticleSprite(e); break;
     case 'ring': case 'shock': case 'line': case 'fan': case 'zone':
@@ -207,6 +207,9 @@ function _attachPickupSprite(e){
       // Consumable — oversized hollow rune star, deliberately unlike XP diamonds.
       texInfo = getStarTexture(7, e.r * 1.95, e.r * 0.72, col, Math.max(glow, 20), 'rgba(12,6,4,.82)', 2.6);
     }
+  } else if(e.type === 'biomeGate'){
+    const col = e.color || C.violet;
+    texInfo = getStarTexture(8, e.r * 1.9, e.r * 0.74, col, 26, 'rgba(8,2,8,.9)', 3);
   } else {
     texInfo = getCircleTexture(e.r, '#ffffff', 6, '#ffffff', 1);
   }
@@ -728,10 +731,12 @@ export function spawnXP(x,y,amount){
   else if(amount >= 5) kind = 'md';
   if(amount >= 50) kind = 'huge';
   const colorMap = {sm:C.cyan, md:C.lime, lg:C.gold, huge:C.magenta};
-  makeEnt({type:'xp', x, y, vx:rand(-40,40), vy:rand(-40,40), amount, kind, color:colorMap[kind], r: kind==='sm'?5: kind==='md'?7: kind==='lg'?9:12, life:60, maxLife:60});
+  const life = G.t > 900 ? 42 : (G.t > 600 ? 50 : 60);
+  makeEnt({type:'xp', x, y, vx:rand(-40,40), vy:rand(-40,40), amount, kind, color:colorMap[kind], r: kind==='sm'?5: kind==='md'?7: kind==='lg'?9:12, life, maxLife:life});
 }
 export function spawnCoin(x,y){
-  makeEnt({type:'coin', x, y, vx:rand(-50,50), vy:rand(-50,50), r:6, color:C.gold, life:30, maxLife:30});
+  const life = G.t > 900 ? 22 : 30;
+  makeEnt({type:'coin', x, y, vx:rand(-50,50), vy:rand(-50,50), r:6, color:C.gold, life, maxLife:life});
 }
 export function spawnHeart(x,y){
   makeEnt({type:'heart', x, y, vx:rand(-40,40), vy:rand(-40,40), r:8, color:C.red, life:30, maxLife:30});
@@ -749,4 +754,22 @@ export function spawnShrine(x,y){
   // Mid-run coin sink. Long life so the player can finish the current cluster
   // before walking over. Color is violet to read distinct from chest gold.
   return makeEnt({type:'shrine', x, y, r:22, color:C.violet, life:90, maxLife:90});
+}
+export function spawnBiomeGate(x, y, target){
+  const color = target.color || C.violet;
+  return makeEnt({
+    type:'biomeGate',
+    x, y,
+    vx:0, vy:0,
+    r:30,
+    color,
+    life:9999,
+    maxLife:9999,
+    targetKey:target.key,
+    targetName:target.name,
+    targetIndex:target.index,
+    gateLabel:target.gateLabel || '심연 관문',
+    gateVerb:target.gateVerb || '관문 통과',
+    seed:Math.random()*TAU,
+  });
 }

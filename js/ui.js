@@ -849,7 +849,16 @@ export function updateHUD(){
     ce.classList.add('show');
   } else { ce.classList.remove('show'); }
   const diff = document.getElementById('diff-chip');
-  if(diff) diff.textContent = '균열 · ' + (G.biomeName || '붕괴한 성당');
+  if(diff){
+    let label = '균열 · ' + (G.biomeName || '붕괴한 성당');
+    if(G.biomeTransition){
+      label = '관문 통과 중 · ' + G.biomeTransition.targetName;
+    } else if(G.biomeGate && G.biomeGate.alive){
+      const d = Math.hypot(G.biomeGate.x - p.x, G.biomeGate.y - p.y);
+      label = `${G.biomeName || '붕괴한 성당'} → ${G.biomeGate.targetName} · ${Math.max(1, Math.round(d / 35))}m`;
+    }
+    diff.textContent = label;
+  }
   renderBuffTimers(p);
   // Progression guide panel — right-side, always-visible during play. Throttled
   // since state only changes on level-up / evolve, not per frame.
@@ -879,6 +888,9 @@ export function startRun(classKey){
   G.ents = []; G.t = 0; G.spawnTimer = 0; G.combo=0; G.comboTimer=0;
   G.killCount = 0; G.coinsRun = 0; G.bossActive=null; G.bossTimer = 0; G.bossCount = 0;
   G._shrinesSpawned = null;  // re-seed each run so SHRINEs respawn
+  G.biomeKey = 'nave'; G.biomeName = '붕괴한 성당'; G.biomeIndex = 0;
+  G.biomeGate = null; G.biomeGateTarget = null; G.biomeTransition = null;
+  G._biomeGatesSpawned = null; G._pickupCullTimer = 0;
   G.endReason = null; G.rerollCost = baseRerollCost();
   G.classChosen = classKey;
   G.cam = {x:0, y:0, zoom:1, tx:0, ty:0};

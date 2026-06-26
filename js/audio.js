@@ -295,13 +295,14 @@ export const AUDIO = (()=>{
       subHit(62*(1+(Math.random()-0.5)*0.12), 0.42, 0.27, 24, null, pv);
     }
   }
-  function pickup(x){ if(!gate('pickup')) return;
+  function pickup(x, opts={}){ if(!gate('pickup')) return;
     const pv = pan(x);
+    const vol = opts.vol ?? 0.22;
     if(buffers.sfx_pickup){
-      playBuf('sfx_pickup', { vol: 0.22, panVal: pv, rate: 0.96 + Math.random()*0.1, lpHz: 7200 });
+      playBuf('sfx_pickup', { vol, panVal: pv, rate: 0.96 + Math.random()*0.1, lpHz: opts.lpHz ?? 7200 });
       return;
     }
-    darkBell(360 + Math.random()*42, 0.24, 0.085, null, pv);
+    darkBell(360 + Math.random()*42, 0.24, Math.min(0.085, vol * 0.4), null, pv);
   }
   function level(){
     duck(-11, 0.035, 0.24, 0.86);

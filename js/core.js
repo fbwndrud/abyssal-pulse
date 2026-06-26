@@ -157,7 +157,14 @@ export const G = {
   freezeTimer: 0,
   qualityScale: 1,
   qualityLabel: '높음',
-  biomeKey: null,
+  biomeKey: 'nave',
+  biomeName: '붕괴한 성당',
+  biomeIndex: 0,
+  biomeGate: null,
+  biomeGateTarget: null,
+  biomeTransition: null,
+  _biomeGatesSpawned: null,
+  _pickupCullTimer: 0,
 };
 
 /* ───────── CAMERA ─────────

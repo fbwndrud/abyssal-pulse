@@ -398,9 +398,7 @@ export function dropItem(x, y, luck, tierBias, kindFilter){
   }
   if(it.tier === 'legendary'){
     shake(.3); flash(tier.color, .22);
-    announce('전설 유물 · ' + it.name, 2.0);
-  } else if(it.tier === 'epic'){
-    announce('영웅 전리품 · ' + it.name, 1.4);
+    announce((it.kind === 'relic' ? '전설 유물 · ' : '전설 전리품 · ') + it.name, 1.8);
   }
   const radius = isConsumable ? 14 : 12;
   const life = isConsumable ? 46 : 60;
@@ -427,10 +425,14 @@ export function applyItem(p, itemId){
   if(!meta.seenCodex.items) meta.seenCodex.items = [];
   if(!meta.seenCodex.items.includes(itemId)){ meta.seenCodex.items.push(itemId); saveMeta(); }
   const col = ITEM_TIERS[it.tier].color;
-  fxBurst(p.x, p.y, col, 24, 200, 3, .5);
-  fxRing(p.x, p.y, col, 80, .5);
-  AUDIO.pickup();
-  announce((it.kind==='relic'?'◈ 유물 · ':'◇ 전리품 · ') + it.name, 1.6);
+  const isRelic = it.kind === 'relic';
+  const isMajor = it.tier === 'epic' || it.tier === 'legendary';
+  fxBurst(p.x, p.y, col, isRelic ? 24 : 10, isRelic ? 200 : 120, isRelic ? 3 : 2.2, isRelic ? .5 : .26);
+  fxRing(p.x, p.y, col, isRelic ? 80 : (isMajor ? 56 : 38), isRelic ? .5 : .28);
+  AUDIO.pickup(p.x, { vol: isRelic ? 0.16 : 0.07, lpHz: isRelic ? 7200 : 5200 });
+  if(isRelic) announce('◈ 유물 · ' + it.name, 1.3);
+  else if(it.tier === 'legendary') announce('◇ 전설 전리품 · ' + it.name, 1.2);
+  else fxText(p.x, p.y - 28, it.name, col, false);
   if(p._forcedLevelup){ p._forcedLevelup = false; p.xp = p.xpNext; if(_doLevelUp) _doLevelUp(false); }
   updateSynergies(p);
 }
@@ -458,7 +460,8 @@ setOnKillHook(function onKill(e){
     spawnChest(e.x, e.y);
     if(_openGlyphPick) _openGlyphPick();
   } else if(e.eliteAffix){
-    announce('정예 처치 · ' + (e.eliteName || e.kind), 1.4);
+    fxText(e.x, e.y - e.r - 16, '정예 처치', e.eliteColor || e.color, false);
+    fxRing(e.x, e.y, e.eliteColor || e.color, e.r * 2.6, .24);
     if(Math.random() < Math.min(.42, .18 + pLuck*.10)){
       const kind = Math.random() < .35 ? 'relic' : 'consumable';
       dropItem(e.x, e.y, pLuck + .35, ['rare','epic','legendary'], kind);
