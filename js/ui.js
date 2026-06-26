@@ -33,17 +33,17 @@ const CLASS_ART = {
   STAR:'assets/sprites/classes/hex-witch.png',
 };
 const SETTINGS = [
-  { key:'reduceFlash',  name:'REDUCE FLASH',  desc:'섬광과 파티클 밀도를 낮춥니다.' },
-  { key:'reduceShake',  name:'REDUCE SHAKE',  desc:'카메라 흔들림을 약하게 합니다.' },
-  { key:'autoQuality',  name:'AUTO QUALITY',  desc:'프레임 저하 시 효과 밀도를 자동 조절합니다.' },
-  { key:'highContrast', name:'HIGH CONTRAST', desc:'작은 UI 텍스트 대비를 높입니다.' },
+  { key:'reduceFlash',  name:'섬광 줄이기',  desc:'섬광과 파티클 밀도를 낮춥니다.' },
+  { key:'reduceShake',  name:'흔들림 줄이기',  desc:'카메라 흔들림을 약하게 합니다.' },
+  { key:'autoQuality',  name:'자동 품질',  desc:'프레임 저하 시 효과 밀도를 자동 조절합니다.' },
+  { key:'highContrast', name:'고대비', desc:'작은 UI 텍스트 대비를 높입니다.' },
 ];
 const CODEX_TABS = [
-  { key:'skills', label:'SKILLS' },
-  { key:'virtues', label:'VIRTUES' },
-  { key:'awaken', label:'AWAKEN' },
-  { key:'runes', label:'RUNES' },
-  { key:'enemies', label:'ENEMIES' },
+  { key:'skills', label:'스킬' },
+  { key:'virtues', label:'덕목' },
+  { key:'awaken', label:'각성' },
+  { key:'runes', label:'룬' },
+  { key:'enemies', label:'적' },
 ];
 let _codexTab = 'skills';
 const SKILL_ART = {
@@ -59,6 +59,15 @@ const SKILL_ART = {
   PRISM:'assets/icons/skills/soul-prism.png',
 };
 const STAT_ICON_CLASS = { dmg:'wrath', area:'dominion', cd:'zeal', speed:'fleet', hp:'vitality' };
+const ITEM_KIND_LABELS = { relic:'유물', consumable:'전리품' };
+const BRAIN_LABELS = {
+  chase:'추격', shooter:'사격', dasher:'돌진', healer:'치유',
+  ringboss:'고리 보스', spikeboss:'가시 보스', hydraboss:'히드라 보스', prismaboss:'프리즘 보스',
+};
+function displayWeaponName(key){ return WEAPONS[key]?.name || key; }
+function displayPassiveName(key){ return PASSIVES[key]?.name || key; }
+function displayItemKind(kind){ return ITEM_KIND_LABELS[kind] || kind; }
+function displayBrain(brain){ return BRAIN_LABELS[brain] || brain; }
 function _escAttr(s){ return String(s || '').replace(/"/g, '&quot;'); }
 if(!window.__replaceBrokenIcon){
   window.__replaceBrokenIcon = img => {
@@ -107,7 +116,7 @@ function weaponSlotSignature(w){
 function renderWeaponSlot(el, w){
   el.className = 'slot' + (w.evolved ? ' evolved' : '');
   el.dataset.sig = weaponSlotSignature(w);
-  el.title = w.evolved ? `${w.def.name} → ${w.evoName || 'AWAKENED'}` : w.def.name;
+  el.title = w.evolved ? `${w.def.name} → ${w.evoName || '각성됨'}` : w.def.name;
   el.innerHTML = `${slotWeaponIcon(w)}<div class="lv">${w.level}</div>${w.evolved ? '<div class="evo-mark">▲</div>' : ''}`;
 }
 function slotPassiveIcon(key){
@@ -128,13 +137,13 @@ function renderBuffTimers(p){
   const add = (name, time, color) => {
     if(time > 0) buffs.push({ name, time, color });
   };
-  add('WRATH', p._boostDmg || 0, C.red);
-  add('ZEAL', p._boostCdr || 0, C.gold);
-  add('FLEET', p._boostSpd || 0, C.cyan);
-  add('AEGIS', p._boostInvuln || 0, C.violet);
-  add('MAGNET', G.superMagnetTimer || 0, C.pink);
-  add('FREEZE', G.freezeTimer || 0, C.teal);
-  add('STREAK', p._streakActive || 0, C.gold);
+  add('분노', p._boostDmg || 0, C.red);
+  add('열의', p._boostCdr || 0, C.gold);
+  add('기민', p._boostSpd || 0, C.cyan);
+  add('방벽', p._boostInvuln || 0, C.violet);
+  add('자력', G.superMagnetTimer || 0, C.pink);
+  add('빙결', G.freezeTimer || 0, C.teal);
+  add('연속', p._streakActive || 0, C.gold);
   if(!buffs.length){ root.innerHTML = ''; return; }
   root.innerHTML = buffs.slice(0, 6).map(b =>
     `<div class="buff-pill" style="--accent:${b.color}">${b.name}<span>${Math.max(0, b.time).toFixed(1)}</span></div>`
@@ -149,26 +158,26 @@ function renderBuffTimers(p){
    - statLabel / fmtVal: display formatting
    =================================================================== */
 const STAT_LABELS = {
-  cd:'CD', dmg:'DMG', radius:'RAD', kb:'KB',
-  rotSpeed:'ROT', length:'LEN', width:'WID', count:'CNT',
-  tick:'TICK', nodeR:'NODE',
-  speed:'SPD', life:'LIFE',
-  pierce:'PIER',
-  arc:'ARC',
-  jumps:'JUMP', range:'RNG',
-  pull:'PULL', splits:'SPL',
+  cd:'쿨', dmg:'피해', radius:'범위', kb:'넉백',
+  rotSpeed:'회전', length:'사거리', width:'폭', count:'개수',
+  tick:'간격', nodeR:'노드',
+  speed:'속도', life:'지속',
+  pierce:'관통',
+  arc:'각도',
+  jumps:'연쇄', range:'거리',
+  pull:'흡인', splits:'분열',
 };
 // Hover description per stat — shown via native title tooltip on each row.
 const STAT_DESC = {
   cd:'쿨다운 — 무기 재발사 간격(초). 낮을수록 좋음',
-  dmg:'데미지 — 1회 적중 피해량',
+  dmg:'피해 — 1회 적중 피해량',
   radius:'반경 — 효과 범위(픽셀)',
   kb:'넉백 — 적을 밀어내는 힘',
   rotSpeed:'회전 속도 — 라디안/초',
   length:'사거리 — 빔 길이(픽셀)',
   width:'굵기 — 빔/공격 굵기',
   count:'개수 — 동시 발사/노드 수',
-  tick:'적중 간격 — 빔의 데미지 발생 주기(초). 낮을수록 좋음',
+  tick:'적중 간격 — 빔의 피해 발생 주기(초). 낮을수록 좋음',
   nodeR:'노드 크기 — 궤도 노드 반경',
   speed:'탄속 — 투사체 속도(픽셀/초)',
   life:'지속 — 투사체/효과 유지 시간(초)',
@@ -179,7 +188,7 @@ const STAT_DESC = {
   pull:'흡인력 — 적을 빨아들이는 힘',
   splits:'분열 — 명중 시 갈라지는 탄 수',
 };
-function statLabel(k){ return STAT_LABELS[k] || k.toUpperCase(); }
+function statLabel(k){ return STAT_LABELS[k] || k; }
 function statDesc(k){ return STAT_DESC[k] || k; }
 function fmtVal(v){
   if(typeof v !== 'number') return String(v);
@@ -268,18 +277,18 @@ function passivePreviewRows(passiveKey, mult, currentLv, p){
   const statLine = (() => {
     const m = mult || 1;
     switch(passiveKey){
-      case 'POWER':   return `DMG +${fmtPct(12 * m)}`;
+      case 'POWER':   return `피해 +${fmtPct(12 * m)}`;
       case 'HASTE':   return `이동 +${fmtPct(9 * m)}`;
       case 'CADENCE': return `쿨감 +${fmtPct(9 * m)}`;
       case 'REACH':   return `범위 +${fmtPct(12 * m)}`;
-      case 'ARMOR':   return `DR +${fmtPct(6 * m)}`;
-      case 'SOUL':    return `HP +${fmtVal(18 * m)}, 재생 +${fmtVal(.4 * m)}/s`;
+      case 'ARMOR':   return `피해감소 +${fmtPct(6 * m)}`;
+      case 'SOUL':    return `생명 +${fmtVal(18 * m)}, 재생 +${fmtVal(.4 * m)}/초`;
       case 'MAGNET':  return `픽업 +${fmtPct(30 * m)}`;
       case 'LUCK':    return `희귀 +${fmtPct(9 * m)}`;
     }
     return '';
   })();
-  if(statLine) rows.push({ key:'NOW', text: statLine });
+  if(statLine) rows.push({ key:'효과', text: statLine });
   // Personalized evolution preview
   const myWeaponKeys = p ? new Set(p.weapons.map(w => w.key)) : new Set();
   const matches = [];
@@ -294,14 +303,14 @@ function passivePreviewRows(passiveKey, mult, currentLv, p){
     const shown = matches.slice(0, 2).map(m => {
       const w = p.weapons.find(x => x.key === m.wKey);
       const wLv = w ? `${w.level}/${w.def.maxLv}` : '?';
-      return `${m.wKey} Lv.${wLv} → ${m.evo.name}`;
+      return `${displayWeaponName(m.wKey)} Lv ${wLv} → ${m.evo.name}`;
     });
-    for(const s of shown) rows.push({ key:lvNext === maxLv ? '★MAX' : 'EVO', text: s });
+    for(const s of shown) rows.push({ key:lvNext === maxLv ? '★최대' : '각성', text: s });
     if(matches.length > 2){
       rows.push({ key:'+', text:`...+${matches.length-2} 더` });
     }
   } else if(p) {
-    rows.push({ key:'RUNE', text:'<span style="color:#7d96b4">관련 스킬 미보유</span>' });
+    rows.push({ key:'룬', text:'<span style="color:#7d96b4">관련 스킬 미보유</span>' });
   }
   return rows;
 }
@@ -363,15 +372,15 @@ export function doLevelUp(forceNoXpReset=false){
 // keep growing past the content cap, but the +%/level is small (5-12% scaled by
 // rarity) so it doesn't trivialize the mid-game weapon/passive picks.
 const STAT_UPS = {
-  dmg:   { label:'+ WRATH',   tag:'STAT', color:C.red,    desc:'전 스킬 데미지 영구 +5%',
+  dmg:   { label:'+ 분노',   tag:'능력', color:C.red,    desc:'전 스킬 피해 영구 +5%',
            apply:(p,m)=>{ p.dmgMul *= (1 + .05*m); } },
-  area:  { label:'+ DOMINION',tag:'STAT', color:C.violet, desc:'효과 범위 영구 +5%',
+  area:  { label:'+ 지배',tag:'능력', color:C.violet, desc:'효과 범위 영구 +5%',
            apply:(p,m)=>{ p.areaMul *= (1 + .05*m); } },
-  cd:    { label:'+ ZEAL',    tag:'STAT', color:C.gold,   desc:'발사 속도 영구 +5%',
+  cd:    { label:'+ 열의',    tag:'능력', color:C.gold,   desc:'발사 속도 영구 +5%',
            apply:(p,m)=>{ p.cdMul *= (1 + .05*m); } },
-  speed: { label:'+ FLEET',   tag:'STAT', color:C.cyan,   desc:'이동 속도 영구 +4%',
+  speed: { label:'+ 기민',   tag:'능력', color:C.cyan,   desc:'이동 속도 영구 +4%',
            apply:(p,m)=>{ p.speed *= (1 + .04*m); } },
-  hp:    { label:'+ VITALITY',tag:'STAT', color:C.lime,   desc:'최대 HP 영구 +15, 회복',
+  hp:    { label:'+ 활력',tag:'능력', color:C.lime,   desc:'최대 생명 영구 +15, 회복',
            apply:(p,m)=>{ const inc = Math.round(15*m); p.maxHp += inc; p.hp = Math.min(p.maxHp, p.hp + inc); } },
 };
 function pickLevelupCards(p, n=3){
@@ -462,7 +471,7 @@ function renderLevelupCards(){
     let title = '', desc = '', tag='', color='#fff', statTable = '';
     const mult = card.mult || 1;
     if(card.type === 'weap_new'){
-      const d = WEAPONS[card.key]; title = d.name; tag = 'NEW'; color = d.color;
+      const d = WEAPONS[card.key]; title = d.name; tag = '신규'; color = d.color;
       desc = `<span style="color:#9ab5d0">${d.desc}</span>`;
       statTable = renderStatTable(weaponNewRows(d));
     }
@@ -471,20 +480,20 @@ function renderLevelupCards(){
       const w = p.weapons.find(w=>w.key===card.key);
       const d = WEAPONS[card.key] || w?.def;
       if(!d || !w){ continue; }  // defensive — skip malformed card
-      title = d.name; tag = 'UP'; color = w.color || d.color;
-      desc = `Lv.${w.level} → ${w.level+1}`;
+      title = d.name; tag = '강화'; color = w.color || d.color;
+      desc = `Lv ${w.level} → ${w.level+1}`;
       statTable = renderStatTable(weaponUpgradeRows(w, mult));
     }
     else if(card.type === 'pas'){
       const d = PASSIVES[card.key]; const curLv = (p.passives[card.key]||0); const lv = curLv + 1;
-      title = d.name; tag = `Lv.${lv}/${d.maxLv}`; color = d.color;
+      title = d.name; tag = `Lv ${lv}/${d.maxLv}`; color = d.color;
       desc = `<span style="color:#9ab5d0">${d.desc}</span>`;
       statTable = renderStatTable(passivePreviewRows(card.key, mult, curLv, p));
     }
     else if(card.type === 'heal'){
-      title = 'BLOOD REST'; tag='HEAL'; color=C.red;
+      title = '피의 휴식'; tag='회복'; color=C.red;
       const heal = Math.round(p.maxHp * 0.5 * mult);
-      desc = `HP +${heal} <span style="color:#7d96b4">(50%${mult!==1?` ×${mult.toFixed(2)}`:''})</span>`;
+      desc = `생명 +${heal} <span style="color:#7d96b4">(50%${mult!==1?` ×${mult.toFixed(2)}`:''})</span>`;
     }
     else if(card.type === 'stat_up'){
       const su = STAT_UPS[card.stat];
@@ -492,13 +501,13 @@ function renderLevelupCards(){
       desc = `<span style="color:#cfeaff">${su.desc}${mult!==1?` <span style="color:#9eff5b">×${mult.toFixed(2)}</span>`:''}</span>`;
     }
     else if(card.type === 'gold'){
-      title = 'COFFER OF CORES'; tag='GOLD'; color=C.gold;
+      title = '코어 궤짝'; tag='코어'; color=C.gold;
       const amt = Math.round(10 * mult);
       desc = `+${amt} ◆${mult!==1?` <span style="color:#7d96b4">(×${mult.toFixed(2)})</span>`:''}`;
     }
     else if(card.type === 'evolve'){
       const e = card.evo; const w = p.weapons.find(w=>w.key===card.key);
-      title = e.name; color = e.color; tag = '▲ RUNE';
+      title = e.name; color = e.color; tag = '▲ 룬';
       const reqs = e.req.map(r => PASSIVES[r].name).join(' + ');
       desc = `${e.desc}<br><span style="color:#ffd96b">룬 조건: ${reqs}</span><br><span style="color:#9eff5b">→ 스킬 슬롯이 각성됩니다</span>`;
       if(w) statTable = renderStatTable(evolutionRows(w, e));
@@ -506,37 +515,37 @@ function renderLevelupCards(){
     else if(card.type === 'item_pick'){
       const it = card.item;
       title = it.name; color = ITEM_TIERS[it.tier].color;
-      tag = it.kind === 'relic' ? '◈ RELIC' : '◇ LOOT';
+      tag = it.kind === 'relic' ? '◈ 유물' : '◇ 전리품';
       desc = `<span style="color:#cfeaff">${it.desc}</span><br><span style="color:#7d96b4">${it.kind === 'relic' ? '영구 효과' : '일회성 사용'}</span>`;
     }
     else if(card.type === 'glyph_pick'){
       const g = card.glyph;
       const stackCount = (p.glyphs||[]).filter(id => id === g.id).length;
-      title = g.name; color = g.color; tag = '▽ RUNE';
+      title = g.name; color = g.color; tag = '▽ 룬';
       const stackLabel = stackCount > 0 ? `<br><span style="color:#9eff5b">현재 ${stackCount}중첩 — 픽 시 누적</span>` : '<br><span style="color:#9eff5b">이번 원정 영구 (심연 보스 보상)</span>';
       desc = `<span style="color:#cfeaff">${g.desc}</span>${stackLabel}`;
     }
     else if(card.type === 'shrine_pick'){
       const s = card.shrine;
       const affordable = meta.coins >= card.cost;
-      title = s.name; color = s.color; tag = '◈ ALTAR';
+      title = s.name; color = s.color; tag = '◈ 제단';
       const costLine = `<br><span style="color:${affordable?'#ffd400':'#ff6464'};font-weight:900">◆ ${card.cost} ${affordable?'':'(코인 부족)'}</span>`;
       desc = `<span style="color:#cfeaff">${s.desc}</span>${costLine}`;
     }
     else if(card.type === 'fuse'){
       const f = card.fuse;
-      title = f.name; color = f.color; tag = '★ AWAKEN';
-      desc = `${f.desc}<br><span style="color:#ffd96b">각성 재료: ${f.sourceA} + ${f.sourceB}</span><br><span style="color:#9eff5b">두 스킬 흡수 → Lv.1 전설 스킬</span>`;
+      title = f.name; color = f.color; tag = '★ 각성';
+      desc = `${f.desc}<br><span style="color:#ffd96b">각성 재료: ${displayWeaponName(f.sourceA)} + ${displayWeaponName(f.sourceB)}</span><br><span style="color:#9eff5b">두 스킬 흡수 → Lv 1 전설 스킬</span>`;
     }
     el.className = 'card rarity-' + rarityClass + (card.type==='evolve'?' evo':'') + (card.type==='fuse'?' fuse':'') + (card.type==='glyph_pick'?' glyph':'') + (card.type==='shrine_pick'?' shrine':'');
     el.style.setProperty('--accent', color);
     let tierLabel;
-    if(card.type === 'evolve') tierLabel = `<div class="tier-label" style="color:#49c7ff;text-shadow:0 0 14px rgba(73,199,255,.9)">▲ RUNE · 각성</div>`;
-    else if(card.type === 'fuse') tierLabel = `<div class="tier-label" style="color:#b8182f;text-shadow:0 0 14px rgba(184,24,47,.9)">★ AWAKEN · 전설</div>`;
-    else if(card.type === 'glyph_pick') tierLabel = `<div class="tier-label" style="color:${card.glyph.color};text-shadow:0 0 14px ${card.glyph.color}">▽ BOSS RUNE · 심연 보상</div>`;
-    else if(card.type === 'shrine_pick') tierLabel = `<div class="tier-label" style="color:${card.shrine.color};text-shadow:0 0 14px ${card.shrine.color}">◈ CURSED ALTAR · 즉시 헌납</div>`;
-    else if(card.type === 'pas') tierLabel = `<div class="tier-label" style="color:${PASSIVES[card.key].color};text-shadow:0 0 10px ${PASSIVES[card.key].color}">◇ VIRTUE · 룬 조건</div>`;
-    else if(card.type === 'item_pick') tierLabel = `<div class="tier-label" style="color:${ITEM_TIERS[card.item.tier].color};text-shadow:0 0 12px ${ITEM_TIERS[card.item.tier].glow}">${card.item.tier.toUpperCase()} · ${card.item.kind.toUpperCase()}</div>`;
+    if(card.type === 'evolve') tierLabel = `<div class="tier-label" style="color:#49c7ff;text-shadow:0 0 14px rgba(73,199,255,.9)">▲ 룬 · 각성</div>`;
+    else if(card.type === 'fuse') tierLabel = `<div class="tier-label" style="color:#b8182f;text-shadow:0 0 14px rgba(184,24,47,.9)">★ 각성 · 전설</div>`;
+    else if(card.type === 'glyph_pick') tierLabel = `<div class="tier-label" style="color:${card.glyph.color};text-shadow:0 0 14px ${card.glyph.color}">▽ 보스 룬 · 심연 보상</div>`;
+    else if(card.type === 'shrine_pick') tierLabel = `<div class="tier-label" style="color:${card.shrine.color};text-shadow:0 0 14px ${card.shrine.color}">◈ 저주 제단 · 즉시 헌납</div>`;
+    else if(card.type === 'pas') tierLabel = `<div class="tier-label" style="color:${PASSIVES[card.key].color};text-shadow:0 0 10px ${PASSIVES[card.key].color}">◇ 덕목 · 룬 조건</div>`;
+    else if(card.type === 'item_pick') tierLabel = `<div class="tier-label" style="color:${ITEM_TIERS[card.item.tier].color};text-shadow:0 0 12px ${ITEM_TIERS[card.item.tier].glow}">${ITEM_TIERS[card.item.tier].label} · ${displayItemKind(card.item.kind)}</div>`;
     else if(card.tier) tierLabel = `<div class="tier-label" style="color:${card.tier.color};text-shadow:0 0 10px ${card.tier.glow}">${card.tier.label}${(card.mult && card.mult !== 1)?' · ×'+card.mult.toFixed(2):''}</div>`;
     else tierLabel = '';
     const iconHtml = cardIconHtml(card, p, color, title);
@@ -574,7 +583,7 @@ function applyLevelupCard(card){
     fxRuneCircle(p.x, p.y, col, 150, .75, {style:'seal',spokes:9});
     fxRing(p.x, p.y, '#ffffff', 210, .9, {style:'rune',spokes:12});
     AUDIO.level();
-    announce('▲ EVOLVE · ' + card.evo.name, 3);
+    announce('▲ 각성 · ' + card.evo.name, 3);
   }
   else if(card.type === 'item_pick'){ applyItem(p, card.item.id); }
   else if(card.type === 'glyph_pick'){ applyGlyph(p, card.glyph.id); }
@@ -603,7 +612,7 @@ function applyLevelupCard(card){
     fxRuneCircle(p.x, p.y, col, 190, .85, {style:'seal',spokes:12});
     fxRing(p.x, p.y, '#ffffff', 270, 1.0, {style:'rune',spokes:14});
     AUDIO.level();
-    announce('★ FUSE · ' + (card.fuse?.name || 'WEAPON FUSED'), 3);
+    announce('★ 결합 · ' + (card.fuse?.name || '전설 스킬 완성'), 3);
   }
   else if(card.type === 'heal'){ p.hp = Math.min(p.maxHp, p.hp + p.maxHp*.5 * mult); }
   else if(card.type === 'gold'){ const amt = Math.round(10 * mult); G.coinsRun += amt; meta.coins += amt; saveMeta(); }
@@ -734,12 +743,14 @@ function updateProgressionGuide(p){
     const reqStr = bestPath.req.map(pk => {
       const cur = p.passives[pk] || 0;
       const max = PASSIVES[pk].maxLv;
-      return cur >= max ? `<span class="ok">${pk}✓</span>` : `<span class="need">${pk}${cur}/${max}</span>`;
+      const name = displayPassiveName(pk);
+      return cur >= max ? `<span class="ok">${name}✓</span>` : `<span class="need">${name}${cur}/${max}</span>`;
     }).join('+');
-    const lvStr = atMax ? `<span class="ok">Lv.${maxLv}✓</span>` : `<span class="lvl">Lv.${w.level}/${maxLv}</span>`;
+    const lvStr = atMax ? `<span class="ok">Lv ${maxLv}✓</span>` : `<span class="lvl">Lv ${w.level}/${maxLv}</span>`;
     const cls = ready ? 'ready' : ((atMax || allReqsMet) ? 'partial' : 'locked');
     const sortKey = ready ? 0 : (atMax ? 1 : (allReqsMet ? 1 : 2));
-    const tip = `${w.def.name} → ${bestPath.name}\n조건: 스킬 ${maxLv}렙 + ${bestPath.req.join('+')} 만렙`;
+    const reqNames = bestPath.req.map(displayPassiveName).join(' + ');
+    const tip = `${w.def.name} → ${bestPath.name}\n조건: 스킬 Lv ${maxLv} + ${reqNames} 만렙`;
     evoRows.push({ sortKey, html:
       `<div class="pg-row evo ${cls}" title="${tip.replace(/"/g,'&quot;')}">
         <div class="pg-name" style="color:${w.def.color}">${w.def.name} → ${bestPath.name}</div>
@@ -762,12 +773,13 @@ function updateProgressionGuide(p){
     const cls = ready ? 'ready' : (both ? 'partial' : 'locked');
     const sortKey = ready ? 0 : (both ? 1 : 2);
     const stat = (key, has, evo, max, w) => {
-      if(!has) return `<span class="miss">${key}없음</span>`;
-      if(!max) return `<span class="lvl">${key}${w.level}/${w.def.maxLv}</span>`;
-      if(!evo) return `<span class="need">${key}각성필요</span>`;
-      return `<span class="ok">${key}✓</span>`;
+      const name = displayWeaponName(key);
+      if(!has) return `<span class="miss">${name} 없음</span>`;
+      if(!max) return `<span class="lvl">${name} Lv ${w.level}/${w.def.maxLv}</span>`;
+      if(!evo) return `<span class="need">${name} 각성 필요</span>`;
+      return `<span class="ok">${name}✓</span>`;
     };
-    const tip = `${f.name} = ${f.sourceA} + ${f.sourceB}\n조건: 둘 다 만렙+각성 → 새 전설 스킬 Lv.1`;
+    const tip = `${f.name} = ${displayWeaponName(f.sourceA)} + ${displayWeaponName(f.sourceB)}\n조건: 둘 다 만렙+각성 → 새 전설 스킬 Lv 1`;
     fuseRows.push({ sortKey, html:
       `<div class="pg-row fuse ${cls}" title="${tip.replace(/"/g,'&quot;')}">
         <div class="pg-name" style="color:${f.color}">${f.name}</div>
@@ -791,9 +803,9 @@ export function updateHUD(){
   setBar('hp-bar', (p.hp / p.maxHp) * 100);
   document.getElementById('hp-text').textContent = `${Math.ceil(p.hp)} / ${p.maxHp|0}`;
   setBar('xp-bar', (p.xp / p.xpNext) * 100);
-  document.getElementById('lv-chip').textContent = `LV ${p.level}`;
+  document.getElementById('lv-chip').textContent = `Lv ${p.level}`;
   document.getElementById('timer').textContent = fmtTime(G.t);
-  document.getElementById('kill-chip').textContent = `KILLS ${G.killCount}`;
+  document.getElementById('kill-chip').textContent = `처치 ${G.killCount}`;
   document.getElementById('coin-chip').textContent = `◆ ${G.coinsRun}`;
   const ws = document.getElementById('weapon-slots');
   if(ws.children.length !== p.weapons.length){
@@ -833,11 +845,11 @@ export function updateHUD(){
   }
   const ce = document.getElementById('combo');
   if(G.combo > 4){
-    ce.textContent = `×${G.combo} COMBO`;
+    ce.textContent = `×${G.combo} 연속 처치`;
     ce.classList.add('show');
   } else { ce.classList.remove('show'); }
   const diff = document.getElementById('diff-chip');
-  if(diff) diff.textContent = 'RIFT · ' + (G.biomeName || 'RUINED NAVE');
+  if(diff) diff.textContent = '균열 · ' + (G.biomeName || '붕괴한 성당');
   renderBuffTimers(p);
   // Progression guide panel — right-side, always-visible during play. Throttled
   // since state only changes on level-up / evolve, not per frame.
@@ -879,31 +891,31 @@ export function startRun(classKey){
   saveMeta();
   closeOverlay('menu-overlay'); closeOverlay('class-overlay');
   document.getElementById('menu-runs').textContent = meta.runs;
-  announce('SURVIVE THE RIFT 15:00', 1.6);
+  announce('균열에서 15:00 생존', 1.6);
 }
 export function endRun(victory){
   if(G.mode === 'end') return;
   G.mode = 'end';
   G.endReason = victory ? 'victory' : 'death';
   document.getElementById('end-overlay').classList.remove('hidden');
-  document.getElementById('end-title').textContent = victory ? 'RIFT SEALED' : 'EXILE FALLEN';
+  document.getElementById('end-title').textContent = victory ? '균열 봉인' : '추방자 쓰러짐';
   const grade = (() => {
-    if(victory) return 'S RANK · RIFT SEALED';
-    if(G.t >= 720) return 'A RANK · DEEP DELVE';
-    if(G.t >= 420 || G.killCount >= 600) return 'B RANK · BLOODIED';
-    return 'C RANK · FIRST BLOOD';
+    if(victory) return 'S 등급 · 균열 봉인';
+    if(G.t >= 720) return 'A 등급 · 깊은 원정';
+    if(G.t >= 420 || G.killCount >= 600) return 'B 등급 · 피투성이 생존';
+    return 'C 등급 · 첫 피';
   })();
   document.getElementById('end-grade').textContent = grade;
   document.getElementById('end-text').textContent = victory ? '심연이 봉인되었습니다. 전리품이 금고에 적립됩니다.' : '추방자가 균열 속에서 쓰러졌습니다.';
   const stats = document.getElementById('end-stats');
   const coinsTotal = meta.coins;
   stats.innerHTML = `
-    <span>TIME</span><b>${fmtTime(G.t)}</b>
-    <span>KILLS</span><b>${G.killCount}</b>
-    <span>LEVEL</span><b>${G.player ? G.player.level : 1}</b>
-    <span>CORES</span><b>◆ ${G.coinsRun}</b>
-    <span>EXILE</span><b>${CLASSES[G.classChosen]?.name || G.classChosen}</b>
-    <span>VAULT</span><b>◆ ${coinsTotal}</b>
+    <span>시간</span><b>${fmtTime(G.t)}</b>
+    <span>처치</span><b>${G.killCount}</b>
+    <span>Lv</span><b>${G.player ? G.player.level : 1}</b>
+    <span>코어</span><b>◆ ${G.coinsRun}</b>
+    <span>추방자</span><b>${CLASSES[G.classChosen]?.name || G.classChosen}</b>
+    <span>금고</span><b>◆ ${coinsTotal}</b>
   `;
   if(G.t > meta.bestTime){ meta.bestTime = G.t|0; }
   meta.kills += G.killCount;
@@ -922,7 +934,7 @@ function unlockMilestones(){
     const need = CLASSES[k].unlock;
     if(meta.coins >= need && !meta.unlocked.includes(k)){
       meta.unlocked.push(k);
-      announce('EXILE UNLOCKED · ' + CLASSES[k].name, 2);
+      announce('추방자 해금 · ' + CLASSES[k].name, 2);
     }
   }
 }
@@ -956,17 +968,17 @@ export function togglePause(){
     document.getElementById('pause-overlay').classList.remove('hidden');
     setAbandonConfirm(false);
     const p = G.player; if(!p) return;
-    let html = `<div><b>EXILE:</b> ${CLASSES[G.classChosen]?.name || G.classChosen} · LV ${p.level} · ${fmtTime(G.t)}</div>`;
-    html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">SKILLS</div>';
+    let html = `<div><b>추방자:</b> ${CLASSES[G.classChosen]?.name || G.classChosen} · Lv ${p.level} · ${fmtTime(G.t)}</div>`;
+    html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">스킬</div>';
     for(const w of p.weapons){
       const tag = w.evolved ? ` <span style="color:#ff2bd6">▲ ${w.evoName||''}</span>` : '';
-      html += `<div>· ${w.def.name} <span style="color:${w.color||w.def.color}">Lv.${w.level}</span>${tag}</div>`;
+      html += `<div>· ${w.def.name} <span style="color:${w.color||w.def.color}">Lv ${w.level}</span>${tag}</div>`;
     }
-    html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">VIRTUES</div>';
-    for(const k in p.passives) html += `<div>· ${PASSIVES[k].name} <span style="color:${PASSIVES[k].color}">Lv.${p.passives[k]}</span></div>`;
+    html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">덕목</div>';
+    for(const k in p.passives) html += `<div>· ${PASSIVES[k].name} <span style="color:${PASSIVES[k].color}">Lv ${p.passives[k]}</span></div>`;
     if(Object.keys(p.passives).length===0) html += '<div style="color:#5d7290">(없음)</div>';
     // Relics — permanent pickups
-    html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">RELICS</div>';
+    html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">유물</div>';
     const relics = p.relics || [];
     if(relics.length === 0){
       html += '<div style="color:#5d7290">(없음)</div>';
@@ -981,10 +993,10 @@ export function togglePause(){
     const activeBoosts = [];
     if(p._boostSpd > 0) activeBoosts.push(`⚡ 이동가속 ${p._boostSpd.toFixed(1)}s`);
     if(p._boostCdr > 0) activeBoosts.push(`⏱ 쿨감 ${p._boostCdr.toFixed(1)}s`);
-    if(p._boostDmg > 0) activeBoosts.push(`✦ 데미지 ${p._boostDmg.toFixed(1)}s`);
+    if(p._boostDmg > 0) activeBoosts.push(`✦ 피해 ${p._boostDmg.toFixed(1)}s`);
     if(p._boostInvuln > 0) activeBoosts.push(`🛡 무적 ${p._boostInvuln.toFixed(1)}s`);
     if(activeBoosts.length){
-      html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">ACTIVE</div>';
+      html += '<div style="margin-top:8px;color:#9ab5d0;font-weight:700">활성 효과</div>';
       for(const b of activeBoosts) html += `<div style="color:#ffd400">· ${b}</div>`;
     }
     // FUSION guide moved out of pause — it's always visible on the right side
@@ -1040,7 +1052,7 @@ function buildClassPicker(){
     el.innerHTML = `<div class="class-portrait">${art}</div>
       <div class="cname">${cl.name}</div>
       <div class="cdesc">${cl.desc}</div>
-      <div class="cstart">${locked ? '◆ ' + cl.unlock + ' 필요' : 'RIFT SKILL: ' + WEAPONS[cl.startWeap].name}</div>`;
+      <div class="cstart">${locked ? '◆ ' + cl.unlock + ' 필요' : '시작 스킬: ' + WEAPONS[cl.startWeap].name}</div>`;
     grid.appendChild(el);
     if(!locked) el.addEventListener('click', ()=> startRun(k));
   }
@@ -1079,7 +1091,7 @@ function buildShop(){
     el.className = 'shop-card' + (lv>=max ? ' maxed' : '') + (!affordable ? ' unaffordable' : '');
     let pips = '';
     for(let i=0;i<max;i++) pips += `<span class="pip ${i<lv?'on':''}"></span>`;
-    el.innerHTML = `<div class="sn">${it.name}</div><div class="sd">${it.desc}</div><div>${pips}</div><div class="sp" style="color:${cost==null?'#fff':affordable?'#fff1bc':'#ff7aa1'}">${cost==null?'MAX':'◆ '+cost}</div>`;
+    el.innerHTML = `<div class="sn">${it.name}</div><div class="sd">${it.desc}</div><div>${pips}</div><div class="sp" style="color:${cost==null?'#fff':affordable?'#fff1bc':'#ff7aa1'}">${cost==null?'최대':'◆ '+cost}</div>`;
     if(cost!=null) el.addEventListener('click', ()=>{
       if(meta.coins >= cost){
         meta.coins -= cost; meta.shop[it.key] = lv+1; saveMeta();
@@ -1110,7 +1122,7 @@ function buildSettings(){
 export function toggleSetting(key){
   if(!SETTINGS.some(s => s.key === key)) return;
   meta.settings[key] = !meta.settings[key];
-  if(key === 'autoQuality' && !meta.settings[key]){ G.qualityScale = 1; G.qualityLabel = 'HIGH'; }
+  if(key === 'autoQuality' && !meta.settings[key]){ G.qualityScale = 1; G.qualityLabel = '높음'; }
   saveMeta();
   buildSettings();
 }
@@ -1133,7 +1145,7 @@ function _chipCardHtml(chip, opts={}){
   const equippedTag = opts.equippedSlot != null ? `<div class="cequip">▣ ${opts.equippedSlot+1}</div>` : '';
   const stackTag = stack > 1 ? `<div class="cstack">×${stack}</div>` : '';
   const cls = 'chip tier-' + chip.tier + (opts.equipped ? ' equipped' : '') + (opts.fuseReady ? ' fuse-ready' : '') + (opts.empty ? ' empty' : '');
-  const fuseBtn = opts.fuseReady ? `<div class="cfuse" data-fuse="${chip.id}">★ FORGE → ${_CHIP_TIER_NEXT[chip.tier] ? CHIP_TIERS[_CHIP_TIER_NEXT[chip.tier]].label : '?'}</div>` : '';
+  const fuseBtn = opts.fuseReady ? `<div class="cfuse" data-fuse="${chip.id}">★ 제련 → ${_CHIP_TIER_NEXT[chip.tier] ? CHIP_TIERS[_CHIP_TIER_NEXT[chip.tier]].label : '?'}</div>` : '';
   // Effective-strength hint when stack > 1 — players can read "+5%/Lv" but a
   // ×4 stack means +20%, which is non-obvious without math. We surface a
   // small "현재" line that scales linear-equivalent values out of the desc.
@@ -1149,7 +1161,7 @@ function _chipCardHtml(chip, opts={}){
 }
 function _emptySlotHtml(slotIdx){
   return `<div class="chip empty" data-action="empty-slot" data-slot="${slotIdx}" style="width:160px">
-    <div class="cn" style="color:#5d7290">EMPTY SOCKET ${slotIdx+1}</div>
+    <div class="cn" style="color:#5d7290">빈 소켓 ${slotIdx+1}</div>
     <div class="cd" style="color:#5d7290">룬 금고에서 룬을 클릭해 장착</div>
   </div>`;
 }
@@ -1263,7 +1275,7 @@ function chipsetFuse(chipId){
   const tier = CHIP_TIERS[newChip.tier];
   document.getElementById('chipset-pull-result').innerHTML =
     `<div class="chip tier-${newChip.tier}" style="pointer-events:none;outline:3px solid ${tier.color};box-shadow:0 0 24px ${tier.color}">
-      <div class="cn" style="color:${tier.color}">★ FORGE → ${newChip.name}</div>
+      <div class="cn" style="color:${tier.color}">★ 제련 → ${newChip.name}</div>
       <div class="cd" style="font-size:10px">${newChip.desc}</div>
       <div style="font-size:9px;color:${tier.color};letter-spacing:.12em;font-weight:700">${tier.label}</div>
     </div>`;
@@ -1277,14 +1289,14 @@ function buildChipset(){
   const expansionIdx = slots - CHIP_DEFAULT_SLOTS;
   const slotBtn = document.getElementById('slot-btn');
   if(expansionIdx >= CHIP_SLOT_COSTS.length){
-    slotBtn.textContent = '+ 슬롯 (MAX)';
+    slotBtn.textContent = '+ 슬롯 (최대)';
     slotBtn.disabled = true;
   } else {
     const cost = CHIP_SLOT_COSTS[expansionIdx];
     slotBtn.textContent = `+ 슬롯 → ${slots+1} (◆ ${cost})`;
     slotBtn.disabled = meta.coins < cost;
   }
-  document.getElementById('chipset-slot-info').textContent = `${slots} sockets`;
+  document.getElementById('chipset-slot-info').textContent = `${slots}개 소켓`;
   // Equipped grid
   const eqRoot = document.getElementById('chipset-equipped');
   let html = '';
@@ -1350,7 +1362,7 @@ export function openChipset(){
   // like dead space when the player first arrives.
   document.getElementById('chipset-pull-result').innerHTML =
     `<div class="empty-state" style="border-color:rgba(255,61,203,.4)">
-      ◇ 코어로 룬을 제련한 후 금고에서 소켓에 장착하세요 · 같은 룬 ×3 → ★ FORGE 로 다음 등급 변환
+      ◇ 코어로 룬을 제련한 후 금고에서 소켓에 장착하세요 · 같은 룬 ×3 → ★ 제련으로 다음 등급 변환
     </div>`;
   buildChipset();
 }
@@ -1368,36 +1380,36 @@ function buildCodex(){
     `<div style="padding:8px 6px;border-bottom:1px solid #1c2a4a;color:${color}"><b>${title}</b> <span style="color:#9ab5d0">${desc}</span></div>`;
   let html = '';
   if(_codexTab === 'skills'){
-    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">SKILLS</div>';
+    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">스킬</div>';
     for(const k in WEAPONS){
       const seen = meta.seenCodex.weapons.includes(k);
       const d = WEAPONS[k];
       html += row(seen?d.color:'#5d7290', seen?d.name:'???', seen?'· '+d.desc:'· 미해금');
     }
   } else if(_codexTab === 'virtues'){
-    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">VIRTUES</div>';
+    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">덕목</div>';
     for(const k in PASSIVES){
       const seen = meta.seenCodex.passives.includes(k);
       const d = PASSIVES[k];
       html += row(seen?d.color:'#5d7290', seen?d.name:'???', seen?'· '+d.desc:'· 미해금');
     }
   } else if(_codexTab === 'awaken'){
-    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">★ AWAKENINGS</div>';
+    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">★ 각성</div>';
     for(const fk in FUSIONS){
       const f = FUSIONS[fk];
-      html += row(f.color, f.name, `= ${f.sourceA} + ${f.sourceB} — ${f.desc}`);
+      html += row(f.color, f.name, `= ${displayWeaponName(f.sourceA)} + ${displayWeaponName(f.sourceB)} — ${f.desc}`);
     }
   } else if(_codexTab === 'runes'){
-    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">▽ BOSS RUNES</div>';
+    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">▽ 보스 룬</div>';
     for(const gk in GLYPHS){
       const g = GLYPHS[gk];
       html += row(g.color, g.name, '· ' + g.desc);
     }
   } else {
-    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">ABYSS BESTIARY</div>';
+    html += '<div style="color:#fff;font-weight:900;letter-spacing:.2em;margin-bottom:6px">심연 도감</div>';
     for(const k in ENEMIES){
       const d = ENEMIES[k];
-      html += row(d.color, d.name || k, `· ${d.brain} · HP ${d.hp} · DMG ${d.dmg}`);
+      html += row(d.color, d.name || k, `· ${displayBrain(d.brain)} · 생명 ${d.hp} · 피해 ${d.dmg}`);
     }
   }
   root.innerHTML = html;

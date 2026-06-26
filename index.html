@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23070504'/%3E%3Cpath d='M32 6 52 32 32 58 12 32Z' fill='%23d6a84f'/%3E%3Cpath d='M32 16 44 32 32 48 20 32Z' fill='%23b8182f'/%3E%3C/svg%3E">
-<title>Abyssal Pulse · Neon Pulse</title>
+<title>어비스 펄스</title>
 <style>
 /* ───────── RESET ───────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -440,7 +440,7 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
 </head>
 <body>
 <div id="app">
-  <div id="boot-status">LOADING ABYSSAL ASSETS</div>
+  <div id="boot-status">심연 자산 불러오는 중</div>
   <div id="shake">
     <canvas id="canvas" width="1280" height="720"></canvas>
     <div class="scanlines"></div>
@@ -452,25 +452,25 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
     <div id="xp-wrap" class="bar-wrap"><div id="xp-bar" class="bar" style="width:0%"></div></div>
 
     <div id="hud-top">
-      <div class="chip" id="lv-chip">LV 1</div>
+      <div class="chip" id="lv-chip">Lv 1</div>
       <div id="timer">00:00</div>
-      <div class="chip kill" id="kill-chip">KILLS 0</div>
+      <div class="chip kill" id="kill-chip">처치 0</div>
       <div class="chip gold" id="coin-chip">◆ 0</div>
     </div>
 
     <div id="hud-tr">
-      <div class="chip" id="diff-chip">RIFT · NORMAL</div>
+      <div class="chip" id="diff-chip">균열 · 보통</div>
       <div class="chip" id="fps-chip" title="실시간 FPS · 60 목표">FPS --</div>
     </div>
 
     <div id="progression-guide" style="display:none">
-      <div class="pg-help" title="룬 각성: 무기 만렙 + 덕목 만렙 → 스킬 변형. 전설 각성: 각성된 두 무기 만렙 → 새 무기 Lv.1로 합쳐짐. 정보 패널 (클릭 불가)">[?]</div>
+      <div class="pg-help" title="룬 각성: 무기 만렙 + 덕목 만렙 → 스킬 변형. 전설 각성: 각성된 두 무기 만렙 → 새 무기 Lv 1로 합쳐짐. 정보 패널 (클릭 불가)">[?]</div>
       <div class="pg-section evo-section">
-        <div class="pg-head evo">▲ RUNE · 각성</div>
+        <div class="pg-head evo">▲ 룬 · 각성</div>
         <div id="evo-list"></div>
       </div>
       <div class="pg-section fuse-section">
-        <div class="pg-head fuse">★ AWAKEN · 전설</div>
+        <div class="pg-head fuse">★ 각성 · 전설</div>
         <div id="fuse-list"></div>
       </div>
     </div>
@@ -482,16 +482,16 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
       <div class="slot-row" id="relic-slots"></div>
     </div>
 
-    <div id="combo">×0 COMBO</div>
+    <div id="combo">×0 연속 처치</div>
     <div id="buff-timers"></div>
-    <div id="boss-name">▼ ABYSS LORD ▼</div>
+    <div id="boss-name">▼ 심연 군주 ▼</div>
     <div id="boss-hp-wrap"><div id="boss-hp-bar" style="width:100%"></div></div>
     <div id="boss-subtitle"></div>
     <div id="reward-banner"></div>
     <div id="biome-banner"></div>
-    <div id="boss-banner">WARNING</div>
+    <div id="boss-banner">경고</div>
     <div id="announce"></div>
-    <div id="hint"><span class="kbd">WASD</span> 이동 · <span class="kbd">SPACE</span> 일시정지 · <span class="kbd">M</span> 음소거</div>
+    <div id="hint"><span class="kbd">방향키</span> 이동 · <span class="kbd">스페이스</span> 일시정지 · <span class="kbd">M</span> 음소거</div>
     <button class="icon-btn" id="mute-btn" title="음소거" onclick="toggleMute()">♪</button>
     <button class="icon-btn" id="pause-btn" title="일시정지" onclick="togglePause()">‖</button>
   </div>
@@ -500,18 +500,18 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
 
   <!-- MAIN MENU -->
   <div class="overlay" id="menu-overlay">
-    <div id="menu-title">ABYSSAL PULSE</div>
-    <div id="menu-sub">DARK LOOT ROGUELITE · 0.2.0</div>
+    <div id="menu-title">어비스 펄스</div>
+    <div id="menu-sub">어둠의 전리품 로그라이트 · 0.2.0</div>
     <div class="row">
-      <button class="btn" onclick="openClassPicker()">▶ ENTER RIFT</button>
-      <button class="btn gold" onclick="openShop()">◆ BLACKSMITH</button>
-      <button class="btn magenta" onclick="openChipset()">◈ RUNE SOCKETS</button>
-      <button class="btn ghost" onclick="openCodex()">≣ BESTIARY</button>
-      <button class="btn ghost" onclick="openSettings()">⚙ SETTINGS</button>
+      <button class="btn" onclick="openClassPicker()">▶ 균열 입장</button>
+      <button class="btn gold" onclick="openShop()">◆ 대장간</button>
+      <button class="btn magenta" onclick="openChipset()">◈ 룬 소켓</button>
+      <button class="btn ghost" onclick="openCodex()">≣ 도감</button>
+      <button class="btn ghost" onclick="openSettings()">⚙ 설정</button>
     </div>
     <div id="legend">
-      <div><span class="k">HOLLOW IMP</span> 추격</div><div><span class="k">GRAVE BRUTE</span> 돌파</div><div><span class="k">BONE SPLITTER</span> 분열</div>
-      <div><span class="k">CINDER ACOLYTE</span> 사격</div><div><span class="k">BLOOD WRAITH</span> 돌진</div><div><span class="k">PLAGUE DEACON</span> 치유</div>
+      <div><span class="k">공허 임프</span> 추격</div><div><span class="k">묘지 거한</span> 돌파</div><div><span class="k">뼈 가름귀</span> 분열</div>
+      <div><span class="k">잿불 시종</span> 사격</div><div><span class="k">피 망령</span> 돌진</div><div><span class="k">역병 사제</span> 치유</div>
     </div>
     <div style="font-size:11px;color:#5d7290;margin-top:14px;letter-spacing:.2em">
       금고 ◆ <span id="menu-coins">0</span> · 최고 생존 <span id="menu-best">0:00</span> · 원정 <span id="menu-runs">0</span>
@@ -520,7 +520,7 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
 
   <!-- CLASS PICKER -->
   <div class="overlay hidden" id="class-overlay">
-    <h1>CHOOSE EXILE</h1>
+    <h1>추방자 선택</h1>
     <p>각 추방자는 시작 스킬과 생존 성향이 다릅니다.</p>
     <div class="class-grid" id="class-grid"></div>
     <div class="row">
@@ -530,48 +530,48 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
 
   <!-- LEVEL UP -->
   <div class="overlay hidden" id="levelup-overlay">
-    <h2>ALTAR OF BOONS</h2>
+    <h2>축복의 제단</h2>
     <p class="level-flavor">피와 룬이 응답합니다</p>
     <div class="cards" id="cards"></div>
     <div class="row level-actions">
-      <button class="btn ghost" id="reroll-btn" onclick="rerollLevelup()">⟳ REROLL OFFERINGS (◆ <span id="reroll-cost">3</span>)</button>
-      <button class="btn ghost" id="skip-btn" onclick="skipLevelup()">⨯ BLOOD REST (+10HP)</button>
+      <button class="btn ghost" id="reroll-btn" onclick="rerollLevelup()">⟳ 제물 다시 뽑기 (◆ <span id="reroll-cost">3</span>)</button>
+      <button class="btn ghost" id="skip-btn" onclick="skipLevelup()">⨯ 피의 휴식 (+10 생명)</button>
     </div>
   </div>
 
   <!-- PAUSE -->
   <div class="overlay hidden" id="pause-overlay">
-    <h1>RIFT PAUSED</h1>
+    <h1>균열 일시정지</h1>
     <div id="pause-info"></div>
     <div class="row">
-      <button class="btn" onclick="togglePause()">▶ RETURN</button>
-      <button class="btn ghost" onclick="confirmAbandon()">✕ ABANDON RIFT</button>
+      <button class="btn" onclick="togglePause()">▶ 복귀</button>
+      <button class="btn ghost" onclick="confirmAbandon()">✕ 균열 포기</button>
     </div>
     <div id="abandon-confirm" class="confirm-box hidden">
-      <b>ABANDON RIFT?</b>
+      <b>균열을 포기할까요?</b>
       <span>현재 원정을 종료하고 지금까지 얻은 전리품을 정산합니다.</span>
       <div class="row">
-        <button class="btn ghost" onclick="cancelAbandon()">RETURN</button>
-        <button class="btn" onclick="abandonRun()">✕ ABANDON</button>
+        <button class="btn ghost" onclick="cancelAbandon()">돌아가기</button>
+        <button class="btn" onclick="abandonRun()">✕ 포기</button>
       </div>
     </div>
   </div>
 
   <!-- END -->
   <div class="overlay hidden" id="end-overlay">
-    <h1 id="end-title">DEFEAT</h1>
+    <h1 id="end-title">패배</h1>
     <div class="end-grade" id="end-grade"></div>
     <p id="end-text" style="margin-top:-8px"></p>
     <div id="end-stats"></div>
     <div class="row">
-      <button class="btn" onclick="returnToMenu()">▶ CLAIM SPOILS</button>
-      <button class="btn magenta" onclick="restartRun()">↻ DELVE AGAIN</button>
+      <button class="btn" onclick="returnToMenu()">▶ 전리품 정산</button>
+      <button class="btn magenta" onclick="restartRun()">↻ 다시 잠입</button>
     </div>
   </div>
 
   <!-- SETTINGS -->
   <div class="overlay hidden" id="settings-overlay">
-    <h1>SETTINGS</h1>
+    <h1>설정</h1>
     <p>화면 강도와 성능 자동 조절을 원정에 바로 반영합니다.</p>
     <div class="settings-grid" id="settings-grid"></div>
     <div class="row" style="margin-top:8px">
@@ -581,7 +581,7 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
 
   <!-- SHOP -->
   <div class="overlay hidden" id="shop-overlay">
-    <h1>BLACKSMITH</h1>
+    <h1>대장간</h1>
     <p>금고의 코어를 바쳐 영구 강화를 벼립니다. 보유 ◆ <span id="shop-coins">0</span></p>
     <div class="shop-feedback" id="shop-feedback" aria-live="polite"></div>
     <div class="shop-grid" id="shop-grid"></div>
@@ -592,7 +592,7 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
 
   <!-- CHIPSET -->
   <div class="overlay hidden" id="chipset-overlay">
-    <h1>RUNE SOCKETS</h1>
+    <h1>룬 소켓</h1>
     <p>코어를 룬으로 벼려 장착합니다. 장착한 룬만 원정에 적용. 보유 ◆ <span id="chipset-coins">0</span></p>
     <div class="row" style="margin-top:4px;gap:10px">
       <button class="btn magenta" id="pull1-btn" onclick="chipsetPull(1)">◇ 룬 조각 (◆ 100)</button>
@@ -602,11 +602,11 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
     <div id="chipset-pull-result" style="min-height:90px;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:920px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:920px;margin-top:10px;width:90%">
       <div>
-        <div style="color:#fff;font-weight:900;letter-spacing:.18em;margin-bottom:6px;font-size:12px">▣ SOCKETED — <span id="chipset-slot-info">3 sockets</span></div>
+        <div style="color:#fff;font-weight:900;letter-spacing:.18em;margin-bottom:6px;font-size:12px">▣ 장착 중 — <span id="chipset-slot-info">3개 소켓</span></div>
         <div id="chipset-equipped" style="display:flex;gap:6px;flex-wrap:wrap"></div>
       </div>
       <div>
-        <div style="color:#fff;font-weight:900;letter-spacing:.18em;margin-bottom:6px;font-size:12px">◇ RUNE VAULT (클릭=장착, 같은 룬 3=합성)</div>
+        <div style="color:#fff;font-weight:900;letter-spacing:.18em;margin-bottom:6px;font-size:12px">◇ 룬 금고 (클릭=장착, 같은 룬 3=합성)</div>
         <div id="chipset-inventory" style="display:flex;gap:6px;flex-wrap:wrap;max-height:240px;overflow-y:auto"></div>
       </div>
     </div>
@@ -617,7 +617,7 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
 
   <!-- CODEX -->
   <div class="overlay hidden" id="codex-overlay">
-    <h1>BESTIARY</h1>
+    <h1>도감</h1>
     <p>해금된 스킬, 덕목, 각성, 심연의 적 정보.</p>
     <div class="codex-tabs" id="codex-tabs"></div>
     <div id="codex-content" style="max-width:880px;width:90%;max-height:60vh;overflow-y:auto;padding:8px"></div>
@@ -646,7 +646,7 @@ body.load-failed #boot-status{display:block;color:#ff7aa1}
   }
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js" onerror="document.body.classList.add('load-failed');document.getElementById('boot-status').textContent='PIXI LOAD FAILED · 네트워크를 확인하세요'"></script>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js" onerror="document.body.classList.add('load-failed');document.getElementById('boot-status').textContent='PIXI 로드 실패 · 네트워크를 확인하세요'"></script>
 <script type="module" src="js/main.js?v=abyssal-audio-v4"></script>
 </body>
 </html>

@@ -204,8 +204,8 @@ function _attachPickupSprite(e){
       // Relic — large hexagon, full glow, bright fill (distinct from any enemy/XP).
       texInfo = getPolygonTexture(6, e.r * 1.6, col, glow, col, 2.4);
     } else {
-      // Consumable — 5-point star (distinct from XP diamond & enemy polygons).
-      texInfo = getStarTexture(5, e.r * 1.6, e.r * 0.75, col, glow, col, 2);
+      // Consumable — oversized hollow rune star, deliberately unlike XP diamonds.
+      texInfo = getStarTexture(7, e.r * 1.95, e.r * 0.72, col, Math.max(glow, 20), 'rgba(12,6,4,.82)', 2.6);
     }
   } else {
     texInfo = getCircleTexture(e.r, '#ffffff', 6, '#ffffff', 1);
@@ -353,7 +353,7 @@ export function dealDamage(e, dmg, color='#fff'){
     const thresh = e.isBoss ? (G.player.bossExecuteThresh || 0) : (G.player.executeThresh || 0);
     if(thresh > 0 && e.hp / e.maxHp <= thresh){
       e.hp = 0;
-      fxText(e.x, e.y - e.r - 18, 'EXECUTE', C.violet, true);
+      fxText(e.x, e.y - e.r - 18, '처형', C.violet, true);
       fxRing(e.x, e.y, C.violet, e.r * 3.2, .35, {style:'seal',spokes:8});
     }
   }
@@ -470,13 +470,13 @@ export function killEnemy(e){
       if(dx*dx + dy*dy <= e.hexR * e.hexR) dealDamage(o, e.hexDmg, e.hexColor || C.violet);
     }
   }
-  if(e.isBoss){ shake(.6); flash(e.color, .35); AUDIO.explode(e.x, e.y); announce('ABYSS LORD SLAIN', 1.6); }
+  if(e.isBoss){ shake(.6); flash(e.color, .35); AUDIO.explode(e.x, e.y); announce('심연 군주 처치', 1.6); }
   else { shake(.04); AUDIO.hit(e.x); }
   // drops are handled by player.js (it imports the items table) via _onKill hook
   if(_onKillHook) _onKillHook(e);
   // boss UI cleanup + music swap
   if(e.isBoss && G.bossActive === e){
-    _showRewardBanner('ABYSS REWARD', 'Relic chest and boss rune unlocked', e.color);
+    _showRewardBanner('심연 보상', '유물 궤짝과 보스 룬이 열렸습니다', e.color);
     G.bossActive = null;
     document.getElementById('boss-hp-wrap').style.display='none';
     document.getElementById('boss-name').style.display='none';
@@ -661,10 +661,10 @@ export function spawnEnemy(typeKey, x, y){
   return e;
 }
 const BOSS_TELLS = {
-  RING_LORD: 'Rings of ruin expand from the bell.',
-  SPIKE_KING: 'Charges, cleaves, then erupts in bone spikes.',
-  HYDRA: 'Splits the arena with plague volleys.',
-  PRISMA: 'Turns light into crossing soul beams.',
+  RING_LORD: '파멸의 고리가 종소리와 함께 퍼집니다.',
+  SPIKE_KING: '돌진과 가르기 뒤 뼈 가시가 솟구칩니다.',
+  HYDRA: '역병 탄막이 전장을 갈라놓습니다.',
+  PRISMA: '빛을 교차하는 영혼 광선으로 바꿉니다.',
 };
 function _showRewardBanner(title, detail, color=C.gold){
   const el = document.getElementById('reward-banner');
@@ -703,7 +703,7 @@ export function spawnBoss(typeKey){
   });
   G.bossActive = e;
   G.bannerTimer = 2.0;
-  const tell = BOSS_TELLS[typeKey] || 'Abyssal pattern incoming.';
+  const tell = BOSS_TELLS[typeKey] || '심연의 패턴이 다가옵니다.';
   document.getElementById('boss-banner').textContent = '▼ ' + def.name + ' ▼';
   document.getElementById('boss-banner').classList.add('show');
   document.getElementById('boss-name').textContent = '▼ ' + def.name + ' ▼';

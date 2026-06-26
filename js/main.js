@@ -129,13 +129,13 @@ function _updateFps(dt){
   if(_fpsAccum >= 0.5){
     const fps = _fpsFrames / _fpsAccum;
     if(meta.settings?.autoQuality){
-      if(fps < 38 && G.qualityScale > .58){ G.qualityScale = .55; G.qualityLabel = 'LOW'; }
-      else if(fps > 55 && G.qualityScale < 1){ G.qualityScale = 1; G.qualityLabel = 'HIGH'; }
+      if(fps < 38 && G.qualityScale > .58){ G.qualityScale = .55; G.qualityLabel = '낮음'; }
+      else if(fps > 55 && G.qualityScale < 1){ G.qualityScale = 1; G.qualityLabel = '높음'; }
     } else {
-      G.qualityScale = 1; G.qualityLabel = 'HIGH';
+      G.qualityScale = 1; G.qualityLabel = '높음';
     }
     if(_fpsEl){
-      _fpsEl.textContent = `FPS ${fps.toFixed(0)} · ENT ${G.ents.length} · ${G.qualityLabel}`;
+      _fpsEl.textContent = `FPS ${fps.toFixed(0)} · 개체 ${G.ents.length} · ${G.qualityLabel}`;
       const col = fps >= 55 ? '#9eff5b' : (fps >= 30 ? '#ffd400' : '#ff4561');
       _fpsEl.style.color = col;
       _fpsEl.style.borderColor = col;

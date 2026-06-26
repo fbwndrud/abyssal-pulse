@@ -673,17 +673,17 @@ function _makePlayerGlowTexture(){
 
 const BIOMES = {
   nave: {
-    name:'RUINED NAVE',
+    name:'붕괴한 성당',
     center:['rgba(54,22,17,1)', 'rgba(17,10,9,1)', '#050302'],
     stars:[C.gold, C.red, C.cyan, C.violet],
   },
   crypt: {
-    name:'BONE CRYPT',
+    name:'뼈 납골당',
     center:['rgba(16,34,40,1)', 'rgba(10,12,18,1)', '#040506'],
     stars:[C.cyan, C.teal, C.violet, C.white],
   },
   hellforge: {
-    name:'HELLFORGE RIFT',
+    name:'지옥대장간 균열',
     center:['rgba(70,18,12,1)', 'rgba(26,8,7,1)', '#050201'],
     stars:[C.red, C.gold, C.magenta, C.violet],
   },

@@ -1,38 +1,38 @@
-# Abyssal Pulse — Audio Playtest Checklist
+# 어비스 펄스 — 오디오 플레이테스트 체크리스트
 
-This pass uses external licensed dark fantasy/RPG audio instead of the old cyberpunk music, Kenney sci-fi SFX, or local procedural placeholder pack.
+이번 패스는 예전 사이버펑크 음악, Kenney 공상과학 효과음, 로컬 프로시저럴 임시팩 대신 라이선스가 확인된 다크 판타지/RPG 오디오를 사용합니다.
 
-## Setup
+## 준비
 
-- [ ] Test from `http://localhost:8002/`
-- [ ] Use headphones or decent speakers
-- [ ] Hard-refresh once so the browser does not keep cached Ogg files
+- [ ] `http://localhost:8002/`에서 테스트
+- [ ] 헤드폰 또는 괜찮은 스피커 사용
+- [ ] 브라우저가 캐시된 Ogg 파일을 쓰지 않도록 한 번 강력 새로고침
 
-## Music
+## 음악
 
-- [ ] Menu uses a dungeon ambience bed, not synthwave
-- [ ] Main combat cycles only licensed tracks: `Dark Quest`, `A Darkness Opus`, and `ai_fight`
-- [ ] No old procedural arpeggio/drone layer is audible during gameplay
-- [ ] Boss music is clearly heavier and more orchestral
-- [ ] Music transitions do not pop or fall silent for too long
+- [ ] 메뉴 음악이 신스웨이브가 아니라 던전 앰비언스처럼 들림
+- [ ] 전투 음악은 `Dark Quest`, `A Darkness Opus`, `ai_fight` 라이선스 트랙만 순환
+- [ ] 예전 프로시저럴 아르페지오/드론 레이어가 게임플레이 중 들리지 않음
+- [ ] 보스 음악이 확실히 더 무겁고 오케스트라풍으로 들림
+- [ ] 음악 전환에서 팝 노이즈나 긴 무음이 없음
 
-## Sound Effects
+## 효과음
 
-- [ ] Shoot/hit/pickup are real sample-based sounds, not tiny oscillator chirps
-- [ ] Explosion has fireball impact weight
-- [ ] Damage reads as a metal/body hit and does not spam too loudly
-- [ ] Level-up/heal sounds are fantasy chimes, not arcade sparkles
-- [ ] Freeze and laser use ice/electric spell samples
-- [ ] UI click is short and tactile
+- [ ] 발사/피격/픽업이 작은 오실레이터 삑 소리가 아니라 실제 샘플 기반으로 들림
+- [ ] 폭발에 화염구 충돌의 무게감이 있음
+- [ ] 피해음이 금속/신체 충돌처럼 읽히고 너무 시끄럽게 반복되지 않음
+- [ ] 레벨업/회복음이 아케이드 반짝임이 아니라 판타지 차임처럼 들림
+- [ ] 빙결과 광선은 얼음/전기 주문 샘플을 사용함
+- [ ] UI 클릭음이 짧고 촉각적으로 들림
 
-## Mix
+## 믹스
 
-- [ ] Repeated projectiles do not stack into a noisy wall
-- [ ] Big impacts briefly duck music and recover naturally
-- [ ] Boss SFX remains threatening without masking everything
-- [ ] No SFX clips, cracks, or distorts on laptop speakers
+- [ ] 반복 투사체가 쌓여 소음 벽처럼 들리지 않음
+- [ ] 큰 충격이 음악을 잠깐 눌렀다가 자연스럽게 회복됨
+- [ ] 보스 효과음이 위협적이지만 전체 믹스를 가리지 않음
+- [ ] 노트북 스피커에서도 효과음 클리핑, 크랙, 왜곡이 없음
 
-## Attribution
+## 출처 표기
 
-- [ ] `audio/CREDITS.md` lists every external source and license
-- [ ] Any future replacement keeps a source URL and attribution line
+- [ ] `audio/CREDITS.md`가 모든 외부 소스와 라이선스를 적고 있음
+- [ ] 앞으로 교체되는 파일도 출처 URL과 표기 문구를 유지함

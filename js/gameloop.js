@@ -352,13 +352,13 @@ export function update(){
           if(amt > 1) fxRing(e.x, e.y, C.gold, 34, .25);
         }
         else if(e.type==='heart'){
-          p.hp = Math.min(p.maxHp, p.hp + 25); AUDIO.heal(); fxText(e.x,e.y,'+25 HP', C.red); fxRing(e.x, e.y, C.red, 44, .32);
+          p.hp = Math.min(p.maxHp, p.hp + 25); AUDIO.heal(); fxText(e.x,e.y,'+25 생명', C.red); fxRing(e.x, e.y, C.red, 44, .32);
         }
         else if(e.type==='magnet'){
-          G.superMagnetTimer = 8; AUDIO.pickup(); announce('MAGNET ACTIVE', 1); fxShockwave(e.x, e.y, C.pink, 120, .38);
+          G.superMagnetTimer = 8; AUDIO.pickup(); announce('자력 활성', 1); fxShockwave(e.x, e.y, C.pink, 120, .38);
         }
         else if(e.type==='freeze'){
-          G.freezeTimer = 5; AUDIO.freeze(); announce('TIME FREEZE', 1); fxShockwave(e.x, e.y, C.teal, 140, .45);
+          G.freezeTimer = 5; AUDIO.freeze(); announce('시간 빙결', 1); fxShockwave(e.x, e.y, C.teal, 140, .45);
         }
         else if(e.type==='item'){
           fxRing(e.x, e.y, e.color || C.gold, e.item?.kind === 'relic' ? 92 : 58, .42);
@@ -1254,7 +1254,7 @@ function shrineDirector(){
         const minStr = Math.floor(t/60) + '분';
         // announce already imported elsewhere — use direct DOM if not.
         const el = document.getElementById('announce');
-        if(el){ el.textContent = '◈ CURSED ALTAR 등장 (' + minStr + ') ◈'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), 2500); }
+        if(el){ el.textContent = '◈ 저주 제단 등장 (' + minStr + ') ◈'; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), 2500); }
       } catch(e){}
     }
   }

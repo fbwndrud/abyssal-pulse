@@ -1,4 +1,4 @@
-# Neon Pulse — 앞으로의 방향 고찰
+# 어비스 펄스 — 앞으로의 방향 고찰
 
 > 작성: 2026-04-21
 > 대상: `games/neon-pulse/index.html` (단일 파일, ~2400 lines, Canvas 2D + Web Audio)
@@ -28,56 +28,56 @@
 아래는 상업/인디 시장에서 장르로 통용되는 범주를 *축 단위*로 정리한 것. 하나의 게임은 여러 축의 조합으로 만들어지므로, 뒤의 믹스 시나리오는 이 표에서 축을 "선택"하는 방식으로 구성된다.
 
 ### 1-A. 코어 입력/피지컬 장르
-- **Shoot'em Up / 탄막 (Bullet Hell)** — STG, Touhou, Enter the Gungeon
+- **Shoot'em Up / 탄막 (탄막)** — STG, Touhou, Enter the Gungeon
 - **Twin-Stick / Arena Shooter** — Geometry Wars, Nex Machina
-- **Horde Survivor** — Vampire Survivors, Brotato *(← 현재)*
+- **호드 서바이버** — Vampire Survivors, Brotato *(← 현재)*
 - **Beat'em Up / Hack & Slash** — Streets of Rage, DMC
 - **Platformer / Metroidvania** — Celeste, Hollow Knight
-- **Soulslike** — Dark Souls, Hades (메타 진행 혼합)
+- **소울라이크** — Dark Souls, Hades (메타 진행 혼합)
 - **Fighting** — SF, Tekken
-- **Racing** — 아케이드, 시뮬, 트랙 기반
+- **레이싱** — 아케이드, 시뮬, 트랙 기반
 
 ### 1-B. 구조/진행 장르
-- **Roguelike (전통)** — 턴제, ASCII, 영속사망 — NetHack
-- **Roguelite** — 런 + 메타 — Hades, Dead Cells *(← 현재 포함)*
+- **로그라이크 (전통)** — 턴제, ASCII, 영속사망 — NetHack
+- **로그라이트** — 런 + 메타 — Hades, Dead Cells *(← 현재 포함)*
 - **Metroidvania (영속 월드)** — 게이팅 + 언락
-- **Idle / Incremental / Clicker** — Cookie Clicker, Melvor
+- **방치형 / Incremental / Clicker** — Cookie Clicker, Melvor
 - **Gacha / Collection** — HoYo, 서머너즈워
-- **ARPG / Looter** — Diablo, Path of Exile, Borderlands
-- **Extraction** — Tarkov, Dark and Darker (진입 → 수집 → 탈출)
+- **ARPG / 루터** — Diablo, Path of Exile, Borderlands
+- **익스트랙션** — Tarkov, Dark and Darker (진입 → 수집 → 탈출)
 - **Battle Royale** — Apex, PUBG (세션 소거 + 축소)
 
 ### 1-C. 전략/시뮬 장르
 - **RTS** — StarCraft
-- **Turn-based Strategy / Tactics / 4X** — XCOM, Civ, Into the Breach
-- **Tower Defense** — Kingdom Rush, Bloons
-- **Auto-battler / Autochess** — TFT, Backpack Battles
+- **Turn-based Strategy / 택틱스 / 4X** — XCOM, Civ, Into the Breach
+- **타워 디펜스** — Kingdom Rush, Bloons
+- **오토배틀러 / Autochess** — TFT, Backpack Battles
 - **City / Colony Builder** — Cities: Skylines, RimWorld
-- **Factory / Automation** — Factorio, Satisfactory
+- **공장 / Automation** — Factorio, Satisfactory
 - **Management / Tycoon** — Game Dev Story, Two Point
 - **God game / Life sim / Farming sim** — Black & White, Stardew
 
 ### 1-D. 퍼즐/두뇌 장르
-- **Match-3 / Gem** — Candy Crush, Bejeweled
+- **매치 3 / Gem** — Candy Crush, Bejeweled
 - **Physics puzzle** — Angry Birds, World of Goo
 - **Logic / 추리** — Portal, Baba Is You
 - **Sokoban / 밀기**
 - **Word / Trivia**
 
 ### 1-E. 카드/보드 장르
-- **Deckbuilder (Rogue-like)** — Slay the Spire, Balatro
+- **덱빌더 (Rogue-like)** — Slay the Spire, Balatro
 - **CCG** — Hearthstone, MTG
 - **Board port / 전략 카드**
 
 ### 1-F. 오디오/감각 장르
-- **Rhythm** — beatmania, Osu, Crypt of the NecroDancer
-- **Rhythm-Action hybrid** — BPM, Metal: Hellsinger
+- **리듬** — beatmania, Osu, Crypt of the NecroDancer
+- **리듬-Action hybrid** — BPM, Metal: Hellsinger
 
 ### 1-G. 내러티브/감정 장르
 - **Visual Novel / Dating sim**
 - **Walking sim / Narrative exploration**
 - **Interactive fiction**
-- **Horror / Survival horror / Psychological**
+- **호러 / Survival horror / Psychological**
 
 ### 1-H. 샌드박스/제작 장르
 - **Sandbox / Voxel / Crafting** — Minecraft, Terraria
@@ -90,11 +90,11 @@
 - **Social Deduction** — Among Us
 - **Party game**
 
-> 이 중 현재 Neon Pulse는 **1-A: Horde Survivor + 1-B: Roguelite**의 조합이다. 다음 단계는 이 기반 위에 **적어도 하나의 다른 축**을 직교로 얹는 것.
+> 이 중 현재 어비스 펄스는 **1-A: 호드 서바이버 + 1-B: 로그라이트**의 조합이다. 다음 단계는 이 기반 위에 **적어도 하나의 다른 축**을 직교로 얹는 것.
 
 ---
 
-## 2. Neon Pulse × 장르 믹스 시나리오
+## 2. 어비스 펄스 × 장르 믹스 시나리오
 
 각 시나리오는 다음 형식으로:
 - **컨셉**: 한 줄 정체성
@@ -102,124 +102,124 @@
 - **기존 코드에서 바뀌는 것**: 구체적 수정 포인트
 - **기존 코드에서 유지되는 것**: 재사용 가능한 자산
 
-### 시나리오 S1 — `Circuit Deck` (× Roguelike Deckbuilder / STS)
+### 시나리오 S1 — `회로 덱` (× 로그라이크 덱빌더 / STS)
 - **컨셉**: 무기/패시브 레벨업을 "드래프트된 카드"로 대체. 런 중 카드가 쿨타임마다 자동 시전되고, 플레이어는 덱 시너지를 빌드한다.
 - **핵심 훅**: 매 런마다 전혀 다른 덱, 시너지 빌딩. Balatro/STS 유저 친숙.
 - **바뀌는 것**: 레벨업 창 3-선택 → *카드 10장 중 1장 드래프트 + 폐기/업그레이드*. 덱 풀(40+) 도입. 무기 인스턴스는 카드 태그(냉기/전기/기계/시간 등)로 시너지 계산.
 - **유지되는 것**: 렌더러, 적 AI, 보스, 풀(pool) 이동, 벡터 비주얼 100%. 쿨타임/오토 어택 루프.
 
-### 시나리오 S2 — `Chipset Lab` (× Auto-battler)
+### 시나리오 S2 — `칩셋 연구소` (× 오토배틀러)
 - **컨셉**: 전투는 오토. 사이사이 "칩 그리드(6x6)"에 무기/패시브 칩을 배치하고, 인접 시너지로 스탯이 바뀐다. Backpack Battles 계열.
 - **핵심 훅**: 전투보다 *배치 퍼즐*이 주 재미. 같은 무기도 배치 위치에 따라 전혀 다른 빌드.
 - **바뀌는 것**: 레벨업 → 칩 상점 (리롤/락). 무기 스탯은 인접 칩에서 가산. 전투는 3라운드 체크포인트형.
 - **유지되는 것**: 8 패시브 개념, 적/보스, 벡터 아트.
 
-### 시나리오 S3 — `Grid Defense` (× Tower Defense)
+### 시나리오 S3 — `격자 방어` (× 타워 디펜스)
 - **컨셉**: 정해진 맵 + 경로. 플레이어는 직접 움직이며 적을 견제하고, 동시에 맵에 *네온 타워*를 배치한다 (하이브리드 TD + 액션).
 - **핵심 훅**: Nova Drift × BTD. 어디를 지킬지 + 내가 어디에 있을지 동시에 사고.
 - **바뀌는 것**: 무한 평원 → 웨이브 레인 맵. 경험치 → 크레딧으로 타워 구매. 보스 웨이브 = 마지막 러시.
 - **유지되는 것**: 적 스폰/AI, 무기 투사체 시스템이 그대로 타워 투사체로 재활용.
 
-### 시나리오 S4 — `Mirror Pulse` (× Bullet Hell)
+### 시나리오 S4 — `거울 펄스` (× 탄막)
 - **컨셉**: 플레이어 공격은 약화되지만 적 탄막은 풍부하고 패턴 있음. 히트박스 축소, *회피* 중심.
 - **핵심 훅**: "신의 전당" 스타일 슬로우 모션 클러치 순간.
 - **바뀌는 것**: 플레이어 히트박스 ← 코어만. 보스 패턴 스크립트화 (현재 4 → 8+). 무기는 3종만.
 - **유지되는 것**: 투사체/궤적, 벡터 아트는 오히려 탄막에 잘 맞음.
 
-### 시나리오 S5 — `Neon Delve` (× Metroidvania / 영속 월드)
+### 시나리오 S5 — `네온 잠행` (× Metroidvania / 영속 월드)
 - **컨셉**: 15분 런 → *영속 오픈 월드*. 구역별 게이트(빙결·초고속·자기장)가 특정 무기/패시브로만 해제. 사망은 체크포인트 복귀.
 - **핵심 훅**: "이번 런 끝내는 게" 아니라 "지도가 채워지는 것"이 성취.
 - **바뀌는 것**: 런 구조 완전 재설계. 카메라 스크롤 월드. 구역 경계/세이브 포인트. 지도 UI.
 - **유지되는 것**: 전투 시스템 그대로, 클래스/무기 풀.
 - **경고**: 가장 큰 리라이트.
 
-### 시나리오 S6 — `Hard Pulse` (× Soulslike)
+### 시나리오 S6 — `하드 펄스` (× 소울라이크)
 - **컨셉**: 사망 시 모은 ◆ 코어를 드랍, *그 위치에서 회수*. 보스 중심(보스 6-8종). 정통 보스 러쉬.
 - **핵심 훅**: 런당 긴장감 급상승. 모바일보다 PC/패드 타깃 (실력 중심).
 - **바뀌는 것**: 메타 경제 → 회수 경제로. 보스 AI 고도화 (패턴 3-단계). 추가 보스 4개.
 - **유지되는 것**: 기본 전투 루프, 무기 시스템.
 
-### 시나리오 S7 — `Glyph Hunt` (× ARPG / Looter)
+### 시나리오 S7 — `글리프 사냥` (× ARPG / 루터)
 - **컨셉**: 적이 *장비(Glyph)*를 드랍. 장비는 접사(prefix/suffix) + 레벨. 런 사이 장착 → 다음 런 시작부터 빌드 반영.
 - **핵심 훅**: 디아블로 감성의 "드랍 도파민". 시즌 리셋 가능.
 - **바뀌는 것**: 메타 상점 축소/폐지, 인벤토리·장착 UI 추가. 접사 풀 설계. 레어도 확률 테이블.
 - **유지되는 것**: 무기/패시브 로직 (접사는 그들을 수정하는 modifier).
 
-### 시나리오 S8 — `Extract` (× Extraction Shooter)
+### 시나리오 S8 — `추출` (× 익스트랙션 Shooter)
 - **컨셉**: 맵 진입 → 15분 내 자원(◆ 코어, 파편, 유물) 수집 → 지도 끝 *탈출 지점*으로 이동 → 탈출해야 소지품 보존. 사망시 모든 수집분 로스.
 - **핵심 훅**: "지금 한 탕 더 먹을까, 나갈까"의 긴장. Tarkov의 인디화.
 - **바뀌는 것**: 맵에 경계와 탈출 타일 추가. 인벤토리(제한된 슬롯). 리스크/리워드 밸런싱. 보스가 탈출 방해자.
 - **유지되는 것**: 적 스폰 시스템, 무기.
 
-### 시나리오 S9 — `Turn Grid` (× Tactics / TBS)
+### 시나리오 S9 — `턴 격자` (× 택틱스 / TBS)
 - **컨셉**: 실시간 X. 그리드 위 3~4 유닛(클래스) 턴제 지휘. Into the Breach 스타일 텔레그래프.
 - **핵심 훅**: 적 행동 예고 + 퍼즐적 해결. 대시보드 같은 지능형 게임.
 - **바뀌는 것**: 코어 루프가 90% 교체. 단, *벡터 유닛/네온 아트*가 ItB와 잘 맞음.
 - **유지되는 것**: 비주얼 아이덴티티, 적/클래스 개념.
 - **경고**: 사실상 신규 게임.
 
-### 시나리오 S10 — `Beat Pulse` (× Rhythm)
+### 시나리오 S10 — `Beat 펄스` (× 리듬)
 - **컨셉**: BGM BPM에 맞춰 공격할 때 데미지/크리 증폭. Metal: Hellsinger의 2D판. Crypt of NecroDancer의 액션판.
 - **핵심 훅**: 네온 + 비트. 시각·청각 일치의 쾌감 극대화.
 - **바뀌는 것**: Web Audio 합성 → *BPM 고정 트랙* 필요 (그럼에도 합성 트랙 가능). 공격 타이밍 윈도우 UI. 판정(Perfect/Good/Miss).
 - **유지되는 것**: 전투 구조, 적 스폰.
 
-### 시나리오 S11 — `Gem Matrix` (× Match-3 / Puzzle)
+### 시나리오 S11 — `보석 행렬` (× 매치 3 / Puzzle)
 - **컨셉**: 적이 죽을 때 *컬러 젬*을 드랍. 플레이어 주변 5x5 자동 수집 그리드에서 3개 이상 매칭 → 무기 울트 발동.
 - **핵심 훅**: 이동 경로가 곧 퍼즐 풀이. 캐주얼-친화적.
 - **바뀌는 것**: 매칭 로직, 젬 그리드 UI 오버레이. 울트 시스템.
 - **유지되는 것**: 거의 전부.
 
-### 시나리오 S12 — `Neon Idle` (× Idle / Incremental)
+### 시나리오 S12 — `네온 방치` (× 방치형 / Incremental)
 - **컨셉**: 오프라인 진행. 자동 런이 백그라운드에서 계속 돌고, 플레이어는 빌드·튜닝만. 2-분 짧은 액티브 런과 결합.
 - **핵심 훅**: "열어볼 때마다 보상". 모바일 친화적. 저비용 유지.
 - **바뀌는 것**: 오프라인 시뮬 (수식 기반). 프레스티지 루프. 확장 패시브 트리.
 - **유지되는 것**: 액티브 런은 기존 그대로.
 
-### 시나리오 S13 — `Reactor` (× Factory / Automation)
+### 시나리오 S13 — `반응로` (× 공장 / Automation)
 - **컨셉**: 런 클리어 후 그 맵이 *공장지대*가 된다. 에너지 라인/추출기/컨베이어로 다음 런 스탯을 영속 스케일. Factorio-lite 레이어.
 - **핵심 훅**: 롱테일 몰입. "내 제국"이 커짐.
 - **바뀌는 것**: 맵 저장, 타일 기반 빌더, 자원 흐름 시뮬.
 - **유지되는 것**: 전투.
 - **경고**: 메타 깊이 vs. 구현 비용이 가장 큼.
 
-### 시나리오 S14 — `Pulse Squad` (× Co-op / Party)
+### 시나리오 S14 — `펄스 Squad` (× Co-op / Party)
 - **컨셉**: 2-4인 온라인 협동 런. 클래스 역할 분담 (탱/딜/서포트).
 - **핵심 훅**: "유튜브/트위치에서 같이 하는 모습" — 바이럴성.
 - **바뀌는 것**: 네트워킹 (WebRTC + 권위 클라이언트 or WebSocket 서버). 결정론적 시뮬 or 스테이트 싱크.
 - **유지되는 것**: 클라 렌더/전투.
 - **경고**: 네트워킹은 혼자 개발 리스크 최상위.
 
-### 시나리오 S15 — `Dark Pulse` (× Horror / Immersive)
+### 시나리오 S15 — `Dark 펄스` (× 호러 / Immersive)
 - **컨셉**: 시야 제한(원형 손전등), 사운드 큐 중심, 적은 네온 실루엣만 보임. 공포 분위기.
 - **핵심 훅**: 네온 아트가 역설적으로 가장 어울릴 장르. "밝은 이미지에서 불을 끄는" 반전.
 - **바뀌는 것**: 조명 시스템(raycast or shader-ish 마스킹), 오디오 공간화, 적 스텔스 AI.
 - **유지되는 것**: 전투, 무기.
 
-### 시나리오 S16 — `Pulse Lore` (× Visual Novel)
+### 시나리오 S16 — `펄스 Lore` (× Visual Novel)
 - **컨셉**: 런 사이 터미널 로그, NPC 대화, 선택지로 빌드/이벤트 분기. Hades의 감정선.
 - **핵심 훅**: 반복 플레이 이유 부여 (다음 대사 보려고).
 - **바뀌는 것**: 대화/선택 시스템, 캐릭터 아트(벡터로 가능), 플래그 저장.
 - **유지되는 것**: 전투 전부.
 
-### 시나리오 S17 — `Pulse Arena` (× MOBA / PvP 1v1)
+### 시나리오 S17 — `펄스 Arena` (× MOBA / PvP 1v1)
 - **컨셉**: 1v1 / 2v2 실시간. 서로 다른 클래스, 같은 맵, 같은 제한 시간. *빌드 vs 빌드* 대결.
 - **핵심 훅**: 관전·스트리밍 가치. 스킬 천장 높음.
 - **바뀌는 것**: 저지연 네트 + 매치메이킹. 전투 밸런싱 PvP 기준으로 완전 재조정.
 - **경고**: 혼자 운영 불가능에 가까움.
 
-### 시나리오 S18 — `Arena Editor` (× Sandbox / UGC)
+### 시나리오 S18 — `경기장 편집기` (× Sandbox / UGC)
 - **컨셉**: 플레이어가 맵·웨이브·적 패턴을 JSON/DSL로 제작, 공유 (URL-인코딩된 공유 문자열).
 - **핵심 훅**: 장기 콘텐츠 생산을 커뮤니티에 위임. Mario Maker형 롱테일.
 - **바뀌는 것**: 에디터 UI, 공유/가져오기. 웨이브 DSL.
 - **유지되는 것**: 전투 그대로.
 
-### 시나리오 S19 — `Pulse Drift` (× Racing — 약한 조합)
+### 시나리오 S19 — `펄스 Drift` (× 레이싱 — 약한 조합)
 - **컨셉**: 이동이 드리프트 기반 물리. 트랙을 도는 동안 적을 치고 지나간다. Rocket League × 호드.
 - **핵심 훅**: 이동 자체가 재미.
 - **평가**: 아이디어로는 재밌으나 현 엔진/장르 정체성과 충돌.
 
-### 시나리오 S20 — `Mind Grid` (× Tactics Puzzle, Into-the-Breach-lite)
+### 시나리오 S20 — `사고 격자` (× 택틱스 Puzzle, Into-the-Breach-lite)
 - **컨셉**: 플레이어 한 명, 그리드 8x8, 매 턴 적 행동 예고 표시. "예언된 공격을 회피/반사"가 핵심.
 - **핵심 훅**: 실시간 반응성 대신 두뇌 클러치. 1인 개발 친화적 규모.
 - **바뀌는 것**: 실시간 → 턴제. 스테이지 수십 개 제작.
@@ -241,37 +241,37 @@
 
 | # | 시나리오 | AF | DF | FX | IC↓ | SR↓ | LX | **Score** |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| S1 | Circuit Deck (Deckbuilder) | 5 | 4 | 5 | 2 | 2 | 5 | **15** |
-| S2 | Chipset Lab (Autobattler) | 4 | 4 | 4 | 3 | 2 | 4 | **11** |
-| S3 | Grid Defense (TD 하이브리드) | 4 | 3 | 4 | 3 | 2 | 3 | **9** |
-| S4 | Mirror Pulse (Bullet Hell) | 5 | 2 | 4 | 2 | 1 | 3 | **11** |
-| S5 | Neon Delve (Metroidvania) | 2 | 4 | 4 | 5 | 4 | 5 | **6** |
-| S6 | Hard Pulse (Soulslike) | 4 | 2 | 3 | 3 | 2 | 3 | **7** |
-| S7 | Glyph Hunt (Looter) | 4 | 3 | 4 | 3 | 2 | 5 | **11** |
-| S8 | Extract (Extraction) | 3 | 5 | 4 | 3 | 3 | 4 | **10** |
-| S9 | Turn Grid (Tactics) | 1 | 4 | 4 | 5 | 3 | 4 | **5** |
-| S10 | Beat Pulse (Rhythm) | 3 | 5 | 5 | 3 | 3 | 3 | **10** |
-| S11 | Gem Matrix (Match-3) | 5 | 4 | 3 | 2 | 1 | 3 | **12** |
-| S12 | Neon Idle (Idle) | 5 | 2 | 3 | 2 | 1 | 4 | **11** |
-| S13 | Reactor (Factory) | 2 | 4 | 4 | 5 | 3 | 5 | **7** |
-| S14 | Pulse Squad (Co-op) | 3 | 5 | 5 | 5 | 5 | 4 | **7** |
-| S15 | Dark Pulse (Horror) | 4 | 5 | 4 | 3 | 2 | 3 | **11** |
-| S16 | Pulse Lore (VN) | 5 | 2 | 3 | 2 | 2 | 3 | **9** |
-| S17 | Pulse Arena (MOBA) | 2 | 4 | 4 | 5 | 5 | 3 | **3** |
-| S18 | Arena Editor (UGC) | 4 | 3 | 3 | 3 | 2 | 5 | **10** |
-| S19 | Pulse Drift (Racing) | 2 | 3 | 3 | 4 | 3 | 2 | **3** |
-| S20 | Mind Grid (Tactics Puzzle) | 3 | 4 | 4 | 4 | 2 | 4 | **9** |
+| S1 | 회로 덱 (덱빌더) | 5 | 4 | 5 | 2 | 2 | 5 | **15** |
+| S2 | 칩셋 연구소 (Autobattler) | 4 | 4 | 4 | 3 | 2 | 4 | **11** |
+| S3 | 격자 방어 (TD 하이브리드) | 4 | 3 | 4 | 3 | 2 | 3 | **9** |
+| S4 | 거울 펄스 (탄막) | 5 | 2 | 4 | 2 | 1 | 3 | **11** |
+| S5 | 네온 잠행 (Metroidvania) | 2 | 4 | 4 | 5 | 4 | 5 | **6** |
+| S6 | 하드 펄스 (소울라이크) | 4 | 2 | 3 | 3 | 2 | 3 | **7** |
+| S7 | 글리프 사냥 (루터) | 4 | 3 | 4 | 3 | 2 | 5 | **11** |
+| S8 | 추출 (익스트랙션) | 3 | 5 | 4 | 3 | 3 | 4 | **10** |
+| S9 | 턴 격자 (택틱스) | 1 | 4 | 4 | 5 | 3 | 4 | **5** |
+| S10 | Beat 펄스 (리듬) | 3 | 5 | 5 | 3 | 3 | 3 | **10** |
+| S11 | 보석 행렬 (매치 3) | 5 | 4 | 3 | 2 | 1 | 3 | **12** |
+| S12 | 네온 방치 (방치형) | 5 | 2 | 3 | 2 | 1 | 4 | **11** |
+| S13 | 반응로 (공장) | 2 | 4 | 4 | 5 | 3 | 5 | **7** |
+| S14 | 펄스 Squad (Co-op) | 3 | 5 | 5 | 5 | 5 | 4 | **7** |
+| S15 | Dark 펄스 (호러) | 4 | 5 | 4 | 3 | 2 | 3 | **11** |
+| S16 | 펄스 Lore (VN) | 5 | 2 | 3 | 2 | 2 | 3 | **9** |
+| S17 | 펄스 Arena (MOBA) | 2 | 4 | 4 | 5 | 5 | 3 | **3** |
+| S18 | 경기장 편집기 (UGC) | 4 | 3 | 3 | 3 | 2 | 5 | **10** |
+| S19 | 펄스 Drift (레이싱) | 2 | 3 | 3 | 4 | 3 | 2 | **3** |
+| S20 | 사고 격자 (택틱스 Puzzle) | 3 | 4 | 4 | 4 | 2 | 4 | **9** |
 
 ### 3-1. 그룹별 요약 코멘트
 
-- **무조건 피해야 할 것 (Score ≤ 5)**: S17(MOBA), S19(Racing), S9(Tactics 전환), S5(Metroidvania 전환). 공통: 현 아키텍처를 버리거나, 혼자서 운영 불가능한 네트워킹/밸런싱이 요구됨.
-- **고려할 가치 없음은 아니나 리스크 큼**: S13(Factory), S14(Co-op), S6(Soulslike). 큰 리라이트 또는 네트워킹 필요.
-- **"적은 비용 · 큰 가치" 영역**: **S1(Deckbuilder), S11(Gem Matrix), S15(Dark Pulse), S12(Idle), S7(Looter), S4(Bullet Hell 전환)**. 모두 현 코드 재활용률이 높고 새 훅을 준다.
-- **가장 바이럴 잠재력 (DF=5)**: S8 Extract, S10 Beat Pulse, S14 Co-op, S15 Dark Pulse — 단, 비용/리스크는 모두 다름.
+- **무조건 피해야 할 것 (Score ≤ 5)**: S17(MOBA), S19(레이싱), S9(택틱스 전환), S5(Metroidvania 전환). 공통: 현 아키텍처를 버리거나, 혼자서 운영 불가능한 네트워킹/밸런싱이 요구됨.
+- **고려할 가치 없음은 아니나 리스크 큼**: S13(공장), S14(Co-op), S6(소울라이크). 큰 리라이트 또는 네트워킹 필요.
+- **"적은 비용 · 큰 가치" 영역**: **S1(덱빌더), S11(보석 행렬), S15(Dark 펄스), S12(방치형), S7(루터), S4(탄막 전환)**. 모두 현 코드 재활용률이 높고 새 훅을 준다.
+- **가장 바이럴 잠재력 (DF=5)**: S8 추출, S10 Beat 펄스, S14 Co-op, S15 Dark 펄스 — 단, 비용/리스크는 모두 다름.
 
 ### 3-2. 상위 3개 추천 & 근거
 
-#### 🥇 추천 1 — S1 `Circuit Deck` (Deckbuilder 믹스)
+#### 🥇 추천 1 — S1 `회로 덱` (덱빌더 믹스)
 - **왜**: 최고 점수(15). 현재 레벨업 선택 UI를 *카드 드래프트*로 치환하는 것이 최소 변경. STS/Balatro 플레이어에게 바로 꽂힘.
 - **초기 2주 스프린트 스코프**:
   1. 카드 데이터 스키마 (`{id, name, tags[], trigger, effect, rarity}`)
@@ -281,7 +281,7 @@
 - **리스크**: 밸런싱 필요량이 기존보다 2~3배.
 - **평가**: *가장 안전하면서 가장 정체성 강한 다음 걸음.*
 
-#### 🥈 추천 2 — S15 `Dark Pulse` (Horror 톤 전환 모드)
+#### 🥈 추천 2 — S15 `Dark 펄스` (호러 톤 전환 모드)
 - **왜**: 네온 아트가 "불을 끄는 순간" 가장 강력해진다는 역설을 이용. 차별성 극대화. 시야 제한 + 사운드 큐는 혼자 개발하기에 비용이 중간.
 - **초기 스프린트 스코프**:
   1. 플레이어 중심 원형 마스크 (canvas composite)
@@ -291,7 +291,7 @@
 - **리스크**: 호러 감성이 잘 뽑히려면 오디오 품질이 중요 — Web Audio 한계.
 - **평가**: *메인 모드 위에 얹는 "모드"로 시작하면 리스크 관리 가능.*
 
-#### 🥉 추천 3 — S8 `Extract` (Extraction 모드)
+#### 🥉 추천 3 — S8 `추출` (익스트랙션 모드)
 - **왜**: 장르 트렌드(Tarkov-like)가 뜨거움. 15분 타이머가 이미 익스트랙션에 맞음. 현 맵에 *탈출 타일* 하나 추가하고 인벤토리 제한만 도입해도 거의 절반이 완성.
 - **초기 스프린트 스코프**:
   1. 인벤토리 슬롯(6칸) + 루팅 가능한 아이템 풀
@@ -303,7 +303,7 @@
 
 ### 3-3. 조합 추천 (차후)
 
-추천 1(`Circuit Deck`)을 **메인 진행 체계**로 삼고, 추천 2(`Dark Pulse`)와 추천 3(`Extract`)을 **모드 선택지**로 얹는 구조가 장기적으로 가장 강력하다. 베이스 루프가 "카드로 빌딩"이 되면, 그 위에 어떤 모드 랩을 씌우든 내용이 쌓인다.
+추천 1(`회로 덱`)을 **메인 진행 체계**로 삼고, 추천 2(`Dark 펄스`)와 추천 3(`추출`)을 **모드 선택지**로 얹는 구조가 장기적으로 가장 강력하다. 베이스 루프가 "카드로 빌딩"이 되면, 그 위에 어떤 모드 랩을 씌우든 내용이 쌓인다.
 
 ---
 
@@ -327,6 +327,6 @@
 
 ---
 
-## 6. 다음 행동 (Suggested Next Step)
+## 6. 다음 행동 (다음 제안 작업)
 
-이 문서를 바탕으로 **추천 1 `Circuit Deck`의 1주 프로토타입 스코프**를 분리된 설계서로 작성하는 것이 자연스러운 다음 작업이다. 요청 시 `DIRECTION_S1_CIRCUIT_DECK.md`로 별도 작성 가능.
+이 문서를 바탕으로 **추천 1 `회로 덱`의 1주 프로토타입 스코프**를 분리된 설계서로 작성하는 것이 자연스러운 다음 작업이다. 요청 시 `DIRECTION_S1_CIRCUIT_DECK.md`로 별도 작성 가능.

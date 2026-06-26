@@ -156,7 +156,7 @@ export const G = {
   superMagnetTimer: 0,
   freezeTimer: 0,
   qualityScale: 1,
-  qualityLabel: 'HIGH',
+  qualityLabel: '높음',
   biomeKey: null,
 };
 

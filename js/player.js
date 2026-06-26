@@ -176,7 +176,7 @@ export function addPassive(p, key, mult){
     fxBurst(p.x, p.y, def.color, 30, 240, 3.5, .7);
     fxRing(p.x, p.y, def.color, 110, .6);
     AUDIO.level();
-    announce('▲ ' + def.name + ' MAX — 룬 각성 해금', 2.0);
+    announce('▲ ' + def.name + ' 최대 — 룬 각성 해금', 2.0);
   }
   if(!meta.seenCodex.passives.includes(key)){ meta.seenCodex.passives.push(key); saveMeta(); }
   return true;
@@ -210,7 +210,7 @@ export function damagePlayer(amount){
       fxBurst(p.x, p.y, C.gold, 60, 360, 5, 1.0);
       fxRing(p.x, p.y, C.gold, 220, .9);
       shake(.6); flash(C.gold, .6);
-      announce('★ PHOENIX REVIVE', 2.4);
+      announce('★ 불사조 부활', 2.4);
       return;
     }
     p.hp = 0;
@@ -385,18 +385,26 @@ export function dropItem(x, y, luck, tierBias, kindFilter){
   const it = pickRandomItem(luck, tierBias, kindFilter);
   if(!it) return null;
   const tier = ITEM_TIERS[it.tier];
+  const isConsumable = it.kind === 'consumable';
+  if(isConsumable){
+    fxLine(x, y - 132, x, y + 18, tier.color, it.tier === 'common' ? 1.15 : 1.55, it.tier === 'common' ? 3 : 5);
+    fxRing(x, y, tier.color, it.tier === 'common' ? 48 : 62, .48);
+  }
   if(it.tier === 'rare' || it.tier === 'epic' || it.tier === 'legendary'){
     fxLine(x, y - 170, x, y + 14, tier.color, it.tier === 'legendary' ? 2.4 : 1.8, it.tier === 'legendary' ? 8 : 5);
     fxRing(x, y, tier.color, it.tier === 'legendary' ? 92 : 66, .65);
-    fxText(x, y - 38, it.tier.toUpperCase(), tier.color, it.tier === 'legendary');
+    const tierLabel = { common:'일반', rare:'희귀', epic:'영웅', legendary:'전설' }[it.tier] || it.tier;
+    fxText(x, y - 38, tierLabel, tier.color, it.tier === 'legendary');
   }
   if(it.tier === 'legendary'){
     shake(.3); flash(tier.color, .22);
-    announce('LEGENDARY RELIC · ' + it.name, 2.0);
+    announce('전설 유물 · ' + it.name, 2.0);
   } else if(it.tier === 'epic'){
-    announce('EPIC LOOT · ' + it.name, 1.4);
+    announce('영웅 전리품 · ' + it.name, 1.4);
   }
-  return makeEnt({type:'item', x, y, vx:rand(-60,60), vy:rand(-60,60), r:11, color:tier.color, glow:tier.glow, item:it, life:30, maxLife:30});
+  const radius = isConsumable ? 14 : 12;
+  const life = isConsumable ? 46 : 60;
+  return makeEnt({type:'item', x, y, vx:rand(-48,48), vy:rand(-48,48), r:radius, color:tier.color, glow:tier.glow, item:it, life, maxLife:life});
 }
 export function applyGlyph(p, glyphId){
   const g = GLYPHS[glyphId]; if(!g) return;
@@ -439,9 +447,8 @@ setOnKillHook(function onKill(e){
   }
   const pLuck = G.player ? G.player.luck : 0;
   // Drop rate caps — luck never breaks the game economy.
-  // Item drops halved (mob: .0015→.00075, cap .008→.004; elite: .03→.015, cap .08→.04)
-  // — items felt too common, drowning out other pickup feedback.
-  const HEART_CAP = .015, ITEM_MOB_CAP = .004, ITEM_ELITE_CAP = .04;
+  // Consumables should feel like loot spikes, not XP replacements.
+  const HEART_CAP = .015, ITEM_MOB_CAP = .002, ITEM_ELITE_CAP = .018;
   if(e.isBoss){
     // Boss reward = chest (relic) + immediate glyph pick. Two-stage: glyph picks
     // open right away (modal pause), chest is left in the world to pick up after
@@ -451,9 +458,9 @@ setOnKillHook(function onKill(e){
     spawnChest(e.x, e.y);
     if(_openGlyphPick) _openGlyphPick();
   } else if(e.eliteAffix){
-    announce('ELITE SLAIN · ' + (e.eliteName || e.kind), 1.4);
-    if(Math.random() < Math.min(.55, .25 + pLuck*.18)){
-      const kind = Math.random() < .25 ? 'relic' : 'consumable';
+    announce('정예 처치 · ' + (e.eliteName || e.kind), 1.4);
+    if(Math.random() < Math.min(.42, .18 + pLuck*.10)){
+      const kind = Math.random() < .35 ? 'relic' : 'consumable';
       dropItem(e.x, e.y, pLuck + .35, ['rare','epic','legendary'], kind);
     }
   } else if(Math.random() < Math.min(HEART_CAP, .003 + pLuck*.01)){
@@ -462,14 +469,13 @@ setOnKillHook(function onKill(e){
     spawnMagnet(e.x, e.y);
   } else if(Math.random() < .0008){
     spawnFreeze(e.x, e.y);
-  } else if(Math.random() < Math.min(ITEM_MOB_CAP, .00075 + pLuck*.0015)){
+  } else if(Math.random() < Math.min(ITEM_MOB_CAP, .00035 + pLuck*.0008)){
     // Regular mobs: small chance of a consumable item. Relics never drop here.
     dropItem(e.x, e.y, pLuck, ['common','rare','epic'], 'consumable');
   }
-  // Elite (HEX/OCT) drop chance — bumped slightly back to 3% since passives no
-  // longer give stat boosts; consumable items now carry the stat scaling load.
+  // HEX/OCT are tougher than fodder, but their consumables should not flood the floor.
   if(!e.isBoss && (e.kind === 'HEX' || e.kind === 'OCT')){
-    if(Math.random() < Math.min(ITEM_ELITE_CAP, .015 + pLuck*.0125)){
+    if(Math.random() < Math.min(ITEM_ELITE_CAP, .006 + pLuck*.006)){
       dropItem(e.x, e.y, pLuck, ['common','rare','epic'], 'consumable');
     }
   }

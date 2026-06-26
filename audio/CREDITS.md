@@ -1,22 +1,22 @@
-# Abyssal Pulse — Audio Credits
+# 어비스 펄스 — 오디오 크레딧
 
-This audio pass replaces the previous cyberpunk/sci-fi sources with licensed dark fantasy music and fantasy RPG sound effects. Files were re-encoded to Ogg Vorbis for browser delivery and loudness-managed with `ffmpeg`.
+이번 오디오 패스는 기존 사이버펑크/공상과학 계열 소스를 라이선스가 확인된 다크 판타지 음악과 판타지 RPG 효과음으로 교체했습니다. 브라우저 전달을 위해 파일은 Ogg Vorbis로 다시 인코딩했고, `ffmpeg`로 음량을 정리했습니다.
 
-## Music
+## 음악
 
-| Game file | Source | Artist | License | Processing |
+| 게임 파일 | 출처 | 아티스트 | 라이선스 | 처리 |
 |---|---|---|---|---|
-| `menu.ogg` | OpenGameArt — [Dark Dungeon Ambience](https://opengameart.org/content/dark-dungeon-ambience) | Machine | CC-BY 3.0 | Re-encoded from `dark_dungeon_ambience_0.mp3` |
-| `main_low.ogg` | OpenGameArt — [Dark Quest](https://opengameart.org/content/dark-quest) | Alexandr Zhelanov | CC-BY 4.0 | Re-encoded from `Dark Quest.ogg` |
-| `main_high.ogg` | OpenGameArt — [A Darkness Opus](https://opengameart.org/content/a-darkness-opus) | Alexandr Zhelanov | OGA-BY 3.0 | 180-second gameplay excerpt, re-encoded |
-| `ai_fight.ogg` | OpenGameArt — [A Darkness Opus](https://opengameart.org/content/a-darkness-opus) | Alexandr Zhelanov | OGA-BY 3.0 | Alternate 180-second excerpt, re-encoded |
-| `boss.ogg` | OpenGameArt — [Dark souls type boss theme](https://opengameart.org/content/dark-souls-type-boss-theme) | ProjectHelmet / Philémon Weber (Helmet) | CC-BY 4.0 | Re-encoded from MP3 |
+| `menu.ogg` | OpenGameArt — [Dark Dungeon Ambience](https://opengameart.org/content/dark-dungeon-ambience) | Machine | CC-BY 3.0 | `dark_dungeon_ambience_0.mp3`에서 재인코딩 |
+| `main_low.ogg` | OpenGameArt — [Dark Quest](https://opengameart.org/content/dark-quest) | Alexandr Zhelanov | CC-BY 4.0 | `Dark Quest.ogg`에서 재인코딩 |
+| `main_high.ogg` | OpenGameArt — [A Darkness Opus](https://opengameart.org/content/a-darkness-opus) | Alexandr Zhelanov | OGA-BY 3.0 | 180초 게임플레이 구간 추출 후 재인코딩 |
+| `ai_fight.ogg` | OpenGameArt — [A Darkness Opus](https://opengameart.org/content/a-darkness-opus) | Alexandr Zhelanov | OGA-BY 3.0 | 다른 180초 구간 추출 후 재인코딩 |
+| `boss.ogg` | OpenGameArt — [Dark souls type boss theme](https://opengameart.org/content/dark-souls-type-boss-theme) | ProjectHelmet / Philémon Weber (Helmet) | CC-BY 4.0 | MP3에서 재인코딩 |
 
-## Sound Effects
+## 효과음
 
-All bundled SFX below come from OpenGameArt — [JC Sounds - Fantasy SFX Pack Vol 1](https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1), by JC Sounds, licensed CC-BY 4.0. Attribution notice from the source page: `CC BY 4.0 - Credit: JC Sounds`.
+아래 효과음은 모두 OpenGameArt — [JC Sounds - Fantasy SFX Pack Vol 1](https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1)에서 가져왔습니다. 제작자는 JC Sounds이며 라이선스는 CC-BY 4.0입니다. 원 출처의 표기 문구는 `CC BY 4.0 - Credit: JC Sounds`입니다.
 
-| Game file | Source file |
+| 게임 파일 | 원본 파일 |
 |---|---|
 | `sfx_explosion.ogg` | `Single_Fantasy SFX Pack Vol 1_Fireball Impact_03.wav` |
 | `sfx_shield.ogg` | `Single_Fantasy SFX Pack Vol 1_Magic Shield_Activation_02.wav` |
@@ -32,6 +32,6 @@ All bundled SFX below come from OpenGameArt — [JC Sounds - Fantasy SFX Pack Vo
 | `sfx_laser.ogg` | `Single_Fantasy SFX Pack Vol 1_Electric Spell_Hit_03.wav` |
 | `sfx_blip.ogg` | `Single_Fantasy SFX Pack Vol 1_Dagger_Hit_Metal_01.wav` |
 
-## Runtime Fallbacks
+## 런타임 폴백
 
-`js/audio.js` still contains small Web Audio fallback generators for rare missing-file cases and transition accents, but normal gameplay now uses the external music/SFX files listed above.
+`js/audio.js`에는 파일 누락 같은 예외 상황과 전환 강조음에 쓰는 작은 Web Audio 폴백 생성기가 남아 있습니다. 일반 플레이에서는 위에 적은 외부 음악/효과음 파일을 사용합니다.

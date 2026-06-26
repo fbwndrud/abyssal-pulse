@@ -1,4 +1,4 @@
-# Neon Pulse Diablo-Like Redesign Plan
+# 어비스 펄스 디아블로식 리디자인 계획
 
 > 목표: 기존 호드 서바이버/로그라이트 뼈대는 유지하면서, 체감은 다크 고딕 루터 ARPG처럼 바꾼다.
 > 기준 코드: `index.html`, `js/core.js`, `js/data.js`, `js/player.js`, `js/entities.js`, `js/gameloop.js`, `js/render.js`, `js/ui.js`
@@ -7,7 +7,7 @@
 
 ## 1. 한 줄 컨셉
 
-**Neon Pulse: Abyssal Rift**
+**어비스 펄스: 심연 균열**
 
 플레이어는 네온 벡터가 아니라, 심연 균열에 들어간 추방자다. 15분 동안 몰려오는 악마 군단을 버티며 장비, 룬, 저주받은 제단, 보스 글리프를 모으고, 런이 끝나면 금고와 룬 장착으로 다음 원정을 강화한다.
 
@@ -21,7 +21,7 @@
 ### 2026-06-23 아트 적용 상태
 
 - `RIFT WARDEN`, `HOLLOW IMP`, `GRAVE BRUTE`, `ASHEN BUTCHER`를 생성형 투명 PNG 스프라이트로 교체
-- `Bone Shards`, `Hellfire Cross`, `Spectral Blades` 투사체 PNG 적용
+- `뼈 파편`, `지옥불 십자`, `망령 칼날` 투사체 PNG 적용
 - PixiJS 렌더러는 PNG 에셋 우선, 기존 도형 텍스처 폴백 구조 유지
 - `RUINED NAVE`, `BONE CRYPT`, `HELLFORGE RIFT` 전투 맵을 절차적 석재/납골/지옥 균열 바닥으로 교체
 - 레벨업 선택창을 `ALTAR OF BOONS` 제단 카드 UI로 리디자인하고, 클래스/상점/룬 소켓 오버레이 프레임 통일
@@ -34,7 +34,7 @@
 현재 구조에서 유지할 것:
 
 - `15:00` 런 생존 구조
-- WASD 이동 + 자동 공격
+- 방향키 또는 W/A/S/D 이동 + 자동 공격
 - 레벨업 3장 카드 선택
 - 무기 레벨업, 패시브, 진화, 융합
 - 보스 처치 후 글리프 선택
@@ -80,15 +80,15 @@
 
 ### 무대
 
-세계는 `The Signal Cathedral`이라는 붕괴한 네온 성역이다. 신성한 회로와 지옥의 균열이 섞여 있어, 기존 네온 정체성을 완전히 버리지 않고 다크 판타지로 연결한다.
+세계는 `신호 대성당`이라는 붕괴한 네온 성역이다. 신성한 회로와 지옥의 균열이 섞여 있어, 기존 네온 정체성을 완전히 버리지 않고 다크 판타지로 연결한다.
 
 3개 구역을 런 시간에 따라 전환한다.
 
 | 시간 | 구역 | 체감 |
 |---|---|---|
-| 00:00-05:00 | Ruined Nave | 무너진 성당, 촛불, 스테인드글라스 파편 |
-| 05:00-10:00 | Bone Crypt | 뼈 지하묘지, 푸른 영혼불, 좁아지는 압박 |
-| 10:00-15:00 | Hellforge Rift | 용암 균열, 쇳가루, 붉은 재, 보스 압박 |
+| 00:00-05:00 | 무너진 성당 | 무너진 성당, 촛불, 스테인드글라스 파편 |
+| 05:00-10:00 | 뼈 지하묘지 | 뼈 지하묘지, 푸른 영혼불, 좁아지는 압박 |
+| 10:00-15:00 | 지옥대장간 균열 | 용암 균열, 쇳가루, 붉은 재, 보스 압박 |
 
 ### 클래스 리네임
 
@@ -96,11 +96,11 @@
 
 | 기존 | 새 이름 | 역할 |
 |---|---|---|
-| `CIRCLE` | Rift Warden | 균형형 성기사. 신성 폭발 시작 |
-| `TRIANGLE` | Blood Seer | 빠른 사도. 회전 광선 시작 |
-| `HEXAGON` | Grave Bulwark | 탱커. 수호 룬 시작 |
-| `SQUARE` | Iron Exile | 중장 전사. 전방 충격파 시작 |
-| `STAR` | Hex Witch | 사술사. 번개 저주 시작 |
+| `CIRCLE` | 균열 수호자 | 균형형 성기사. 신성 폭발 시작 |
+| `TRIANGLE` | 피의 예언자 | 빠른 사도. 회전 광선 시작 |
+| `HEXAGON` | 묘지 방벽 | 탱커. 수호 룬 시작 |
+| `SQUARE` | 철갑 추방자 | 중장 전사. 전방 충격파 시작 |
+| `STAR` | 저주 마녀 | 사술사. 번개 저주 시작 |
 
 ---
 
@@ -112,33 +112,33 @@
 
 | 기존 무기 | 새 이름 | 판타지 |
 |---|---|---|
-| `PULSE` | Sanctified Nova | 주변을 정화하는 신성 파동 |
-| `BEAM` | Seraph Lance | 몸 주위를 도는 천상 광선 |
-| `ORBIT` | Runic Aegis | 궤도 수호 룬 |
-| `HOMING` | Bone Shards | 적을 추적하는 뼈 파편 |
-| `CROSS` | Hellfire Cross | 사방으로 갈라지는 지옥불 |
-| `SHOCK` | Grave Cleave | 전방을 베는 묘지의 충격파 |
-| `CHAIN` | Hex Lightning | 적을 잇는 저주 번개 |
-| `BLADE` | Spectral Blades | 관통하는 망령 칼날 |
-| `BLACKHOLE` | Abyss Well | 적을 빨아들이는 심연 구멍 |
-| `PRISM` | Soul Prism | 영혼 결정 파편 |
+| `PULSE` | 신성 노바 | 주변을 정화하는 신성 파동 |
+| `BEAM` | 세라프의 창 | 몸 주위를 도는 천상 광선 |
+| `ORBIT` | 룬 방벽 | 궤도 수호 룬 |
+| `HOMING` | 뼈 파편 | 적을 추적하는 뼈 파편 |
+| `CROSS` | 지옥불 십자 | 사방으로 갈라지는 지옥불 |
+| `SHOCK` | 묘지 가르기 | 전방을 베는 묘지의 충격파 |
+| `CHAIN` | 사슬 번개 | 적을 잇는 저주 번개 |
+| `BLADE` | 망령 칼날 | 관통하는 망령 칼날 |
+| `BLACKHOLE` | 심연 우물 | 적을 빨아들이는 심연 구멍 |
+| `PRISM` | 영혼 프리즘 | 영혼 결정 파편 |
 
 ### 패시브 리네임
 
 | 기존 | 새 이름 |
 |---|---|
-| `POWER` | Wrath |
-| `HASTE` | Fleet |
-| `CADENCE` | Zeal |
-| `REACH` | Dominion |
-| `ARMOR` | Iron Skin |
-| `SOUL` | Vitality |
-| `MAGNET` | Greed |
-| `LUCK` | Fortune |
+| `POWER` | 분노 |
+| `HASTE` | 기민 |
+| `CADENCE` | 열의 |
+| `REACH` | 지배 |
+| `ARMOR` | 철피 |
+| `SOUL` | 활력 |
+| `MAGNET` | 탐욕 |
+| `LUCK` | 운명 |
 
 ### 진화/융합
 
-기존 자동 진화와 융합은 이 게임의 강점이다. 이를 `Skill Rune`과 `Legendary Awakening`으로 표현한다.
+기존 자동 진화와 융합은 이 게임의 강점이다. 이를 `스킬 룬`과 `전설 각성`으로 표현한다.
 
 - 무기 만렙 + 패시브 만렙: 스킬 룬 각성
 - 진화 무기 2개 만렙: 전설 각성
@@ -154,10 +154,10 @@
 
 | 등급 | 색 | 역할 |
 |---|---|---|
-| Common | bone white | 소소한 생존/회복 |
-| Rare | soul blue | 빌드 방향을 살짝 바꿈 |
-| Epic | violet | 특정 무기/상태와 강한 시너지 |
-| Legendary | infernal gold | 플레이 스타일을 바꾸는 효과 |
+| 일반 | 뼈빛 흰색 | 소소한 생존/회복 |
+| 희귀 | 영혼빛 파랑 | 빌드 방향을 살짝 바꿈 |
+| 영웅 | 보랏빛 | 특정 무기/상태와 강한 시너지 |
+| 전설 | 지옥불 금빛 | 플레이 스타일을 바꾸는 효과 |
 
 ### 접사 방식
 
@@ -165,10 +165,10 @@
 
 예시:
 
-- `Vampiric Bone Charm`: 처치 회복 + 특정 확률로 피폭발
-- `Molten Prism Lens`: 범위 증가 + 적 사망 시 작은 화염 장판
-- `Zealous Iron Plate`: 방어 증가 + 쿨감 소폭 증가
-- `Greedy Grave Coil`: 픽업 범위 증가 + 코어 획득 증가
+- `흡혈 뼈 부적`: 처치 회복 + 특정 확률로 피폭발
+- `용융 프리즘 렌즈`: 범위 증가 + 적 사망 시 작은 화염 장판
+- `열의의 철판`: 방어 증가 + 쿨감 소폭 증가
+- `탐욕스러운 묘지 고리`: 픽업 범위 증가 + 코어 획득 증가
 
 구현 방식:
 
@@ -183,8 +183,8 @@
 
 MVP에서 추가할 연출:
 
-- Rare 이상 아이템은 수직 빛기둥
-- Legendary는 화면 흔들림 + 짧은 사운드 + 텍스트 배너
+- 희귀 이상 아이템은 수직 빛기둥
+- 전설은 화면 흔들림 + 짧은 사운드 + 텍스트 배너
 - 보스 체스트는 즉시 열리는 카드 선택 대신, 바닥에 떨어진 보물상자 느낌을 강화
 
 ---
@@ -227,7 +227,7 @@ MVP에서 추가할 연출:
 
 - 보스 처치 즉시 `GLYPH` 선택
 - 바닥에 `Relic Chest` 드랍
-- 10분 이후 보스는 `Epic` 이상 보정
+- 10분 이후 보스는 `영웅` 이상 보정
 
 ---
 
@@ -245,7 +245,7 @@ MVP에서 추가할 연출:
 --infernal-gold: #d6a84f;
 --bone: #d8c7a1;
 --soul-blue: #49c7ff;
---void-violet: #7f4dd8;
+--void-보랏빛: #7f4dd8;
 --poison: #8bdc53;
 --iron: #4b4a46;
 ```
@@ -262,10 +262,10 @@ MVP에서 추가할 연출:
 
 레벨업 카드는 기존 모달 구조를 유지하되, 카드 프레임만 다음처럼 변경한다.
 
-- Common: 뼈/양피지 프레임
-- Rare: 푸른 영혼불 프레임
-- Epic: 보라 균열 프레임
-- Legendary: 금속 + 용암 균열 프레임
+- 일반: 뼈/양피지 프레임
+- 희귀: 푸른 영혼불 프레임
+- 영웅: 보라 균열 프레임
+- 전설: 금속 + 용암 균열 프레임
 
 ---
 
@@ -329,13 +329,13 @@ MVP에서 추가할 연출:
 ```text
 Use case: stylized-concept
 Asset type: game key art for main menu and visual direction
-Primary request: dark gothic looter ARPG key art for "Neon Pulse: Abyssal Rift"
+주요 요청: dark gothic looter ARPG key art for "어비스 펄스: 심연 균열"
 Scene/backdrop: ruined cathedral fused with glowing arcane circuitry, cracked stone floor, infernal rift opening in the nave, drifting ash and ember particles
 Subject: a lone armored exile seen from behind, holding a radiant rune weapon, surrounded by faint geometric neon sigils
 Style/medium: polished stylized game concept art, high-detail painterly illustration, not photoreal
 Composition/framing: wide 16:9 composition, central character small against massive cathedral architecture, space in upper center for title UI
 Lighting/mood: ominous, crimson hellfire from below, cold blue soul light from stained glass, high contrast
-Color palette: blood red, ember orange, antique gold, bone white, soul blue, void violet
+Color palette: blood red, ember orange, antique gold, 뼈빛 흰색, 영혼빛 파랑, void 보랏빛
 Constraints: no logos, no existing franchise characters, no readable text, no watermark
 Avoid: cartoon style, cute characters, sci-fi spaceship, modern city, direct imitation of any existing game artwork
 ```
@@ -345,7 +345,7 @@ Avoid: cartoon style, cute characters, sci-fi spaceship, modern city, direct imi
 ```text
 Use case: stylized-concept
 Asset type: seamless-ish game background texture for a 2D top-down action roguelite
-Primary request: <zone name>
+주요 요청: <zone name>
 Scene/backdrop: <zone-specific environment>
 Subject: no characters, no UI, only environment texture and atmospheric details
 Style/medium: stylized dark gothic fantasy game art, painterly but readable under gameplay
@@ -359,13 +359,13 @@ Avoid: photorealism, busy tiny details, bright full-screen gradients
 
 ## 11. 구현 로드맵
 
-### Phase 0: 기획 고정 + P0 키아트
+### 단계 0: 기획 고정 + P0 키아트
 
 - 이 문서 확정
 - `assets/concept/abyssal-rift-keyart.png` 생성
 - 메뉴 첫 화면의 분위기 기준 확정
 
-### Phase 1: 이름/텍스트/팔레트 리스킨
+### 단계 1: 이름/텍스트/팔레트 리스킨
 
 목표: 게임 로직은 건드리지 않고 체감만 전환한다.
 
@@ -382,7 +382,7 @@ Avoid: photorealism, busy tiny details, bright full-screen gradients
 - 메뉴, 클래스 선택, 레벨업 카드, 보스 배너, 종료 화면이 정상 표시
 - 기존 세이브가 깨지지 않음
 
-### Phase 2: 다크 던전 배경
+### 단계 2: 다크 던전 배경
 
 목표: 런 시간에 따라 배경이 3구역으로 바뀐다.
 
@@ -397,7 +397,7 @@ Avoid: photorealism, busy tiny details, bright full-screen gradients
 - 0분, 5분, 10분에 배경 톤이 자연스럽게 전환
 - FPS 저하가 없거나 미미함
 
-### Phase 3: 엘리트 접사
+### 단계 3: 엘리트 접사
 
 목표: 잡몹 무리 안에서 디아블로식 “위험한 이름 붙은 몬스터”가 등장한다.
 
@@ -414,7 +414,7 @@ Avoid: photorealism, busy tiny details, bright full-screen gradients
 - 접사별 onDeath/onTick이 작동
 - 엘리트가 일반몹보다 보상이 좋음
 
-### Phase 4: Loot 2.0
+### 단계 4: Loot 2.0
 
 목표: 드랍 보상이 더 자주 기억에 남게 한다.
 
@@ -427,10 +427,10 @@ Avoid: photorealism, busy tiny details, bright full-screen gradients
 
 검증:
 
-- Rare/Epic/Legendary 드랍 연출 차이가 명확함
+- 희귀/영웅/전설 드랍 연출 차이가 명확함
 - 접사 효과가 중복 적용되어도 밸런스가 무너지지 않음
 
-### Phase 5: 보스/제단 연출 강화
+### 단계 5: 보스/제단 연출 강화
 
 목표: 보스와 제단이 던전 이벤트처럼 느껴지게 만든다.
 
@@ -456,7 +456,7 @@ Avoid: photorealism, busy tiny details, bright full-screen gradients
 2. 팔레트 변경
 3. P0 키아트 생성 후 메뉴 배경 적용
 4. 엘리트 접사 3종: Molten, Frostbound, Void-Touched
-5. Legendary 드랍 빛기둥과 배너
+5. 전설 드랍 빛기둥과 배너
 
 이 MVP는 기존 로직을 거의 유지하므로 리스크가 낮고, 플레이어가 보는 첫 인상과 전투 보상 감각은 크게 바뀐다.
 
@@ -468,7 +468,7 @@ Avoid: photorealism, busy tiny details, bright full-screen gradients
 
 - 엘리트는 일반몹보다 HP 2.5-4배
 - 엘리트 드랍은 일반몹보다 10-20배
-- Legendary는 너무 자주 나오지 않게 15분 런 기준 평균 1-2개
+- 전설은 너무 자주 나오지 않게 15분 런 기준 평균 1-2개
 - 보스 글리프는 강하지만 런 한정
 - 영구 룬은 편의와 초반 안정성 중심으로 제한
 
